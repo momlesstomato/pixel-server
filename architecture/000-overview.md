@@ -143,3 +143,4 @@ See [001-go-workspace.md](001-go-workspace.md) for `go.work` and per-module deta
 | [007-messaging.md](007-messaging.md) | NATS JetStream subjects, event contracts |
 | [008-patterns.md](008-patterns.md) | Hexagonal architecture, DDD boundaries, TDD scope |
 | [009-packet-roadmap.md](009-packet-roadmap.md) | Phase-by-phase 922-packet implementation order |
+| [011-plugin-system.md](011-plugin-system.md) | ECS-aligned plugin lifecycle, events, interceptors |

@@ -1,0 +1,28 @@
+go 1.25.5
+
+use (
+	./pkg/core/codec
+	./pkg/core/config
+	./pkg/core/logging
+	./pkg/core/bus
+	./pkg/core/testutil
+	./pkg/protocol
+	./pkg/pathfinding
+	./pkg/plugin
+	./pkg/user
+	./pkg/room
+	./pkg/item
+	./pkg/social
+	./pkg/navigator
+	./pkg/moderation
+	./pkg/catalog
+	./services/gateway
+	./services/auth
+	./services/game
+	./services/social
+	./services/navigator
+	./services/catalog
+	./services/moderation
+	./tools/protogen
+	./tools/packageguard
+)

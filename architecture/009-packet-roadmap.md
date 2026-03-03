@@ -126,6 +126,27 @@ Key packets:
 
 Implementation note: Profile data comes from PostgreSQL via `UserRepository`. After `session.authenticated` is received by the game service, it prepares a `user.authenticated` composite and publishes it to `session.output.<sessionID>`.
 
+### Permissions parity plan (Phase 2 entry requirement)
+
+Before Phase 2 is marked complete, permission behavior must be aligned to vendor baselines:
+
+- **Comet v2** references:
+	- `vendor/comet-v2/Comet-Server/src/main/java/com/cometproject/server/storage/queries/permissions/PermissionsDao.java`
+	- `vendor/comet-v2/Comet-Server/src/main/java/com/cometproject/server/game/rooms/types/components/RightsComponent.java`
+	- `vendor/comet-v2/database.sql` tables: `server_permissions_ranks`, `permission_perks`, `permission_commands`, `room_rights`
+- **Arcturus** references:
+	- `vendor/Arcturus-Community/src/main/java/com/eu/habbo/habbohotel/permissions/PermissionsManager.java`
+	- `vendor/Arcturus-Community/src/main/java/com/eu/habbo/habbohotel/permissions/Rank.java`
+- **PlusEMU** references:
+	- `vendor/PlusEMU/**` patterns around `Permissions.HasRight(...)`, rank checks, and room-rights checks
+
+Planned pixel-server implementation in Phase 2:
+
+1. Introduce identity permission profile builder in `services/game/internal/identity` (started).
+2. Map storage rank/perk state to `user.permissions` packet payload (`clubLevel`, `securityLevel`, ambassador).
+3. Reserve room-rights and command-rights enforcement for Phase 3+ while keeping profile permissions deterministic in Phase 2.
+4. Add integration tests asserting rank/perk variants produce expected packet values.
+
 Exit: After login, the client renders the hotel view with its username, figure, and credits displayed.
 
 ---

@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────
 # Go
 # ──────────────────────────────────────────────
-# Binaries
+# Generic binary artefacts
 *.exe
 *.exe~
 *.dll
@@ -9,6 +9,23 @@
 *.dylib
 bin/
 dist/
+
+# Service binaries produced by `go build ./services/<svc>`
+gateway
+auth
+game
+social
+navigator
+catalog
+moderation
+
+# protogen binary
+tools/protogen/protogen
+
+# Plugin shared objects placed in runtime plugins/ directory
+plugins/*.so
+plugins/*.dylib
+plugins/*.exe
 
 # Test output
 *.test
@@ -18,6 +35,7 @@ coverage.html
 
 # Build cache (per-module)
 **/vendor/modules.txt
+vendor/*
 
 # Go workspace sum
 go.work.sum
