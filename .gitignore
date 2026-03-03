@@ -1,0 +1,109 @@
+# ──────────────────────────────────────────────
+# Go
+# ──────────────────────────────────────────────
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test output
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Build cache (per-module)
+**/vendor/modules.txt
+
+# Go workspace sum
+go.work.sum
+
+# ──────────────────────────────────────────────
+# Generated protocol package
+# (regenerated on every `make generate` — do NOT commit)
+# If you intentionally commit generated files, remove this block
+# and add them to CI freshness checks instead.
+# ──────────────────────────────────────────────
+# pkg/protocol/*.go
+
+# ──────────────────────────────────────────────
+# Secrets / configuration
+# ──────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+config/local*.yaml
+config/local*.yml
+
+# ──────────────────────────────────────────────
+# Docker / Kubernetes
+# ──────────────────────────────────────────────
+docker-compose.override.yml
+.docker/
+
+# ──────────────────────────────────────────────
+# IDE / editors
+# ──────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ──────────────────────────────────────────────
+# Node (pixel-protocol tooling inside vendor/)
+# ──────────────────────────────────────────────
+vendor/pixel-protocol/node_modules/
+vendor/pixel-protocol/.docusaurus/
+vendor/pixel-protocol/build/
+
+# ──────────────────────────────────────────────
+# Java build artefacts (reference vendor/)
+# ──────────────────────────────────────────────
+vendor/Arcturus-Community/target/
+vendor/comet-v2/**/target/
+vendor/comet-v2/**/*.class
+*.class
+*.jar
+*.war
+
+# ──────────────────────────────────────────────
+# C# build artefacts (reference vendor/)
+# ──────────────────────────────────────────────
+vendor/PlusEMU/bin/
+vendor/PlusEMU/obj/
+*.user
+*.suo
+
+# ──────────────────────────────────────────────
+# Logs & profiling
+# ──────────────────────────────────────────────
+*.log
+*.prof
+*.pprof
+cpu.out
+mem.out
+trace.out
+
+# ──────────────────────────────────────────────
+# Database / migration state
+# ──────────────────────────────────────────────
+*.sqlite
+*.db
+atlas.sum
+
+# ──────────────────────────────────────────────
+# Test artefacts
+# ──────────────────────────────────────────────
+testdata/output/
