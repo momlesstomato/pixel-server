@@ -17,8 +17,9 @@ It implements the Pixel Protocol defined in `vendor/pixel-protocol/spec/protocol
 6. **Fixed-tick simulation at 20 Hz.** The game loop runs on a 50 ms ticker. I/O is never blocking inside the tick.
 7. **All cross-service communication goes through NATS.** No direct HTTP/gRPC calls between services in the hot path.
 8. **Extensibility is mandatory.** New domain features must define explicit extension points in `pkg/plugin` and corresponding events/interceptors where appropriate.
-9. **Markdown file naming convention.** All Markdown files use an UPPERCASE stem and a lowercase `.md` extension (e.g. `README.md`, `AGENTS.md`, `OVERVIEW.md`). Docs realm folders under `docs/` are lowercase with a numeric prefix (e.g. `docs/01-handshake/OVERVIEW.md`). Mixed-case stems or uppercase `.MD` extensions are rejected in CI review.
-10. **Every server feature wires plugin hooks.** When adding a new domain action (player joins, packet received, room loaded, etc.), emit an `event.Bus` event and support `intercept.Interceptor` hooks. No feature ships without Observable extension points.
+9. **Top-level module boundaries only.** Under `pkg/`, each top-level domain/infrastructure area is a module root. `pkg/core` is a single shared module; nested modules under `pkg/core/*` are not allowed.
+10. **Markdown file naming convention.** All Markdown files use an UPPERCASE stem and a lowercase `.md` extension (e.g. `README.md`, `AGENTS.md`, `OVERVIEW.md`). Docs realm folders under `docs/` are lowercase with a numeric prefix (e.g. `docs/01-handshake/OVERVIEW.md`). Mixed-case stems or uppercase `.MD` extensions are rejected in CI review.
+11. **Every server feature wires plugin hooks.** When adding a new domain action (player joins, packet received, room loaded, etc.), emit an `event.Bus` event and support `intercept.Interceptor` hooks. No feature ships without Observable extension points.
 
 ---
 
@@ -190,6 +191,7 @@ When a decision contradicts an architecture doc, update the doc before changing 
 - Placeholder READMEs with only vague one-line descriptions are not acceptable.
 - At minimum, each module/package `README.md` must document: purpose and scope, key entry points/APIs, invariants/constraints, and operational commands (build/test/generate where relevant).
 - The repository root must include a public-oriented `README.md` describing architecture, design goals, and operational commands.
+- Do not place production `.go` files directly under `pkg/`; source files must live inside a specific module package (for example `pkg/core/config`, `pkg/room`, `pkg/user`).
 - **Markdown file naming: UPPERCASE stem, lowercase `.md` extension.** Examples: `README.md`, `AGENTS.md`, `OVERVIEW.md`. Docs realm folders are lowercase with a numeric prefix: `docs/01-handshake/PACKETS.md`.
 
 ### Configuration
@@ -253,6 +255,7 @@ Unit, integration, and e2e test layers are all mandatory in CI.
 - **Pattern:** Table-driven tests with `t.Run` sub-tests.
 - **Assertions:** `github.com/stretchr/testify/assert` and `require`.
 - **Coverage target:** Aim for the highest coverage possible, preferably 100% for core packages and all new logic.
+- **Coverage bar for changes:** New or modified logic should target 100% statement coverage where practical; any gap must be intentional and explained in the PR notes.
 
 ```go
 func TestReaderWriterRoundTrip(t *testing.T) {
@@ -311,12 +314,12 @@ Shared helpers:
 
 ### CI pipeline
 ```
-go vet ./...                          # always
-golangci-lint run ./...               # always
-go run ./tools/packageguard -root . -max 12 -allow pkg/protocol  # package split guard
-go test -race -count=1 ./...          # unit tests
-go test -race -tags=integration ./... # integration (needs Docker)
-go test -race -tags=e2e ./...         # e2e (needs Docker)
+make vet                              # workspace-wide vet across all modules
+make lint                             # workspace-wide golangci-lint + package split guard
+make check-package-split              # explicit package split guard
+make test                             # unit tests
+make test-integration                 # integration (needs Docker)
+make test-e2e                         # e2e (needs Docker)
 ```
 
 All three levels run in CI on every PR. Unit tests gate merge; integration and e2e must be kept green for release readiness.
@@ -328,6 +331,11 @@ All three levels run in CI on every PR. Unit tests gate merge; integration and e
 ---
 
 ## Package dependency rules
+
+### Module topology
+- Under `pkg/`, modules must be top-level only (`pkg/core`, `pkg/room`, `pkg/user`, etc.).
+- `pkg/core` is the only module root for core infrastructure; do not add `go.mod` files in `pkg/core/*`.
+- Sub-packages live under their owning module and must not become standalone modules unless architecture docs are updated first.
 
 ```
 pkg/core/codec       → (nothing)

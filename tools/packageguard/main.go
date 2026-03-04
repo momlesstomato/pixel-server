@@ -56,6 +56,10 @@ func main() {
 	}
 
 	if len(violations) == 0 {
+		if err := checkModuleTopology(*root); err != nil {
+			fmt.Fprintf(os.Stderr, "packageguard: %v\n", err)
+			os.Exit(1)
+		}
 		fmt.Printf("packageguard: ok (max=%d)\n", *maxFiles)
 		return
 	}
@@ -66,6 +70,44 @@ func main() {
 		fmt.Printf("  - %s (%d files)\n", v.Path, v.Count)
 	}
 	os.Exit(1)
+}
+
+func checkModuleTopology(root string) error {
+	nested, err := filepath.Glob(filepath.Join(root, "pkg", "*", "*", "go.mod"))
+	if err != nil {
+		return fmt.Errorf("scan nested pkg modules: %w", err)
+	}
+	if len(nested) > 0 {
+		sort.Strings(nested)
+		var rel []string
+		for _, p := range nested {
+			rel = append(rel, filepath.ToSlash(mustRel(root, p)))
+		}
+		return fmt.Errorf("nested pkg modules are not allowed: %s", strings.Join(rel, ", "))
+	}
+
+	rootGo, err := filepath.Glob(filepath.Join(root, "pkg", "*.go"))
+	if err != nil {
+		return fmt.Errorf("scan pkg root Go files: %w", err)
+	}
+	if len(rootGo) > 0 {
+		sort.Strings(rootGo)
+		var rel []string
+		for _, p := range rootGo {
+			rel = append(rel, filepath.ToSlash(mustRel(root, p)))
+		}
+		return fmt.Errorf("Go files directly under pkg/ are not allowed: %s", strings.Join(rel, ", "))
+	}
+
+	return nil
+}
+
+func mustRel(base, target string) string {
+	rel, err := filepath.Rel(base, target)
+	if err != nil {
+		return target
+	}
+	return rel
 }
 
 func countGoFiles(path string) (int, error) {

@@ -159,13 +159,13 @@ func (r *Reader) ReadListString() ([]string, error) {
 	return result, nil
 }
 
-// ReadFrom reads all bytes from an io.Reader and resets the reader cursor.
-func (r *Reader) ReadFrom(rd io.Reader) error {
+// ReadFrom reads all bytes from an io.Reader, resets the cursor, and returns bytes read.
+func (r *Reader) ReadFrom(rd io.Reader) (int64, error) {
 	data, err := io.ReadAll(rd)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	r.buf = data
 	r.pos = 0
-	return nil
+	return int64(len(data)), nil
 }

@@ -2,11 +2,7 @@ go 1.25.5
 
 use (
 	./pkg/catalog
-	./pkg/core/bus
-	./pkg/core/codec
-	./pkg/core/config
-	./pkg/core/logging
-	./pkg/core/testutil
+	./pkg/core
 	./pkg/item
 	./pkg/moderation
 	./pkg/navigator

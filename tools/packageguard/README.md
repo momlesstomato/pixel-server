@@ -8,6 +8,9 @@
 - Counts only direct non-test `.go` files in each package directory.
 - Fails when a package exceeds the configured max file count.
 - Supports an allowlist for intentionally large packages (for example generated code).
+- Enforces module topology under `pkg/`:
+  - nested module files like `pkg/*/*/go.mod` are rejected
+  - `.go` files directly under `pkg/` are rejected
 
 ## Usage
 
