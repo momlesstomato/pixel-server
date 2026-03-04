@@ -1,28 +1,28 @@
 go 1.25.5
 
 use (
+	./pkg/catalog
+	./pkg/core/bus
 	./pkg/core/codec
 	./pkg/core/config
 	./pkg/core/logging
-	./pkg/core/bus
 	./pkg/core/testutil
-	./pkg/protocol
+	./pkg/item
+	./pkg/moderation
+	./pkg/navigator
 	./pkg/pathfinding
 	./pkg/plugin
-	./pkg/user
+	./pkg/protocol
 	./pkg/room
-	./pkg/item
 	./pkg/social
-	./pkg/navigator
-	./pkg/moderation
-	./pkg/catalog
-	./services/gateway
+	./pkg/user
 	./services/auth
-	./services/game
-	./services/social
-	./services/navigator
 	./services/catalog
+	./services/game
+	./services/gateway
 	./services/moderation
-	./tools/protogen
+	./services/navigator
+	./services/social
 	./tools/packageguard
+	./tools/protogen
 )

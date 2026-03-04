@@ -17,6 +17,8 @@ It implements the Pixel Protocol defined in `vendor/pixel-protocol/spec/protocol
 6. **Fixed-tick simulation at 20 Hz.** The game loop runs on a 50 ms ticker. I/O is never blocking inside the tick.
 7. **All cross-service communication goes through NATS.** No direct HTTP/gRPC calls between services in the hot path.
 8. **Extensibility is mandatory.** New domain features must define explicit extension points in `pkg/plugin` and corresponding events/interceptors where appropriate.
+9. **Markdown file naming convention.** All Markdown files use an UPPERCASE stem and a lowercase `.md` extension (e.g. `README.md`, `AGENTS.md`, `OVERVIEW.md`). Docs realm folders under `docs/` are lowercase with a numeric prefix (e.g. `docs/01-handshake/OVERVIEW.md`). Mixed-case stems or uppercase `.MD` extensions are rejected in CI review.
+10. **Every server feature wires plugin hooks.** When adding a new domain action (player joins, packet received, room loaded, etc.), emit an `event.Bus` event and support `intercept.Interceptor` hooks. No feature ships without Observable extension points.
 
 ---
 
@@ -84,11 +86,66 @@ pixel-server/
 │   ├── navigator/              ← room discovery
 │   ├── catalog/                ← store, economy
 │   └── moderation/             ← bans, tickets
+├── docs/                       ← wiki-like project documentation (what IS built)
+│   ├── ARCHITECTURE.md         ← cross-cutting system overview
+│   ├── 01-handshake/           ← handshake-security realm
+│   │   ├── OVERVIEW.md
+│   │   ├── PACKETS.md
+│   │   ├── AUTH-FLOW.md
+│   │   └── ERROR-HANDLING.md
+│   ├── 02-session/             ← session-connection realm
+│   │   ├── OVERVIEW.md
+│   │   ├── LIFECYCLE.md
+│   │   ├── PACKETS.md
+│   │   └── PLUGIN-HOOKS.md
+│   ├── 03-user-profile/        ← user-profile realm
+│   │   ├── OVERVIEW.md
+│   │   ├── LOGIN-BUNDLE.md
+│   │   ├── PACKETS.md
+│   │   ├── DATA-MODELS.md
+│   │   └── PLUGIN-HOOKS.md
+│   ├── 04-room/                ← room domain, ECS components, movement
+│   │   ├── OVERVIEW.md
+│   │   ├── DATA-MODELS.md
+│   │   ├── ECS-COMPONENTS.md
+│   │   ├── SYSTEMS.md
+│   │   └── PLUGIN-HOOKS.md
+│   └── 05-pathfinding/         ← 3D A*, heightmap layout, integration
+│       ├── OVERVIEW.md
+│       ├── LAYOUT.md
+│       ├── ALGORITHM.md
+│       └── INTEGRATION.md
 ├── tools/
 │   ├── protogen/               ← YAML → Go code generator
 │   └── packageguard/           ← CI: enforces max file count per package
 └── vendor/                     ← upstream references (read-only)
 ```
+
+---
+
+## Documentation (`docs/`)
+
+`docs/` contains wiki-like documentation describing **what is currently implemented** — not plans or aspirations. This is the single source of truth for understanding the running system.
+
+### Rules
+
+1. **Only document what exists.** Every statement in `docs/` must correspond to working, tested code in the repository. Planned features belong in `architecture/`, never in `docs/`.
+2. **Update on every change.** When a feature is added, modified, or removed, the corresponding `docs/` page must be updated in the same PR. Stale documentation is treated as a bug.
+3. **One folder per realm, numbered by implementation order.** Each implemented protocol realm gets its own lowercase subdirectory with a two-digit numeric prefix (e.g. `docs/04-room/`). Inside, create focused files named with an UPPERCASE stem and lowercase `.md` extension: `OVERVIEW.md`, `PACKETS.md`, `DATA-MODELS.md`, `PLUGIN-HOOKS.md`, etc. New realms receive the next available number. Cross-cutting concerns get a single standalone `docs/ARCHITECTURE.md` file.
+4. **Detail level: exhaustive wiki-quality.** Each page MUST include all of the following sections:
+   - **Purpose** — what the realm is responsible for.
+   - **Packet table** — every C2S and S2C packet: header ID, struct name, field list, when it is sent.
+   - **Handler walkthrough** — per-packet handler: what it reads, what it validates, what it publishes/returns.
+   - **NATS subjects** — every subject published or subscribed, with message layout (field-by-field).
+   - **Data models** — every domain struct and ECS component involved, with all fields and types.
+   - **Plugin hooks** — every `event.Bus` event emitted and every `intercept.Interceptor` hook point, with Payload field descriptions.
+   - **Realm relations** — which other realms this realm depends on and how (NATS, shared domain types).
+   - **Permissions / guards** — any auth or role checks enforced before processing.
+   - **Error handling** — every error path, what is logged, and what is returned to the client.
+   - **Configuration knobs** — env vars and config struct fields that control this realm's behavior.
+   A new contributor must be able to understand and extend the feature from the doc alone.
+5. **No duplication with `architecture/`.** `architecture/` is the *design intent*; `docs/` is the *as-built reality*. When the implementation diverges from the architecture doc, `docs/` is authoritative for the current state.
+6. **File naming convention enforced.** Markdown files anywhere in the repository must have an UPPERCASE stem and a lowercase `.md` extension. Realm subdirectories under `docs/` must be lowercase with a numeric prefix. Any file with an uppercase `.MD` extension or a mixed-case folder name is treated as a bug.
 
 ---
 
@@ -133,6 +190,7 @@ When a decision contradicts an architecture doc, update the doc before changing 
 - Placeholder READMEs with only vague one-line descriptions are not acceptable.
 - At minimum, each module/package `README.md` must document: purpose and scope, key entry points/APIs, invariants/constraints, and operational commands (build/test/generate where relevant).
 - The repository root must include a public-oriented `README.md` describing architecture, design goals, and operational commands.
+- **Markdown file naming: UPPERCASE stem, lowercase `.md` extension.** Examples: `README.md`, `AGENTS.md`, `OVERVIEW.md`. Docs realm folders are lowercase with a numeric prefix: `docs/01-handshake/PACKETS.md`.
 
 ### Configuration
 - Service/runtime configuration must load through `pkg/core/config` (Viper-backed) with struct schemas.
@@ -176,6 +234,15 @@ When a decision contradicts an architecture doc, update the doc before changing 
 
 Every package and service **must** have tests. PRs without tests for new logic are rejected.
 Unit, integration, and e2e test layers are all mandatory in CI.
+
+### Enforcement rules
+
+1. **No untested handler.** Every packet handler must have at least one unit test covering the happy path and one covering the primary error path.
+2. **No untested service method.** Every exported method on a domain service (`*Service`) must have table-driven unit tests.
+3. **No untested NATS wiring.** Every NATS subscription callback must have a unit test using a mock or in-memory bus proving message dispatch.
+4. **Coverage gates.** Core packages (`pkg/core/*`, `pkg/user`, `pkg/room`) target ≥90% line coverage. Service packages (`services/*/internal/*`) target ≥80%.
+5. **Integration tests per repository.** Every repository interface method backed by PostgreSQL/Redis must have an integration test using `testcontainers`.
+6. **E2E per phase exit.** Each completed phase (per `009-packet-roadmap.md`) must have at least one scenario-based e2e test proving the phase exit criteria.
 
 ### Three test levels
 
@@ -323,3 +390,5 @@ Infrastructure-level subjects (handshake, session lifecycle) live in `pkg/core/b
 - Do **not** block or perform I/O inside a plugin event handler — it runs synchronously on the tick goroutine.
 - Do **not** try to unload a plugin at runtime — Go's `plugin` package does not support it.
 - Do **not** compile plugins with a different Go toolchain version than the host service binary.
+- Do **not** use an uppercase `.MD` extension — all Markdown files must use a lowercase `.md` extension with an UPPERCASE stem (e.g. `README.md`, not `README.MD`).
+- Do **not** add a server feature without wiring `event.Bus` emission and `intercept.Interceptor` hook points.

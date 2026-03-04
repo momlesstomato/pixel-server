@@ -1,5 +1,7 @@
 package plugin
 
+import "pixel-server/pkg/plugin/roomsvc"
+
 // EventName identifies an in-process plugin event.
 type EventName string
 
@@ -36,7 +38,7 @@ type Event struct {
 	Tick uint64
 
 	// Entity identifies the event's primary entity when applicable.
-	Entity EntityRef
+	Entity roomsvc.EntityRef
 
 	// Payload contains event-specific immutable data.
 	Payload any
