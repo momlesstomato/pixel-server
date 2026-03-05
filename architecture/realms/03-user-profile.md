@@ -1,5 +1,8 @@
 # Realm: User & Profile
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 30 | **Phase:** 2 (Identity) | **Packets:** 56 (29 c2s, 27 s2c)
 > **Services:** game (identity module) | **Status:** 16 handlers implemented
 
@@ -89,7 +92,7 @@ The User & Profile realm is the identity backbone of the entire system. It cover
 
 The `game` service's `internal/identity` module owns this realm. After authentication, the game service:
 1. Receives `session.authenticated` event via NATS.
-2. Loads user data from PostgreSQL via `UserRepository`.
+2. Loads user data from PostgreSQL via a domain-owned repository built on `pkg/storage/postgres` primitives.
 3. Builds a "login bundle" of S2C packets: `user.object`, `user.perks`, `user.permissions`, `user.credits`, `user.currency`, `user.subscription`, `user.wardrobe`, `user.ignored_list`, `user.effect_list`.
 4. Publishes the bundle to `session.output.<sessionID>` via NATS.
 

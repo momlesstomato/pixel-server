@@ -2,13 +2,13 @@
 
 ## Purpose
 
-The plugin framework extends service behavior without violating core architecture:
+The plugin framework extends module behavior without violating core architecture:
 
 - One ECS World per room goroutine remains authoritative.
-- Cross-service communication remains NATS-only.
+- Cross-module communication remains contract-topic based.
 - Plugins never get direct mutable access to room ECS internals.
 
-This document defines the required model for `pkg/plugin` and `services/game` integration.
+This document defines the required model for `pkg/plugin` and `internal/modules/game` integration.
 
 ---
 
@@ -18,7 +18,7 @@ Minecraft-like plugin UX (drop-in binary, lifecycle callbacks, event listeners) 
 
 The source of truth is pixel-server architecture:
 
-- `003-service-topology.md` for service and NATS boundaries.
+- `003-service-topology.md` for module and contract boundaries.
 - `004-ecs-ark.md` for room/world ownership and tick model.
 - `008-patterns.md` for hexagonal dependency direction.
 
@@ -55,7 +55,7 @@ The registry wraps API adapters so every event/packet subscription is tracked an
 
 - Direct access to `*ecs.World`.
 - Blocking I/O inside event handlers executed on room goroutines.
-- Cross-service direct calls that bypass NATS.
+- Cross-module direct calls that bypass contracts.
 
 ### Event context contract
 
@@ -86,7 +86,7 @@ type API interface {
 
 ### Scope
 
-`ServiceScope` identifies runtime location (`Name`, `NodeID`, `Version`) to support distributed observability.
+`ServiceScope` identifies runtime location (`Name`, `NodeID`, `Version`) to support observability.
 
 ### Room facade
 
@@ -98,9 +98,9 @@ type API interface {
 
 ---
 
-## Integration path for game service
+## Integration path for game module
 
-`services/game` must wire plugin components in this order:
+`internal/modules/game` must wire plugin components in this order:
 
 1. Build shared `EventBus` and `PacketInterceptor`.
 2. Build a `RoomService` adapter backed by room worker channels.
@@ -111,11 +111,11 @@ type API interface {
 Packet flow integration:
 
 ```
-gateway -> NATS room.input -> game router
+gateway -> room.input topic -> game router
     -> interceptor.RunBefore
     -> default domain handler
     -> interceptor.RunAfter
-    -> NATS session.output
+    -> session.output topic
 ```
 
 ---
@@ -135,5 +135,5 @@ These constraints are accepted for Phase 0/1. Future adapter option: WASM runtim
 Any change to plugin contracts must include:
 
 - Unit tests for event, interceptor, registry behavior.
-- Integration tests when game service wiring is introduced.
+- Integration tests when game module wiring is introduced.
 - Documentation updates in this file and `AGENTS.md`.

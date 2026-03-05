@@ -1,0 +1,26 @@
+# STORAGE
+
+## Overview
+
+Storage follows ports-and-adapters:
+
+- Ports: `pkg/storage/interfaces`
+- PostgreSQL adapter: `pkg/storage/postgres`
+- Redis adapter: `pkg/storage/redis`
+
+## PostgreSQL
+
+- Connection pool service in `postgres.Service`
+- Generic query helper in `postgres.FetchOne`
+- Domain repositories must be implemented in higher-order domain packages, not in `pkg/storage/postgres`
+
+## Redis
+
+- Connection service in `redis.Service`
+- Generic key/value adapter via `redis.KVStore`
+- Domain stores must be implemented in higher-order domain packages, not in `pkg/storage/redis`
+
+## E2E Steps
+
+- `e2e/01_config_e2e_test.go`
+- `e2e/02_storage_e2e_test.go`

@@ -1,5 +1,8 @@
 # Realm: Camera & Photos
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 190 | **Phase:** 13 (Remaining) | **Packets:** 15 (8 c2s, 7 s2c)
 > **Services:** game | **Status:** Not yet implemented
 

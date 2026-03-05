@@ -1,5 +1,8 @@
 # Realm: Room
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 60 | **Phase:** 3 (Room Entry & Movement) | **Packets:** 90 (46 c2s, 44 s2c)
 > **Services:** game (room worker) | **Status:** Not yet implemented
 

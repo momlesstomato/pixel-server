@@ -907,7 +907,7 @@ This directly fixes the biggest performance problem in the legacy emulators: `IN
 
 ## Offline messenger message delivery
 
-On login, `social-svc` delivers pending messages and clears them in one round-trip:
+On login, the `social` module delivers pending messages and clears them in one round-trip:
 
 ```go
 rows, _ := pool.Query(ctx,
@@ -978,21 +978,21 @@ DECR online:total      -- on session.disconnected
 ZADD navigator:<category>  <score>  <roomID>
 HSET roominfo:<roomID>     name <n>  users <u>  owner <o>  ...
 ```
-Invalidated via `navigator.room_updated` NATS events.
+Invalidated via `navigator.room_updated` contract topics.
 
 ### Leaderboards
 ```
 ZADD leaderboard:rooms:score  <score>  <roomID>   -- top rooms
 ZADD leaderboard:users:credits <credits> <userID>  -- top users
 ```
-Refreshed from DB every 5 minutes by `navigator-svc`.
+Refreshed from DB every 5 minutes by the `navigator` module scheduler.
 
 ---
 
 ## Migration workflow
 
 Schema source: `pkg/storage/migrations/schema.hcl` (Atlas HCL).  
-Monthly log partitions: pre-created by `services/maintenance` — a lightweight cron service that runs `CREATE TABLE chatlog_YYYY_MM PARTITION OF chat_log FOR VALUES FROM (...) TO (...)` for the next 2 months.
+Monthly log partitions: pre-created by `pixelsv jobs` maintenance role — a lightweight scheduler that runs `CREATE TABLE chatlog_YYYY_MM PARTITION OF chat_log FOR VALUES FROM (...) TO (...)` for the next 2 months.
 
 CI checks: `atlas schema diff` must produce an empty diff against the committed schema file.
 
@@ -1007,4 +1007,4 @@ CI checks: `atlas schema diff` must produce an empty diff against the committed 
 | Achievement progress | Correctness-critical; must survive restarts |
 | Authoritative ban record | Redis is a cache only; primary in PostgreSQL |
 | Friendship graph | Read-heavy but must be consistent; query + 60 s cache |
-| Room heightmaps | Loaded into `game-svc` in-memory; invalidated on item change |
+| Room heightmaps | Loaded into the `game` module in-memory; invalidated on item change |

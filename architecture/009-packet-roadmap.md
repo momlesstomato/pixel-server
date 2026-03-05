@@ -4,6 +4,11 @@
 
 The `pixel-protocol` spec defines **922 packets** (461 c2s + 461 s2c as of spec v1.0.0) across 21 realms. This document defines the implementation order, grouped into phases that each produce a system that is usable and testable end-to-end even before later phases are complete.
 
+Terminology for this roadmap:
+
+- "Service" means internal module/bounded context inside the single `pixelsv` binary.
+- "NATS subject" means internal contract topic unless an external broker adapter is explicitly enabled.
+
 The phases are ordered by **dependency depth**, not by packet count. A phase is not started until all packets it depends on (for a connected session to function) are implemented.
 
 ---
@@ -16,7 +21,7 @@ Each phase lists:
 - Implementation notes specific to pixel-server's architecture
 - Entry and exit criteria (what needs to pass in CI before the phase is "done")
 
-**"Implemented"** means: packet is decoded in `pkg/protocol`, handler is registered in the appropriate service, handler contains correct business logic (not a TODO stub), at least one happy-path integration test passes.
+**"Implemented"** means: packet is decoded in `pkg/protocol`, handler is registered in the appropriate module, handler contains correct business logic (not a TODO stub), at least one happy-path integration test passes.
 
 ---
 
@@ -54,14 +59,14 @@ Each phase lists:
 **Goal:** Every structural decision in place before a single packet handler is written.
 
 Deliverables:
-- `go.work` file at root with all module stubs (`go.mod` + empty `main.go` or `doc.go`).  
+- Root `go.mod` (`module pixelsv`) and root `go.work` (`use .`).  
 - `tools/protogen` reads `spec/protocol.yaml` and emits stubs for all 922 packets in `pkg/protocol`. The stubs panic ("not implemented"); they compile.  
 - `pkg/codec` with `Reader`/`Writer` and round-trip tests for all primitive types.  
-- `pkg/bus` thin NATS wrapper with connect/publish/subscribe.  
-- `pkg/storage` interfaces for `UserRepository`, `RoomRepository` with in-memory fakes.  
+- `pkg/bus` thin internal contract bus abstraction.  
+- `pkg/storage` generic interfaces (`RowQuerier`, `KeyValueStore`) with in-memory fakes.  
 - `pkg/pathfinding` 3D A* with full unit test suite (see [005-pathfinding-3d.md](005-pathfinding-3d.md)).  
 - `pkg/ecs` component registration; empty `World`; one system skeleton.  
-- Docker Compose: `nats`, `postgres`, `redis` only.  
+- Docker Compose: `pixelsv`, `postgres`, `redis`.  
 - Atlas migration: `users`, `rooms`, `items`, `bans` tables created.  
 - CI: `go build ./...`, `go test ./...`, `go vet ./...`, lint all pass.  
 
@@ -93,13 +98,13 @@ Exit: `go build ./...` green; all tables created; `pkg/pathfinding` 100% test co
 ### session-connection (30 packets)
 
 Key packets:
-- `session.ping` / `session.pong` — keep-alive (gateway proxies without hitting game-svc)
+- `session.ping` / `session.pong` — keep-alive (gateway proxies without hitting the game module)
 - `session.latency_measure` (c2s + s2c) — round-trip time tracking
 - `session.disconnect` (s2c) — graceful close with reason code
 - `availability.status` (s2c) — hotel open/closed flag on login
 - `connection.error` (s2c) — general error envelope
 
-Implementation note: Most session-connection packets are handled entirely in the gateway with no NATS round-trip. The gateway handles ping/pong inline; only authenticated session state changes are published.
+Implementation note: Most session-connection packets are handled entirely in the gateway with no external broker round-trip. The gateway handles ping/pong inline; only authenticated session state changes are published to internal topics.
 
 Exit: A Nitro client connects to `gateway` on port 2096, completes handshake, receives the `availability.status` packet, and maintains an idle connection without disconnecting.
 
@@ -124,7 +129,7 @@ Key packets:
 - `user.wardrobe` (s2c) — saved outfits
 - `user.badges` (s2c) — badge collection subset (full inventory in Phase 7)
 
-Implementation note: Profile data comes from PostgreSQL via `UserRepository`. After `session.authenticated` is received by the game service, it prepares a `user.authenticated` composite and publishes it to `session.output.<sessionID>`.
+Implementation note: Profile data is loaded through domain-owned repositories built on top of generic `pkg/storage/postgres` primitives. After `session.authenticated` is received by the game module, it prepares a `user.authenticated` composite and publishes it to `session.output.<sessionID>`.
 
 ### Permissions parity plan (Phase 2 entry requirement)
 
@@ -142,7 +147,7 @@ Before Phase 2 is marked complete, permission behavior must be aligned to vendor
 
 Planned pixel-server implementation in Phase 2:
 
-1. Introduce identity permission profile builder in `services/game/internal/identity` (started).
+1. Introduce identity permission profile builder in `internal/modules/game/identity` (started).
 2. Map storage rank/perk state to `user.permissions` packet payload (`clubLevel`, `securityLevel`, ambassador).
 3. Reserve room-rights and command-rights enforcement for Phase 3+ while keeping profile permissions deterministic in Phase 2.
 4. Add integration tests asserting rank/perk variants produce expected packet values.
@@ -269,7 +274,7 @@ Exit: A room with a full furniture layout loads correctly; players can interact 
 ### catalog-store (21)
 - `catalog.page` (c2s + s2c) — browse pages
 - `catalog.offer` (s2c) — product listing
-- `catalog.purchase` (c2s) — buy item; triggers `catalog.purchase_completed` NATS event
+- `catalog.purchase` (c2s) — buy item; triggers `catalog.purchase_completed` contract event
 - `catalog.purchase_ok` / `catalog.purchase_failed` (s2c)
 - `catalog.gift_wrap` (c2s + s2c) — gift flow
 - `catalog.voucher_redeem` (c2s + s2c) — discount voucher
@@ -339,7 +344,7 @@ Exit: Group creation flow completes; group badge appears on member profiles; gro
 
 **Capability unlocked:** Mod-tool opens; staff can issue bans, mutes, view chat history, handle reports (call-for-help), and use guardian system.
 
-Implementation note: The ban flow is synchronous-critical: `moderation.ban_issued` must reach the gateway within 500 ms. Use Redis `PUBLISH ban:<userID>` from `moderation-svc`; gateway subscribes and closes socket immediately.
+Implementation note: The ban flow is synchronous-critical: `moderation.ban_issued` must reach the gateway within 500 ms. Use Redis `PUBLISH ban:<userID>` from the moderation module; gateway subscribes and closes socket immediately.
 
 Exit: A staff account bans a user via mod-tool; the banned user's socket is closed within 1 second; the ban persists after a new connection attempt.
 

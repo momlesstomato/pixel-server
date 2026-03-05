@@ -1,5 +1,8 @@
 # Realm: Groups & Forums
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 130 | **Phase:** 10 (Groups) | **Packets:** 64 (36 c2s, 28 s2c)
 > **Services:** social (groups), game (badge display) | **Status:** Not yet implemented
 

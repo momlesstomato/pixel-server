@@ -1,5 +1,8 @@
 # Realm: Other
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 220 | **Phase:** 13 (Remaining) | **Packets:** 10 (7 c2s, 3 s2c)
 > **Services:** game | **Status:** Not yet implemented
 

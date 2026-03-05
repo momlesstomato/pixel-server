@@ -1,5 +1,8 @@
 # Realm: Inventory
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 120 | **Phase:** 7 (Economy) | **Packets:** 33 (13 c2s, 20 s2c)
 > **Services:** game (inventory module) | **Status:** Not yet implemented
 

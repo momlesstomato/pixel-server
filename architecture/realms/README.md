@@ -1,8 +1,13 @@
 # Realm Analysis Index
 
-This directory contains deep-dive analysis documents for each of the 22 protocol realms defined in `vendor/pixel-protocol/spec/protocol.yaml`. Each document covers every packet in its realm, implementation approaches, edge cases, caveats, and improvement opportunities specific to pixel-server's architecture.
+This directory contains deep-dive planning analysis for each protocol realm.
 
-These analyses complement the [Packet Implementation Roadmap](../009-packet-roadmap.md) by providing per-realm architectural depth, reference emulator comparisons, and actionable implementation guidance.
+Terminology note for this directory:
+
+- References to "services" map to **internal modules/bounded contexts** inside the single `pixelsv` binary.
+- References to "NATS subjects" map to **internal contract topics** unless explicitly marked as external adapter integration.
+
+These analyses complement the [Packet Implementation Roadmap](../009-packet-roadmap.md) with per-realm architecture planning and reference emulator comparisons.
 
 ---
 
@@ -10,7 +15,7 @@ These analyses complement the [Packet Implementation Roadmap](../009-packet-road
 
 Documents are numbered by implementation order, matching the phases in [009-packet-roadmap.md](../009-packet-roadmap.md). Work top-to-bottom; each realm depends on the realms above it.
 
-| # | Realm | Packets | Phase | Service(s) | Doc |
+| # | Realm | Packets | Phase | Module(s) | Doc |
 |---|-------|---------|-------|------------|-----|
 | 01 | Handshake & Security | 13 (8 c2s, 5 s2c) | 1 — Connection | gateway, auth | [01-handshake-security.md](01-handshake-security.md) |
 | 02 | Session & Connection | 30 (10 c2s, 20 s2c) | 1 — Connection | gateway | [02-session-connection.md](02-session-connection.md) |
@@ -62,7 +67,7 @@ Documents are numbered by implementation order, matching the phases in [009-pack
 
 - **22 realms**, **922 packets** (463 c2s + 459 s2c)
 - **13 implementation phases** spanning ~41 weeks for a 2-3 engineer team
-- **7 services** (gateway, auth, game, social, navigator, catalog, moderation)
+- **7 bounded contexts** (gateway, auth, game, social, navigator, catalog, moderation)
 
 ## How to Read These Documents
 
@@ -70,7 +75,7 @@ Each realm analysis follows a consistent structure:
 
 1. **Overview** -- realm purpose, packet counts, phase mapping
 2. **Packet Inventory** -- complete table of every C2S and S2C packet with IDs, fields, and summaries
-3. **Architecture Mapping** -- which service owns the realm, NATS subjects, database tables
+3. **Architecture Mapping** -- which module owns the realm, contract topics, database tables
 4. **Implementation Analysis** -- detailed approach for pixel-server, reference emulator patterns
 5. **Caveats & Edge Cases** -- pitfalls observed in Comet v2, Arcturus, and PlusEMU
 6. **Improvements Over Legacy** -- where pixel-server's architecture enables better solutions

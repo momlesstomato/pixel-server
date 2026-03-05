@@ -1,5 +1,8 @@
 # Realm: Navigator
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 50 | **Phase:** 4 (Navigator) | **Packets:** 55 (37 c2s, 18 s2c)
 > **Services:** navigator | **Status:** Not yet implemented
 
@@ -86,7 +89,7 @@ The Navigator realm handles room discovery, search, favourites, categories, room
 
 ### Service Ownership
 
-The **navigator service** is an independent microservice that:
+The **navigator module** is a dedicated bounded context that:
 - Maintains room metadata cache (room names, owners, user counts, scores).
 - Executes search queries against PostgreSQL and Redis.
 - Receives room state updates from the game service via NATS.

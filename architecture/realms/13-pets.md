@@ -1,5 +1,8 @@
 # Realm: Pets
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 140 | **Phase:** 9 (Pets) | **Packets:** 41 (21 c2s, 20 s2c)
 > **Services:** game (PetAI ECS system) | **Status:** Not yet implemented
 

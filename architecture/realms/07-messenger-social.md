@@ -1,5 +1,8 @@
 # Realm: Messenger & Social
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 40 | **Phase:** 5 (Social) | **Packets:** 30 (14 c2s, 16 s2c)
 > **Services:** social | **Status:** Not yet implemented
 

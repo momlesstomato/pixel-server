@@ -1,5 +1,8 @@
 # Realm: Economy & Trading
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 110 | **Phase:** 7 (Economy) | **Packets:** 54 (28 c2s, 26 s2c)
 > **Services:** game (trading within room), catalog (marketplace) | **Status:** Not yet implemented
 

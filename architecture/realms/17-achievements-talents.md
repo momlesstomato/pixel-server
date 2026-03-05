@@ -1,5 +1,8 @@
 # Realm: Achievements & Talents
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 150 | **Phase:** 13 (Remaining) | **Packets:** 24 (10 c2s, 14 s2c)
 > **Services:** game | **Status:** Not yet implemented
 

@@ -258,7 +258,7 @@ func (w *roomWorker) tick() {
     ChatCooldownSystem(rw)
     // 8. Evaluate WIRED condition → effect chains
     WiredSystem(rw)
-    // 9. Collect Dirty entities, compose s2c packets, publish to NATS
+    // 9. Collect Dirty entities and publish to session output topic
     BroadcastSystem(rw)
 }
 ```
@@ -310,8 +310,8 @@ func ChatCooldownSystem(rw *roomWorld, tick uint64) {
 Ark supports entity relationships natively, which is directly useful for:
 
 - Pet → Owner: `ecs.Relation` from pet entity to its owner entity.
-- Item → Room: linking items to their room world (less useful when each room has its own World, but useful for cross-room lookups in game-svc's supervisor).
-- Group → Member: managed in the social service's own world.
+- Item → Room: linking items to their room world (less useful when each room has its own World, but useful for cross-room lookups in the game supervisor).
+- Group → Member: managed in the social module's own world.
 
 ```go
 // Example: pet owns a relation to its owner avatar
@@ -368,7 +368,7 @@ This replaces the manual per-item flush loops in legacy emulators. The full ECS 
 
 ## Why NOT to use ECS everywhere
 
-ECS is appropriate inside `game-svc` for room simulation only.
+ECS is appropriate inside the `game` module for room simulation only.
 
 | Service | Use ECS? | Reason |
 |---|---|---|
@@ -388,7 +388,7 @@ Ark's benchmarks (from its published benchmark suite) show ~2–5 ns per entity 
 |---|---|---|
 | MovementSystem | 200 walking entities | ~1–2 µs |
 | ItemInteractionSystem | 100 interactive items | ~3–10 µs |
-| BroadcastSystem (dirty scan) | 200 entities | ~5–20 µs (NATS publish dominates) |
+| BroadcastSystem (dirty scan) | 200 entities | ~5–20 µs (session output publish dominates) |
 | All systems combined | 200+100 | ~30–80 µs per 50 ms tick |
 
-At 100 active rooms per `game-svc` pod, total ECS CPU ≈ 8 ms/s = well under 1% of one core. I/O (NATS, Redis) dominates at scale, not ECS iteration.
+At 100 active rooms per process, total ECS CPU ≈ 8 ms/s = well under 1% of one core. I/O (Redis, storage adapters) dominates at scale, not ECS iteration.

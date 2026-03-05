@@ -1,5 +1,8 @@
 # Realm: Subscription & Offers
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 100 | **Phase:** 8 (Subscriptions) | **Packets:** 50 (26 c2s, 24 s2c)
 > **Services:** catalog, auth | **Status:** Not yet implemented
 

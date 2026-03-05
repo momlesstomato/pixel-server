@@ -1,5 +1,8 @@
 # Realm: Furniture & Items
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 80 | **Phase:** 6 (Furniture & WIRED) | **Packets:** 99 (52 c2s, 47 s2c)
 > **Services:** game (item interaction, WIRED engine) | **Status:** Not yet implemented
 

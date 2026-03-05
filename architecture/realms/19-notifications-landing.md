@@ -1,5 +1,8 @@
 # Realm: Notifications & Landing
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 200 | **Phase:** 13 (Remaining) | **Packets:** 22 (6 c2s, 16 s2c)
 > **Services:** gateway, game | **Status:** Not yet implemented
 

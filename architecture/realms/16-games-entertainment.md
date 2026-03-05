@@ -1,5 +1,8 @@
 # Realm: Games & Entertainment
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 170 | **Phase:** 12 (Games) | **Packets:** 49 (21 c2s, 28 s2c)
 > **Services:** game (mini-game ECS systems) | **Status:** Not yet implemented
 

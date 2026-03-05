@@ -1,5 +1,8 @@
 # Realm: Catalog & Store
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 90 | **Phase:** 7 (Economy) | **Packets:** 21 (10 c2s, 11 s2c)
 > **Services:** catalog | **Status:** Not yet implemented
 
@@ -52,7 +55,7 @@ The Catalog & Store realm handles store browsing, product display, purchases, gi
 
 ### Service Ownership
 
-The **catalog service** is an independent microservice:
+The **catalog module** is a dedicated bounded context:
 
 ```
 Client ──packet──▶ Gateway ──NATS──▶ Catalog Service

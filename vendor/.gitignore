@@ -1,0 +1,4 @@
+# Keep vendor references out of git history by default.
+*
+!.gitignore
+!README.md

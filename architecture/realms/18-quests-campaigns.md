@@ -1,5 +1,8 @@
 # Realm: Quests & Campaigns
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 160 | **Phase:** 13 (Remaining) | **Packets:** 33 (15 c2s, 18 s2c)
 > **Services:** game | **Status:** Not yet implemented
 

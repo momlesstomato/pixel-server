@@ -1,5 +1,8 @@
 # Realm: Handshake & Security
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 10 | **Phase:** 1 (Connection) | **Packets:** 13 (8 c2s, 5 s2c)
 > **Services:** gateway, auth | **Status:** Partially implemented
 

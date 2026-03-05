@@ -1,5 +1,8 @@
 # Realm: Moderation & Safety
 
+Terminology note: references to services and NATS subjects in this file map to internal modules and internal contract topics in the single `pixelsv` binary unless explicitly marked as external adapter behavior.
+
+
 > **Position:** 180 | **Phase:** 11 (Moderation) | **Packets:** 83 (43 c2s, 40 s2c)
 > **Services:** moderation | **Status:** Not yet implemented
 
