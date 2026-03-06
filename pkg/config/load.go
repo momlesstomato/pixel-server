@@ -58,6 +58,24 @@ func BindViper(v *viper.Viper) error {
 	if value := v.GetString("APP_ENV"); value != "" {
 		v.Set("app.env", value)
 	}
+	if err := v.BindEnv("runtime.role", "PIXELSV_ROLE"); err != nil {
+		return fmt.Errorf("bind PIXELSV_ROLE: %w", err)
+	}
+	if err := v.BindEnv("runtime.instance_id", "PIXELSV_INSTANCE_ID"); err != nil {
+		return fmt.Errorf("bind PIXELSV_INSTANCE_ID: %w", err)
+	}
+	if err := v.BindEnv("runtime.nats_url", "NATS_URL"); err != nil {
+		return fmt.Errorf("bind NATS_URL: %w", err)
+	}
+	if value := v.GetString("PIXELSV_ROLE"); value != "" {
+		v.Set("runtime.role", value)
+	}
+	if value := v.GetString("PIXELSV_INSTANCE_ID"); value != "" {
+		v.Set("runtime.instance_id", value)
+	}
+	if value := v.GetString("NATS_URL"); value != "" {
+		v.Set("runtime.nats_url", value)
+	}
 	return nil
 }
 

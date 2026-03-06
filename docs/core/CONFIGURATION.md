@@ -16,7 +16,7 @@ Fields without a `default` tag are treated as required and must pass validation.
 ## Environment Variables
 
 - `PIXELSV_ROLE` default: `all` values: `all`, `gateway`, `game`, `auth`, `social`, `navigator`, `catalog`, `moderation`, `api`, `jobs` (comma-separated for multiple)
-- `PIXELSV_INSTANCE_ID` default: hostname (unique per process in distributed mode)
+- `PIXELSV_INSTANCE_ID` default: `pixelsv-local` (set unique values per process in distributed mode)
 - `APP_ENV` default: `development`
 - `HTTP_ADDR` default: `:8080`
 - `HTTP_READ_TIMEOUT_SECONDS` default: `10`
@@ -31,7 +31,7 @@ Fields without a `default` tag are treated as required and must pass validation.
 - `REDIS_URL` required (except for roles that don't use Redis)
 - `REDIS_KEY_PREFIX` default: `pixelsv`
 - `REDIS_SESSION_TTL_SECONDS` default: `3600`
-- `NATS_URL` default: (none, only required in distributed mode)
+- `NATS_URL` default: empty string (set when using distributed transport)
 
 ## Source Order
 

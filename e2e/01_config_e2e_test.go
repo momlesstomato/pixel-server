@@ -16,6 +16,9 @@ func Test01ConfigurationComposition(t *testing.T) {
 	envFile := filepath.Join(t.TempDir(), ".env")
 	content := "" +
 		"APP_ENV=staging\n" +
+		"PIXELSV_ROLE=gateway,api\n" +
+		"PIXELSV_INSTANCE_ID=gw-01\n" +
+		"NATS_URL=nats://nats:4222\n" +
 		"LOG_FORMAT=json\n" +
 		"LOG_LEVEL=warn\n" +
 		"POSTGRES_URL=postgres://u:p@localhost:5432/pixelsv?sslmode=disable\n" +
@@ -43,6 +46,9 @@ func Test01ConfigurationComposition(t *testing.T) {
 	baseCfg, err := config.FromViper(v)
 	if err != nil || baseCfg.App.Env != "staging" {
 		t.Fatalf("unexpected base config: %+v %v", baseCfg, err)
+	}
+	if baseCfg.Runtime.Role != "gateway,api" || baseCfg.Runtime.InstanceID != "gw-01" {
+		t.Fatalf("unexpected runtime config: %+v", baseCfg.Runtime)
 	}
 	logCfg, err := logpkg.FromViper(v)
 	if err != nil || logCfg.Format != logpkg.FormatJSON {

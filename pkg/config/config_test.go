@@ -12,6 +12,9 @@ import (
 // TestLoadDefaults validates default configuration values.
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("APP_ENV", "")
+	t.Setenv("PIXELSV_ROLE", "")
+	t.Setenv("PIXELSV_INSTANCE_ID", "")
+	t.Setenv("NATS_URL", "")
 	cfg, err := Load(LoadOptions{EnvFile: "testdata/missing.env"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -19,17 +22,38 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.App.Env != "development" {
 		t.Fatalf("expected development env, got %q", cfg.App.Env)
 	}
+	if cfg.Runtime.Role != "all" {
+		t.Fatalf("expected all role, got %q", cfg.Runtime.Role)
+	}
+	if cfg.Runtime.InstanceID != "pixelsv-local" {
+		t.Fatalf("expected default instance id, got %q", cfg.Runtime.InstanceID)
+	}
+	if cfg.Runtime.NATSURL != "" {
+		t.Fatalf("expected empty NATS URL, got %q", cfg.Runtime.NATSURL)
+	}
 }
 
 // TestLoadFromEnvironment validates env variable override behavior.
 func TestLoadFromEnvironment(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
+	t.Setenv("PIXELSV_ROLE", "gateway,api")
+	t.Setenv("PIXELSV_INSTANCE_ID", "gateway-01")
+	t.Setenv("NATS_URL", "nats://localhost:4222")
 	cfg, err := Load(DefaultLoadOptions())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if cfg.App.Env != "production" {
 		t.Fatalf("expected production env, got %q", cfg.App.Env)
+	}
+	if cfg.Runtime.Role != "gateway,api" {
+		t.Fatalf("expected gateway,api role, got %q", cfg.Runtime.Role)
+	}
+	if cfg.Runtime.InstanceID != "gateway-01" {
+		t.Fatalf("expected gateway-01 instance id, got %q", cfg.Runtime.InstanceID)
+	}
+	if cfg.Runtime.NATSURL != "nats://localhost:4222" {
+		t.Fatalf("expected nats url, got %q", cfg.Runtime.NATSURL)
 	}
 }
 
@@ -43,10 +67,27 @@ func TestAppConfigValidate(t *testing.T) {
 	}
 }
 
+// TestRuntimeConfigValidate checks runtime config validation rules.
+func TestRuntimeConfigValidate(t *testing.T) {
+	if err := (RuntimeConfig{Role: "", InstanceID: "x"}).Validate(); err == nil {
+		t.Fatalf("expected empty role validation error")
+	}
+	if err := (RuntimeConfig{Role: "game", InstanceID: ""}).Validate(); err == nil {
+		t.Fatalf("expected empty instance id validation error")
+	}
+	if err := (RuntimeConfig{Role: "invalid", InstanceID: "x"}).Validate(); err == nil {
+		t.Fatalf("expected invalid role validation error")
+	}
+	if err := (RuntimeConfig{Role: "game,gateway", InstanceID: "x"}).Validate(); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
 // TestLoadFromEnvFile validates env file parsing.
 func TestLoadFromEnvFile(t *testing.T) {
 	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, []byte("APP_ENV=qa\n"), 0o644); err != nil {
+	content := "APP_ENV=qa\nPIXELSV_ROLE=api\nPIXELSV_INSTANCE_ID=api-01\nNATS_URL=nats://nats:4222\n"
+	if err := os.WriteFile(envFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	cfg, err := Load(LoadOptions{EnvFile: envFile})
@@ -56,18 +97,27 @@ func TestLoadFromEnvFile(t *testing.T) {
 	if cfg.App.Env != "qa" {
 		t.Fatalf("expected qa env, got %q", cfg.App.Env)
 	}
+	if cfg.Runtime.Role != "api" || cfg.Runtime.InstanceID != "api-01" {
+		t.Fatalf("unexpected runtime config: %+v", cfg.Runtime)
+	}
 }
 
 // TestFromViperAppliesDefaults checks default filling from tags.
 func TestFromViperAppliesDefaults(t *testing.T) {
 	v := viper.New()
 	v.Set("app.env", "")
+	v.Set("runtime.role", "")
+	v.Set("runtime.instance_id", "")
+	v.Set("runtime.nats_url", "")
 	cfg, err := FromViper(v)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if cfg.App.Env != "development" {
 		t.Fatalf("unexpected env value: %s", cfg.App.Env)
+	}
+	if cfg.Runtime.Role != "all" || cfg.Runtime.InstanceID != "pixelsv-local" {
+		t.Fatalf("unexpected runtime defaults: %+v", cfg.Runtime)
 	}
 }
 
@@ -113,6 +163,16 @@ func TestConfigDefaultTags(t *testing.T) {
 	typ := reflect.TypeOf(AppConfig{})
 	if typ.Field(0).Tag.Get("default") == "" {
 		t.Fatalf("expected default tag on AppConfig.Env")
+	}
+	runtimeTyp := reflect.TypeOf(RuntimeConfig{})
+	if runtimeTyp.Field(0).Tag.Get("default") == "" {
+		t.Fatalf("expected default tag on RuntimeConfig.Role")
+	}
+	if runtimeTyp.Field(1).Tag.Get("default") == "" {
+		t.Fatalf("expected default tag on RuntimeConfig.InstanceID")
+	}
+	if _, ok := runtimeTyp.Field(2).Tag.Lookup("default"); !ok {
+		t.Fatalf("expected default tag on RuntimeConfig.NATSURL")
 	}
 }
 
@@ -169,5 +229,32 @@ func TestFillDefaultsFromTagsNonPointer(t *testing.T) {
 	cfg := AppConfig{}
 	if err := FillDefaultsFromTags(cfg); err == nil {
 		t.Fatalf("expected non-pointer error")
+	}
+}
+
+// TestParseRoles checks runtime role parsing behavior.
+func TestParseRoles(t *testing.T) {
+	roles, err := ParseRoles("gateway,api,gateway")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(roles) != 2 || roles[0] != "gateway" || roles[1] != "api" {
+		t.Fatalf("unexpected roles: %+v", roles)
+	}
+	all, err := ParseRoles("all,game")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(all) != 1 || all[0] != "all" {
+		t.Fatalf("unexpected all roles result: %+v", all)
+	}
+	if _, err := ParseRoles("unknown"); err == nil {
+		t.Fatalf("expected invalid role error")
+	}
+	if _, err := ParseRoles("all,unknown"); err == nil {
+		t.Fatalf("expected invalid role error")
+	}
+	if _, err := ParseRoles(" , "); err == nil {
+		t.Fatalf("expected empty role error")
 	}
 }

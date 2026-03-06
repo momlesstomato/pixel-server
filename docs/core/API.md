@@ -13,8 +13,6 @@ Core HTTP/WebSocket runtime implementation is provided by `pkg/http`.
 ## Administrative Endpoints
 
 - `GET /api/v1/admin/ping`
-- `POST /api/v1/tickets` — create SSO ticket
-- `DELETE /api/v1/tickets/:ticket` — revoke SSO ticket
 
 Administrative endpoints require header:
 
@@ -32,13 +30,13 @@ Administrative endpoints require header:
 
 ## Role-Aware Endpoint Availability
 
-- `--role=api` or `--role=all`: serves REST admin endpoints, Swagger, OpenAPI.
-- `--role=gateway` or `--role=all`: serves `/ws` WebSocket endpoint.
-- All roles: serve `/health` and `/ready` probes.
+- HTTP listener enabled roles: `all`, `gateway`, `api`, `jobs`.
+- HTTP listener disabled roles: `game`, `auth`, `social`, `navigator`, `catalog`, `moderation`.
+- Phase 0 behavior: any role that enables HTTP serves the same core endpoints listed above.
 
 ## CLI
 
-- `pixelsv serve` starts all roles (HTTP + WebSocket + all realm modules).
-- `pixelsv serve --role=api` starts only the REST admin API.
-- `pixelsv serve --role=gateway` starts only the WebSocket gateway.
+- `pixelsv serve` starts all roles.
+- `pixelsv serve --role=api` starts the HTTP runtime for API process deployment.
+- `pixelsv serve --role=gateway` starts the HTTP/WebSocket runtime for gateway deployment.
 - `pixelsv serve --env-file .env` loads environment from a specific file.
