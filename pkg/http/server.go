@@ -12,8 +12,9 @@ import (
 
 // Server owns the core Fiber HTTP/WebSocket runtime.
 type Server struct {
-	app *fiber.App
-	cfg Config
+	app    *fiber.App
+	cfg    Config
+	logger *zap.Logger
 }
 
 // New creates a new Server instance.
@@ -27,9 +28,18 @@ func New(cfg Config, logger *zap.Logger) (*Server, error) {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: cfg.DisableStartupMessage,
 		ReadTimeout:           time.Duration(cfg.ReadTimeoutSeconds) * time.Second,
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			logger.Error("fiber request error", zap.String("path", c.Path()), zap.Error(err))
+			return fiber.DefaultErrorHandler(c, err)
+		},
 	})
-	app.Use(fiberzap.New(fiberzap.Config{Logger: logger}))
-	server := &Server{app: app, cfg: cfg}
+	app.Use(fiberzap.New(fiberzap.Config{
+		Logger: logger,
+		Next: func(*fiber.Ctx) bool {
+			return !logger.Core().Enabled(zap.DebugLevel)
+		},
+	}))
+	server := &Server{app: app, cfg: cfg, logger: logger}
 	server.registerRoutes()
 	return server, nil
 }
@@ -41,8 +51,10 @@ func (s *Server) App() *fiber.App {
 
 // ListenAndServe starts the server and shuts it down when context is canceled.
 func (s *Server) ListenAndServe(ctx context.Context) error {
+	s.logger.Info("http server listening", zap.String("address", s.cfg.Address))
 	go func() {
 		<-ctx.Done()
+		s.logger.Info("http server shutdown requested")
 		_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = s.app.Shutdown()

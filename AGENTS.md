@@ -63,6 +63,9 @@ This document is mandatory for all contributors and agents working in this repos
 - WebSocket implementation preference is GoFiber-compatible middleware (`fiber/v3` + websocket middleware) unless a documented benchmark justifies deviation.
 - Runtime modes must share the same domain core and application services.
 - Duplicated code should preferably not exist; shared behavior must be extracted into reusable packages/components.
+- Emit structured `info` logs for lifecycle milestones (runtime start, role activation, worker/service start, listening addresses, shutdown).
+- Keep HTTP access logs disabled by default; enable per-request Fiber logging only at `debug` log level.
+- Keep logs focused on actionable events: framework/app errors, startup/shutdown transitions, and relevant operational state.
 
 ## 6.1) Performance Policy (Strict)
 

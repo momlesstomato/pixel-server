@@ -80,12 +80,18 @@ func runRoleAwareStartup(ctx context.Context, v *viper.Viper, runtimeCfg config.
 		return err
 	}
 	defer plan.Transport.Close()
+	logger.Info(
+		"runtime startup initialized",
+		zap.Strings("roles", roles.names()),
+		zap.String("transport_mode", transportMode(runtimeCfg, roles)),
+	)
 	if plan.Postgres != nil {
 		pgSvc, err := postgres.New(ctx, *plan.Postgres)
 		if err != nil {
 			return err
 		}
 		defer pgSvc.Close()
+		logger.Info("postgres service started")
 	}
 	if plan.Redis != nil {
 		rdSvc, err := redis.New(*plan.Redis)
@@ -93,14 +99,26 @@ func runRoleAwareStartup(ctx context.Context, v *viper.Viper, runtimeCfg config.
 			return err
 		}
 		defer rdSvc.Close()
+		logger.Info("redis service started")
 	}
 	if plan.HTTP != nil {
+		logger.Info("http service started", zap.String("address", plan.HTTP.Address))
 		srv, err := httpserver.New(*plan.HTTP, logger)
 		if err != nil {
 			return err
 		}
 		return srv.ListenAndServe(ctx)
 	}
+	logger.Info("runtime started without http listener")
 	<-ctx.Done()
+	logger.Info("runtime shutdown requested")
 	return nil
+}
+
+// transportMode reports whether runtime transport is local or nats-backed.
+func transportMode(runtimeCfg config.RuntimeConfig, roles roleSet) string {
+	if roles.forceLocalTransport() || runtimeCfg.NATSURL == "" {
+		return "local"
+	}
+	return "nats"
 }

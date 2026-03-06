@@ -1,0 +1,46 @@
+package httpserver
+
+import (
+	"net/http/httptest"
+	"testing"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+)
+
+// TestRequestLogsDisabledOutsideDebug validates that request logs are skipped above debug level.
+func TestRequestLogsDisabledOutsideDebug(t *testing.T) {
+	core, observed := observer.New(zapcore.InfoLevel)
+	logger := zap.New(core)
+	cfg := Config{Address: ":0", DisableStartupMessage: true, ReadTimeoutSeconds: 10, OpenAPIPath: "/openapi.json", SwaggerPath: "/swagger", APIKey: "secret"}
+	srv, err := New(cfg, logger)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	req := httptest.NewRequest("GET", "/health", nil)
+	if _, err := srv.App().Test(req); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if observed.Len() != 0 {
+		t.Fatalf("expected zero request logs at info level, got %d", observed.Len())
+	}
+}
+
+// TestRequestLogsEnabledAtDebug validates that request logs are emitted at debug level.
+func TestRequestLogsEnabledAtDebug(t *testing.T) {
+	core, observed := observer.New(zapcore.DebugLevel)
+	logger := zap.New(core)
+	cfg := Config{Address: ":0", DisableStartupMessage: true, ReadTimeoutSeconds: 10, OpenAPIPath: "/openapi.json", SwaggerPath: "/swagger", APIKey: "secret"}
+	srv, err := New(cfg, logger)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	req := httptest.NewRequest("GET", "/health", nil)
+	if _, err := srv.App().Test(req); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if observed.Len() == 0 {
+		t.Fatalf("expected request logs at debug level")
+	}
+}

@@ -1,5 +1,6 @@
 # OS files
 .DS_Store
+.Ds_Store
 **/.DS_Store
 Thumbs.db
 Desktop.ini

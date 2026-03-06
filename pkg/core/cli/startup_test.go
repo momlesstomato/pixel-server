@@ -81,3 +81,24 @@ func TestBuildStartupPlanNATSSelection(t *testing.T) {
 		t.Fatalf("expected nats connection error without server")
 	}
 }
+
+// TestTransportMode validates transport mode selection behavior.
+func TestTransportMode(t *testing.T) {
+	all, err := newRoleSet("all")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got := transportMode(config.RuntimeConfig{NATSURL: "nats://nats:4222"}, all); got != "local" {
+		t.Fatalf("expected local transport mode, got %s", got)
+	}
+	gateway, err := newRoleSet("gateway")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got := transportMode(config.RuntimeConfig{}, gateway); got != "local" {
+		t.Fatalf("expected local transport mode, got %s", got)
+	}
+	if got := transportMode(config.RuntimeConfig{NATSURL: "nats://nats:4222"}, gateway); got != "nats" {
+		t.Fatalf("expected nats transport mode, got %s", got)
+	}
+}

@@ -46,3 +46,18 @@ func TestRoleSetNeeds(t *testing.T) {
 		t.Fatalf("expected gateway role to allow distributed transport")
 	}
 }
+
+// TestRoleSetNames validates sorted role name rendering.
+func TestRoleSetNames(t *testing.T) {
+	roles, err := newRoleSet("moderation,api,gateway")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	names := roles.names()
+	if len(names) != 3 {
+		t.Fatalf("unexpected role names length: %d", len(names))
+	}
+	if names[0] != "api" || names[1] != "gateway" || names[2] != "moderation" {
+		t.Fatalf("unexpected role names: %+v", names)
+	}
+}

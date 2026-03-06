@@ -1,6 +1,10 @@
 package cli
 
-import "pixelsv/pkg/config"
+import (
+	"sort"
+
+	"pixelsv/pkg/config"
+)
 
 // roleSet stores normalized active runtime roles.
 type roleSet map[string]struct{}
@@ -48,4 +52,14 @@ func (r roleSet) needsRedis() bool {
 // forceLocalTransport reports whether runtime transport must stay in-process.
 func (r roleSet) forceLocalTransport() bool {
 	return r.has("all")
+}
+
+// names returns a sorted list of active role names.
+func (r roleSet) names() []string {
+	values := make([]string, 0, len(r))
+	for role := range r {
+		values = append(values, role)
+	}
+	sort.Strings(values)
+	return values
 }
