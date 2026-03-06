@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"pixelsv/internal/runtime/cli"
+	"pixelsv/pkg/core/cli"
 )
 
 // main executes the CLI root command.

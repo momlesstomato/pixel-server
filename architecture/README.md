@@ -7,7 +7,7 @@ This directory is planning-only.
 
 Global terminology for all files in `architecture/`:
 
-- "module" or "realm" means internal bounded context inside the single `pixelsv` binary (`internal/realms/<realm>/`).
+- "module" or "realm" means internal bounded context inside the single `pixelsv` binary (`internal/<realm>/`).
 - "contract topic" means internal messaging topic. In all-in-one mode these are in-process channels; in distributed mode they are NATS subjects.
 - "role" means a runtime activation flag (`--role=gateway`, `--role=game`, etc.) that decides which realm modules start.
 

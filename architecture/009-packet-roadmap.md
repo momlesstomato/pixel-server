@@ -6,7 +6,7 @@ The `pixel-protocol` spec defines **922 packets** (461 c2s + 461 s2c as of spec 
 
 Terminology for this roadmap:
 
-- "Module" means internal realm/bounded context inside the single `pixelsv` binary (`internal/realms/<realm>/`).
+- "Module" means internal realm/bounded context inside the single `pixelsv` binary (`internal/<realm>/`).
 - "Contract topic" means internal messaging topic. In all-in-one mode these are in-process channels; in distributed mode they are NATS subjects. The topic names are identical either way.
 
 The phases are ordered by **dependency depth**, not by packet count. A phase is not started until all packets it depends on (for a connected session to function) are implemented.
@@ -21,7 +21,7 @@ Each phase lists:
 - Implementation notes specific to pixelsv's architecture
 - Entry and exit criteria (what needs to pass in CI before the phase is "done")
 
-**"Implemented"** means: packet is decoded in `pkg/protocol`, handler is registered in the appropriate realm adapter (`internal/realms/<realm>/adapters/ws/`), handler contains correct business logic (not a TODO stub), at least one happy-path integration test passes.
+**"Implemented"** means: packet is decoded in `pkg/protocol`, handler is registered in the appropriate realm adapter (`internal/<realm>/adapters/ws/`), handler contains correct business logic (not a TODO stub), at least one happy-path integration test passes.
 
 ---
 
@@ -68,8 +68,8 @@ Deliverables:
 - `pkg/log` with Zap logger factory.
 - `pkg/storage` generic interfaces with in-memory fakes.
 - `pkg/pathfinding` 3D A* with full unit test suite (see [005-pathfinding-3d.md](005-pathfinding-3d.md)).
-- `internal/realms/game/domain/` component registration; empty `RoomWorld`; one system skeleton.
-- `internal/runtime/transport/` local bus implementation.
+- `internal/game/domain/` component registration; empty `RoomWorld`; one system skeleton.
+- `pkg/core/transport/` local bus implementation.
 - Docker Compose: `pixelsv`, `postgres`, `redis`.
 - Atlas migration: `users`, `rooms`, `items`, `bans` tables created.
 - CI: `go build ./...`, `go test ./...`, `go vet ./...`, lint all pass.
@@ -133,7 +133,7 @@ Key packets:
 - `user.wardrobe` (s2c) — saved outfits
 - `user.badges` (s2c) — badge collection subset
 
-Implementation note: Profile data is loaded through domain-owned repositories (`internal/realms/auth/domain/`). After `session.authenticated` is published, the game module prepares a `user.authenticated` composite and writes it to the session.
+Implementation note: Profile data is loaded through domain-owned repositories (`internal/auth/domain/`). After `session.authenticated` is published, the game module prepares a `user.authenticated` composite and writes it to the session.
 
 ### Permissions parity plan (Phase 2 entry requirement)
 

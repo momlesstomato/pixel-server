@@ -59,7 +59,7 @@ go get github.com/mlange-42/ark-tools@latest   # optional: system scheduler
 
 ---
 
-## Component definitions (`internal/realms/game/domain/components.go`)
+## Component definitions (`internal/game/domain/components.go`)
 
 ```go
 package domain
@@ -130,7 +130,7 @@ type ItemInteraction struct {
 type Dirty struct{}
 ```
 
-ECS components are **domain types** and live in `internal/realms/game/domain/`. They have no framework imports except `github.com/mlange-42/ark/ecs` which is the ECS framework itself — this is an accepted domain-level dependency for the game realm specifically.
+ECS components are **domain types** and live in `internal/game/domain/`. They have no framework imports except `github.com/mlange-42/ark/ecs` which is the ECS framework itself — this is an accepted domain-level dependency for the game realm specifically.
 
 ---
 
@@ -139,7 +139,7 @@ ECS components are **domain types** and live in `internal/realms/game/domain/`. 
 Ark's `World` returns a pointer from `ecs.NewWorld()` (changed in v0.7.0). Each room worker goroutine creates its own World:
 
 ```go
-// internal/realms/game/domain/world.go
+// internal/game/domain/world.go
 
 type RoomWorld struct {
     world *ecs.World
@@ -181,10 +181,10 @@ func NewRoomWorld() *RoomWorld {
 
 ## Room Worker Integration
 
-The room worker is the primary consumer of ECS. It lives in `internal/realms/game/domain/` and owns one `RoomWorld`:
+The room worker is the primary consumer of ECS. It lives in `internal/game/domain/` and owns one `RoomWorld`:
 
 ```go
-// internal/realms/game/domain/worker.go
+// internal/game/domain/worker.go
 
 type RoomWorker struct {
     roomID    int64

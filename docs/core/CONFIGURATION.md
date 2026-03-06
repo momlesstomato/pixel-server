@@ -7,6 +7,7 @@ Configuration is composed from one shared Viper instance.
 - `pkg/config` owns shared app-level config.
 - `pkg/log` owns logging config.
 - `pkg/http` owns HTTP/WebSocket runtime config.
+- `pkg/core/transport/factory` selects local or NATS transport adapter from runtime config.
 - `pkg/storage/postgres` owns postgres adapter config.
 - `pkg/storage/redis` owns redis adapter config.
 
@@ -31,7 +32,7 @@ Fields without a `default` tag are treated as required and must pass validation.
 - `REDIS_URL` required (except for roles that don't use Redis)
 - `REDIS_KEY_PREFIX` default: `pixelsv`
 - `REDIS_SESSION_TTL_SECONDS` default: `3600`
-- `NATS_URL` default: empty string (set when using distributed transport)
+- `NATS_URL` default: empty string (set to activate NATS transport in split-role deployment)
 
 ## Source Order
 

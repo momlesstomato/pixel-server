@@ -74,24 +74,23 @@ pixel-server/
 ├── cmd/
 │   └── pixelsv/
 ├── internal/
-│   ├── runtime/
-│   │   ├── cli/            <- Cobra command graph
+│   ├── auth/
+│   │   ├── domain/
+│   │   ├── app/
+│   │   └── adapters/
+│   ├── game/
+│   │   ├── domain/
+│   │   ├── app/
+│   │   └── adapters/
+│   ├── social/
+│   ├── navigator/
+│   ├── catalog/
+│   └── moderation/
+├── pkg/
+│   ├── core/
+│   │   ├── cli/            <- Cobra command graph and runtime composition
 │   │   ├── transport/      <- local + NATS adapters
 │   │   └── supervisor/     <- goroutine lifecycle, panic recovery
-│   └── realms/
-│       ├── auth/
-│       │   ├── domain/
-│       │   ├── app/
-│       │   └── adapters/
-│       ├── game/
-│       │   ├── domain/
-│       │   ├── app/
-│       │   └── adapters/
-│       ├── social/
-│       ├── navigator/
-│       ├── catalog/
-│       └── moderation/
-├── pkg/
 │   ├── config/             <- Viper config loading
 │   ├── log/                <- Zap logger factory
 │   ├── codec/              <- binary Reader/Writer

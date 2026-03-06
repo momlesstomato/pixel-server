@@ -19,8 +19,9 @@ This document is mandatory for all contributors and agents working in this repos
 - Prefer composition over direct concrete coupling.
 - `pkg/` must stay domain-agnostic and reusable.
 - Do not place business-domain entities, repositories, or use-case-specific contracts in `pkg/` (examples: `UserRepository`, `RoomRepository`).
-- Domain-specific ports/adapters belong to realm packages under `internal/realms/<realm>/...`.
-- Runtime wiring (CLI/bootstrap/composition) belongs to `internal/runtime/...`, separated from realm business modules.
+- Domain-specific ports/adapters belong to realm packages under `internal/<realm>/...`.
+- Runtime wiring (CLI/bootstrap/composition) belongs to `pkg/core/...`, separated from realm business modules.
+- `internal/` contains realm bounded contexts directly (`internal/<realm>/...`), not an extra `internal/realms/` layer.
 
 ## 3) Documentation and Commenting Rules
 
@@ -62,6 +63,16 @@ This document is mandatory for all contributors and agents working in this repos
 - WebSocket implementation preference is GoFiber-compatible middleware (`fiber/v3` + websocket middleware) unless a documented benchmark justifies deviation.
 - Runtime modes must share the same domain core and application services.
 - Duplicated code should preferably not exist; shared behavior must be extracted into reusable packages/components.
+
+## 6.1) Performance Policy (Strict)
+
+- All code must target low-latency, predictable runtime performance.
+- Every runtime hot path must have explicit performance goals and benchmark coverage.
+- 20Hz simulation budget is non-negotiable: one tick must complete within `50ms`; infrastructure overhead should remain below `5ms` per tick under normal load.
+- Transport goals:
+  - local in-process bus publish-to-handler path must target low microsecond latency and avoid unnecessary allocations.
+  - distributed transport (NATS) must be benchmarked and tuned for low single-digit millisecond publish/consume latency in normal network conditions.
+- Any change that affects hot paths must include updated benchmarks and performance notes in corresponding docs.
 
 ## 7) Configuration Policy
 

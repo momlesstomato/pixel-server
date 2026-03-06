@@ -18,11 +18,18 @@ Domain code never imports transport libraries. It depends only on port interface
 ```go
 // Defined by consumer realm
 type EventPublisher interface {
-    Publish(topic string, payload any) error
+    Publish(ctx context.Context, topic string, payload []byte) error
 }
 
 type EventSubscriber interface {
-    Subscribe(topic string, handler func(payload any)) error
+    Subscribe(ctx context.Context, topic string, handler Handler) (Subscription, error)
+}
+
+type Handler func(ctx context.Context, message Message) error
+
+type Message struct {
+    Topic string
+    Payload []byte
 }
 
 type SessionWriter interface {
@@ -33,7 +40,7 @@ type SessionWriter interface {
 ## Local Transport (In-Process)
 
 ```go
-// internal/runtime/transport/local/bus.go
+// pkg/core/transport/local/bus.go
 
 type Bus struct {
     handlers map[string][]func(any)
@@ -60,7 +67,7 @@ func (b *Bus) Subscribe(topic string, handler func(any)) error {
 ## NATS Transport (Distributed)
 
 ```go
-// internal/runtime/transport/nats/bus.go
+// pkg/core/transport/nats/bus.go
 
 type Bus struct {
     conn *nats.Conn

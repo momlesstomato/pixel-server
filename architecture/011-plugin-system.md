@@ -8,7 +8,7 @@ The plugin framework extends realm module behavior without violating core archit
 - Cross-module communication remains contract-topic based.
 - Plugins never get direct mutable access to room ECS internals.
 
-This document defines the required model for `pkg/plugin` and `internal/realms/game` integration.
+This document defines the required model for `pkg/plugin` and `internal/game` integration.
 
 ---
 
@@ -100,7 +100,7 @@ type API interface {
 
 ## Integration path for game realm
 
-`internal/realms/game/` must wire plugin components in this order:
+`internal/game/` must wire plugin components in this order:
 
 1. Build shared `EventBus` and `PacketInterceptor`.
 2. Build a `RoomService` adapter backed by room worker channels.

@@ -32,13 +32,13 @@ use .
 
 ```
 cmd/pixelsv/                      <- binary entrypoint
-internal/runtime/cli/             <- command graph and runtime composition
-internal/runtime/transport/       <- local + NATS transport adapters
-internal/runtime/supervisor/      <- goroutine lifecycle, panic recovery
-internal/realms/<realm>/          <- domain-focused bounded contexts
-internal/realms/<realm>/domain/   <- entities, aggregates, domain services
-internal/realms/<realm>/app/      <- use cases and orchestration ports
-internal/realms/<realm>/adapters/ <- transport/storage adapters per realm
+pkg/core/cli/             <- command graph and runtime composition
+pkg/core/transport/       <- local + NATS transport adapters
+pkg/core/supervisor/      <- goroutine lifecycle, panic recovery
+internal/<realm>/          <- domain-focused bounded contexts
+internal/<realm>/domain/   <- entities, aggregates, domain services
+internal/<realm>/app/      <- use cases and orchestration ports
+internal/<realm>/adapters/ <- transport/storage adapters per realm
 pkg/                              <- reusable packages shared across realms
 e2e/                              <- end-to-end tests
 ```
@@ -59,11 +59,11 @@ Current shared package baseline:
 
 ## Dependency Direction
 
-- `internal/realms/<realm>/domain` depends on nothing infra-specific.
-- `internal/realms/<realm>/app` depends on realm domain + ports.
-- `internal/realms/<realm>/adapters` depends on realm app/domain ports and concrete libraries.
-- `internal/runtime/cli` composes reusable packages and realm modules.
-- `internal/runtime/transport` implements transport ports (local channels or NATS).
+- `internal/<realm>/domain` depends on nothing infra-specific.
+- `internal/<realm>/app` depends on realm domain + ports.
+- `internal/<realm>/adapters` depends on realm app/domain ports and concrete libraries.
+- `pkg/core/cli` composes reusable packages and realm modules.
+- `pkg/core/transport` implements transport ports (local channels or NATS).
 - `cmd/pixelsv` wires dependencies based on `--role` flag.
 
 ## Multi-Role Wiring

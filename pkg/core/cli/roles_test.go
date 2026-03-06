@@ -39,4 +39,10 @@ func TestRoleSetNeeds(t *testing.T) {
 	if !all.needsHTTP() || !all.needsPostgres() || !all.needsRedis() {
 		t.Fatalf("unexpected all dependency plan")
 	}
+	if !all.forceLocalTransport() {
+		t.Fatalf("expected all role to force local transport")
+	}
+	if gateway.forceLocalTransport() {
+		t.Fatalf("expected gateway role to allow distributed transport")
+	}
 }

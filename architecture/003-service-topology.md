@@ -2,7 +2,7 @@
 
 ## Overview
 
-`pixelsv` runs as one binary. Logical service names (gateway, auth, game, social, navigator, catalog, moderation) are **realm modules** inside `internal/realms/`. Each can be activated independently via the `--role` flag for failure isolation and horizontal scaling.
+`pixelsv` runs as one binary. Logical service names (gateway, auth, game, social, navigator, catalog, moderation) are **realm modules** inside `internal/`. Each can be activated independently via the `--role` flag for failure isolation and horizontal scaling.
 
 ## Deployment Modes
 

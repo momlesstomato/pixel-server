@@ -44,3 +44,8 @@ func (r roleSet) needsRedis() bool {
 	}
 	return r.has("gateway") || r.has("game") || r.has("auth") || r.has("social") || r.has("navigator") || r.has("moderation") || r.has("api") || r.has("jobs")
 }
+
+// forceLocalTransport reports whether runtime transport must stay in-process.
+func (r roleSet) forceLocalTransport() bool {
+	return r.has("all")
+}

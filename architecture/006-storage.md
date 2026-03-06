@@ -51,7 +51,7 @@ The legacy emulators use MySQL/MariaDB. PostgreSQL 16 is preferred because:
 Storage follows hexagonal architecture:
 
 - **Ports** (interfaces): Defined in `pkg/storage/interfaces/` for generic primitives, and in each realm's `domain/` for domain-specific repositories.
-- **Adapters** (implementations): `pkg/storage/postgres/` and `pkg/storage/redis/` for generic adapters; `internal/realms/<realm>/adapters/postgres/` for domain-specific repository implementations.
+- **Adapters** (implementations): `pkg/storage/postgres/` and `pkg/storage/redis/` for generic adapters; `internal/<realm>/adapters/postgres/` for domain-specific repository implementations.
 
 ```go
 // pkg/storage/interfaces/querier.go
@@ -60,13 +60,13 @@ type RowQuerier interface {
     Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
-// internal/realms/game/domain/repository.go
+// internal/game/domain/repository.go
 type RoomRepository interface {
     GetByID(ctx context.Context, id int64) (*Room, error)
     Create(ctx context.Context, r *Room) error
 }
 
-// internal/realms/game/adapters/postgres/room_repository.go
+// internal/game/adapters/postgres/room_repository.go
 type roomRepo struct {
     pool *pgxpool.Pool
 }

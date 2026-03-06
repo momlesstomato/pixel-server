@@ -48,7 +48,7 @@ func newServeCommand() *cobra.Command {
 				return err
 			}
 			defer logger.Sync()
-			return runRoleAwareStartup(ctx, v, logger, roles)
+			return runRoleAwareStartup(ctx, v, baseCfg.Runtime, logger, roles)
 		},
 	}
 	cmd.Flags().StringVar(&envFile, "env-file", ".env", "env file path")
