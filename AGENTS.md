@@ -25,6 +25,8 @@ This document is mandatory for all contributors and agents working in this repos
 - Realm contracts are mandatory realm-owned artifacts: topic constants, messaging subjects, event names, HTTP route paths, and transport-facing domain contracts must be defined in their corresponding `internal/<realm>/...` packages.
 - Shared/reusable packages (`pkg/...`) may provide generic builders/parsers and transport primitives only; they must not declare realm-specific constants or business event names.
 - Cross-realm and runtime integration must avoid cyclic dependencies through ports/adapters and composition at startup boundaries.
+- All realm-facing APIs and module boundaries must be extension-ready for the plugin system defined in `architecture/011-plugin-system.md`.
+- Existing boilerplates are not exempt: any touched boilerplate must be aligned to plugin-ready contracts in the same change set.
 
 ## 3) Documentation and Commenting Rules
 
@@ -70,7 +72,20 @@ This document is mandatory for all contributors and agents working in this repos
 - Keep HTTP access logs disabled by default; enable per-request Fiber logging only at `debug` log level.
 - Keep logs focused on actionable events: framework/app errors, startup/shutdown transitions, and relevant operational state.
 
-## 6.1) Performance Policy (Strict)
+## 6.1) Plugin Extensibility Policy (Strict)
+
+- `pkg/core/cli/startup.go` is the only authority that loads, enables, disables, and unloads plugin registrations during lifecycle.
+- Plugin activation must be role-aware and realm-scoped: plugins that do not match active roles/realms must be skipped.
+- Realms must expose stable extension points via ports/contracts, not concrete internal types.
+- Realm application services must emit plugin events at domain boundaries using `<realm>.<entity>.<action>` naming.
+- Cancellable events must be emitted before irreversible side effects (DB writes, transport publish, broadcasts).
+- Plugin-facing event hooks are in-process only (`plugin.EventBus`) and must never be substituted by transport bus contracts.
+- Plugin HTTP endpoints must be scoped under `/api/v1/plugins/<pluginName>/` and must not shadow core realm/admin routes.
+- Plugin integrations must be fail-safe: plugin errors/panics cannot crash realm flows or server lifecycle.
+- Packet interception hooks must be treated as hot-path code and kept within performance budgets defined in this contract.
+- Any new feature intended for realm behavior must define plugin extension semantics (events/hooks or explicit non-extensible rationale) before implementation.
+
+## 6.2) Performance Policy (Strict)
 
 - All code must target low-latency, predictable runtime performance.
 - Every runtime hot path must have explicit performance goals and benchmark coverage.
@@ -118,3 +133,5 @@ This document is mandatory for all contributors and agents working in this repos
 - `docs/` updates for implemented behavior.
 - `.env.example` updated for every new configuration item.
 - Package file-count policy validated (`<=5` core files per package unless exception).
+- Plugin extensibility validated for new/touched features and boilerplates (events/hooks/contracts aligned with `011-plugin-system`).
+- Plugin boundaries respected (`plugin.EventBus` vs transport bus, route scoping, realm-scoped topic/event ownership).
