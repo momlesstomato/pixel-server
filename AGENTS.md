@@ -19,7 +19,8 @@ This document is mandatory for all contributors and agents working in this repos
 - Prefer composition over direct concrete coupling.
 - `pkg/` must stay domain-agnostic and reusable.
 - Do not place business-domain entities, repositories, or use-case-specific contracts in `pkg/` (examples: `UserRepository`, `RoomRepository`).
-- Domain-specific ports/adapters belong to their higher-order domain package (`internal/<domain>/...` or equivalent).
+- Domain-specific ports/adapters belong to realm packages under `internal/realms/<realm>/...`.
+- Runtime wiring (CLI/bootstrap/composition) belongs to `internal/runtime/...`, separated from realm business modules.
 
 ## 3) Documentation and Commenting Rules
 
@@ -77,6 +78,7 @@ This document is mandatory for all contributors and agents working in this repos
   - output format: `json` or `console` (pretty console)
   - log level: `debug`, `info`, `warn`, `error`, etc.
 - Logging implementation must live in a dedicated package (`pkg/log`), not inside `pkg/config`.
+- Administrative HTTP endpoints must be protected by an API key configured via environment (`API_KEY`).
 
 ## 8) Vendor and Repository Hygiene
 

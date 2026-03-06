@@ -6,6 +6,7 @@ Configuration is composed from one shared Viper instance.
 
 - `pkg/config` owns shared app-level config.
 - `pkg/log` owns logging config.
+- `pkg/http` owns HTTP/WebSocket runtime config.
 - `pkg/storage/postgres` owns postgres adapter config.
 - `pkg/storage/redis` owns redis adapter config.
 
@@ -15,6 +16,11 @@ Fields without a `default` tag are treated as required and must pass validation.
 ## Environment Variables
 
 - `APP_ENV` default: `development`
+- `HTTP_ADDR` default: `:8080`
+- `HTTP_READ_TIMEOUT_SECONDS` default: `10`
+- `OPENAPI_PATH` default: `/openapi.json`
+- `SWAGGER_PATH` default: `/swagger`
+- `API_KEY` required
 - `LOG_FORMAT` default: `console` values: `console`, `json`
 - `LOG_LEVEL` default: `info` values: zap-compatible levels
 - `POSTGRES_URL` required
@@ -38,6 +44,9 @@ if err != nil {
     return err
 }
 if err := log.BindViper(v); err != nil {
+    return err
+}
+if err := httppkg.BindViper(v); err != nil {
     return err
 }
 if err := postgres.BindViper(v); err != nil {

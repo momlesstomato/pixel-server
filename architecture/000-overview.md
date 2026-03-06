@@ -42,9 +42,12 @@ pixel-server/
 ├── cmd/
 │   └── pixelsv/
 ├── internal/
-│   ├── domain/
-│   ├── app/
-│   └── adapters/
+│   ├── runtime/
+│   │   └── cli/
+│   └── realms/
+│       ├── user/
+│       ├── room/
+│       └── chat/
 ├── pkg/
 │   └── ... reusable libraries
 └── vendor/                 <- read-only references

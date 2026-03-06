@@ -125,6 +125,8 @@ func parseDefault(kind reflect.Kind, value string) (any, error) {
 	switch kind {
 	case reflect.String:
 		return value, nil
+	case reflect.Bool:
+		return strconv.ParseBool(value)
 	case reflect.Int:
 		return strconv.Atoi(value)
 	case reflect.Int32:

@@ -141,7 +141,7 @@ func TestFillDefaultsFromTagsInvalidTarget(t *testing.T) {
 // TestApplyDefaultsFromTagsUnsupportedType checks unsupported kind handling.
 func TestApplyDefaultsFromTagsUnsupportedType(t *testing.T) {
 	type bad struct {
-		Enabled bool `mapstructure:"enabled" default:"true"`
+		Ratio float64 `mapstructure:"ratio" default:"1.5"`
 	}
 	v := viper.New()
 	if err := ApplyDefaultsFromTags(v, "", bad{}); err == nil {

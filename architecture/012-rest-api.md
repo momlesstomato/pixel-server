@@ -10,6 +10,10 @@
 - Prefer Fiber-compatible websocket middleware for realtime endpoints.
 - Keep API/WebSocket handlers thin; call application ports and use cases.
 
+## Current Caveat
+
+The current core implementation may temporarily run on Fiber v2-compatible middleware packages while keeping the same route and contract surface (`/health`, `/ready`, `/openapi.json`, `/swagger`, `/ws`, `/api/v1/*`). The upgrade target remains Fiber v3 once middleware compatibility is fully aligned.
+
 ## Why Fiber for WebSocket Path
 
 - Unified middleware and lifecycle in one server runtime.
