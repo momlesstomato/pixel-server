@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	authmessaging "pixelsv/internal/auth/messaging"
+	sessionmessaging "pixelsv/internal/sessionconnection/messaging"
 	"pixelsv/pkg/codec"
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/local"
@@ -21,7 +23,7 @@ func TestHandleBinaryPublishesPacket(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	out := make(chan transport.Message, 1)
-	_, err = bus.Subscribe(ctx, transport.PacketC2STopic("handshake-security", "s1"), func(_ context.Context, message transport.Message) error {
+	_, err = bus.Subscribe(ctx, authmessaging.PacketIngressTopic("s1"), func(_ context.Context, message transport.Message) error {
 		out <- message
 		return nil
 	})
@@ -44,7 +46,7 @@ func TestHandleBinaryPublishesPacket(t *testing.T) {
 	}
 	select {
 	case message := <-out:
-		if message.Topic != "packet.c2s.handshake-security.s1" {
+		if message.Topic != authmessaging.PacketIngressTopic("s1") {
 			t.Fatalf("unexpected topic: %s", message.Topic)
 		}
 		if string(message.Payload) != string(frame[4:]) {
@@ -71,7 +73,7 @@ func TestStartSessionOutputForward(t *testing.T) {
 	if err := gateway.Sessions().Register("s1", connection); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if err := bus.Publish(ctx, transport.SessionOutputTopic("s1"), []byte("out")); err != nil {
+	if err := bus.Publish(ctx, sessionmessaging.OutputTopic("s1"), []byte("out")); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if got := string(connection.last); got != "out" {

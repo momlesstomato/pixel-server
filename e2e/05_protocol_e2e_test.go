@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/fasthttp/websocket"
+	authmessaging "pixelsv/internal/auth/messaging"
+	sessionmessaging "pixelsv/internal/sessionconnection/messaging"
 	"pixelsv/pkg/codec"
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/local"
@@ -47,7 +49,7 @@ func Test05WebSocketProtocolFlow(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	ingress := make(chan transport.Message, 1)
-	_, err = bus.Subscribe(ctx, transport.PacketC2STopic("handshake-security", "1"), func(_ context.Context, message transport.Message) error {
+	_, err = bus.Subscribe(ctx, authmessaging.PacketIngressTopic("1"), func(_ context.Context, message transport.Message) error {
 		ingress <- message
 		return nil
 	})
@@ -70,14 +72,14 @@ func Test05WebSocketProtocolFlow(t *testing.T) {
 	}
 	select {
 	case message := <-ingress:
-		if message.Topic != "packet.c2s.handshake-security.1" {
+		if message.Topic != authmessaging.PacketIngressTopic("1") {
 			t.Fatalf("unexpected topic: %s", message.Topic)
 		}
 	case <-time.After(time.Second):
 		t.Fatalf("expected ingress publish")
 	}
 	outbound := codec.EncodeFrame(1347, []byte("ok"))
-	if err := bus.Publish(ctx, transport.SessionOutputTopic("1"), outbound); err != nil {
+	if err := bus.Publish(ctx, sessionmessaging.OutputTopic("1"), outbound); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	messageType, payload, err := conn.ReadMessage()

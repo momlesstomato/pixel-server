@@ -26,18 +26,14 @@ Factory behavior:
 
 ## Topic Contract
 
-Implemented topic constants include:
+Implemented topic constants are split by realm packages:
 
-- `packet.c2s.<realm>.<sessionID>`
-- `handshake.c2s.<sessionID>`
-- `session.authenticated`
-- `session.disconnected`
-- `room.input.<roomID>`
-- `session.output.<sessionID>`
-- `social.notification.<userID>`
-- `navigator.room_updated.<roomID>`
-- `catalog.purchase.completed`
-- `moderation.ban.issued.<userID>`
+- generic packet ingress:
+  - `packet.c2s.<realm>.<sessionID>` in `pkg/core/transport`
+- auth realm:
+  - `internal/auth/messaging`
+- session-connection realm:
+  - `internal/sessionconnection/messaging`
 
 ## Performance Direction
 
@@ -63,6 +59,7 @@ defer bus.Close()
 
 Runtime startup wiring is in `pkg/core/cli/startup.go`.
 
-Session output parsing helper:
+Topic parsing helpers:
 
-- `transport.ParseSessionOutputTopic(topic string) (sessionID string, ok bool)`
+- `transport.ParsePacketC2STopic(topic string) (realm string, sessionID string, ok bool)`
+- `sessionconnection/messaging.ParseOutputTopic(topic string) (sessionID string, ok bool)`

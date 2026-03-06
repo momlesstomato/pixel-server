@@ -7,35 +7,18 @@ func TestTopicBuilders(t *testing.T) {
 	if got := PacketC2STopic("handshake-security", "abc"); got != "packet.c2s.handshake-security.abc" {
 		t.Fatalf("unexpected packet topic: %s", got)
 	}
-	if got := HandshakeC2STopic("abc"); got != "handshake.c2s.abc" {
-		t.Fatalf("unexpected handshake topic: %s", got)
-	}
-	if got := RoomInputTopic("42"); got != "room.input.42" {
-		t.Fatalf("unexpected room input topic: %s", got)
-	}
-	if got := SessionOutputTopic("abc"); got != "session.output.abc" {
-		t.Fatalf("unexpected session output topic: %s", got)
-	}
-	if got := SocialNotificationTopic("9"); got != "social.notification.9" {
-		t.Fatalf("unexpected social topic: %s", got)
-	}
-	if got := NavigatorRoomUpdatedTopic("42"); got != "navigator.room_updated.42" {
-		t.Fatalf("unexpected navigator topic: %s", got)
-	}
-	if got := ModerationBanIssuedTopic("9"); got != "moderation.ban.issued.9" {
-		t.Fatalf("unexpected moderation topic: %s", got)
-	}
 }
 
-// TestParseSessionOutputTopic validates session output topic parsing.
-func TestParseSessionOutputTopic(t *testing.T) {
-	if value, ok := ParseSessionOutputTopic("session.output.abc"); !ok || value != "abc" {
-		t.Fatalf("expected parsed value, got %q %v", value, ok)
+// TestParsePacketC2STopic validates packet ingress topic parsing.
+func TestParsePacketC2STopic(t *testing.T) {
+	realm, sessionID, ok := ParsePacketC2STopic("packet.c2s.handshake-security.s1")
+	if !ok || realm != "handshake-security" || sessionID != "s1" {
+		t.Fatalf("unexpected parse result: %q %q %v", realm, sessionID, ok)
 	}
-	if _, ok := ParseSessionOutputTopic("session.output"); ok {
+	if _, _, ok := ParsePacketC2STopic("packet.c2s.handshake-security"); ok {
 		t.Fatalf("expected parse failure")
 	}
-	if _, ok := ParseSessionOutputTopic("session.output.abc.extra"); ok {
+	if _, _, ok := ParsePacketC2STopic("session.output.s1"); ok {
 		t.Fatalf("expected parse failure")
 	}
 }

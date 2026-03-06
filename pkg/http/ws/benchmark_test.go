@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	authmessaging "pixelsv/internal/auth/messaging"
 	"pixelsv/pkg/codec"
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/local"
@@ -18,7 +19,7 @@ func BenchmarkHandleBinary(b *testing.B) {
 		b.Fatalf("expected no error, got %v", err)
 	}
 	ctx := context.Background()
-	_, err = bus.Subscribe(ctx, transport.PacketC2STopic("handshake-security", "s1"), func(context.Context, transport.Message) error { return nil })
+	_, err = bus.Subscribe(ctx, authmessaging.PacketIngressTopic("s1"), func(context.Context, transport.Message) error { return nil })
 	if err != nil {
 		b.Fatalf("expected no error, got %v", err)
 	}

@@ -54,6 +54,11 @@ func (r roleSet) forceLocalTransport() bool {
 	return r.has("all")
 }
 
+// runsAuthRealm reports whether auth realm should be activated.
+func (r roleSet) runsAuthRealm() bool {
+	return r.has("all") || r.has("auth")
+}
+
 // names returns a sorted list of active role names.
 func (r roleSet) names() []string {
 	values := make([]string, 0, len(r))

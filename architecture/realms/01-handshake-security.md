@@ -4,7 +4,7 @@ Terminology note: references to services and NATS subjects in this file map to i
 
 
 > **Position:** 10 | **Phase:** 1 (Connection) | **Packets:** 13 (8 c2s, 5 s2c)
-> **Services:** gateway, auth | **Status:** Partially implemented
+> **Services:** gateway, auth | **Status:** Scaffold started (ticket validation path)
 
 ---
 
@@ -48,13 +48,13 @@ The Handshake & Security realm governs everything that happens between WebSocket
 ### Service Ownership
 
 ```
-Client ──WebSocket──▶ Gateway ──NATS(handshake.c2s.<sid>)──▶ Auth Service
+Client ──WebSocket──▶ Gateway ──NATS(packet.c2s.handshake-security.<sid>)──▶ Auth Service
                          ◀──NATS(session.output.<sid>)───────┘
                          ◀──NATS(session.authenticated)──────┘
 ```
 
-- **Gateway** handles WebSocket accept, frame parsing, and initial routing. Packets with IDs 4000, 1053, 3110, 773, 2419, 2490 are forwarded to `handshake.c2s.<sessionID>` via NATS.
-- **Auth service** consumes handshake NATS subjects, performs DH key exchange, validates SSO tokens against Redis, and publishes `session.authenticated` on success.
+- **Gateway** handles WebSocket accept, frame parsing, and initial routing. Packets with realm `handshake-security` are forwarded to `packet.c2s.handshake-security.<sessionID>`.
+- **Auth service** consumes handshake packet topics, validates SSO tickets, publishes `session.authenticated`, and emits `authentication.ok` to `session.output.<sessionID>`.
 - **Gateway** listens for `session.authenticated` and promotes the session to full packet routing.
 
 ### Database Tables

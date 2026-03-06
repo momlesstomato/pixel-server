@@ -5,6 +5,7 @@
 - `03_api_e2e_test.go`: validates HTTP runtime composition with API-key protected admin endpoint.
 - `04_transport_e2e_test.go`: validates transport factory selection and local bus round-trip flow.
 - `05_protocol_e2e_test.go`: validates websocket binary protocol ingress decode/publish and session output fan-out.
+- `06_auth_phase3_e2e_test.go`: validates phase 3 auth realm scaffold (ticket create/validate and authentication.ok frame).
 
 Run all e2e tests:
 

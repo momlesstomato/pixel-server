@@ -45,6 +45,13 @@ func TestRoleSetNeeds(t *testing.T) {
 	if gateway.forceLocalTransport() {
 		t.Fatalf("expected gateway role to allow distributed transport")
 	}
+	auth, err := newRoleSet("auth")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !auth.runsAuthRealm() || !all.runsAuthRealm() || gateway.runsAuthRealm() {
+		t.Fatalf("unexpected auth realm activation rules")
+	}
 }
 
 // TestRoleSetNames validates sorted role name rendering.

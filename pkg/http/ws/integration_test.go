@@ -9,6 +9,8 @@ import (
 	"github.com/fasthttp/websocket"
 	wsmiddleware "github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
+	authmessaging "pixelsv/internal/auth/messaging"
+	sessionmessaging "pixelsv/internal/sessionconnection/messaging"
 	"pixelsv/pkg/codec"
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/local"
@@ -29,11 +31,11 @@ func TestGatewayWebSocketFlow(t *testing.T) {
 	}
 	ingress := make(chan transport.Message, 1)
 	disconnects := make(chan transport.Message, 1)
-	_, _ = bus.Subscribe(ctx, transport.PacketC2STopic("handshake-security", "1"), func(_ context.Context, message transport.Message) error {
+	_, _ = bus.Subscribe(ctx, authmessaging.PacketIngressTopic("1"), func(_ context.Context, message transport.Message) error {
 		ingress <- message
 		return nil
 	})
-	_, _ = bus.Subscribe(ctx, transport.TopicSessionDisconnected, func(_ context.Context, message transport.Message) error {
+	_, _ = bus.Subscribe(ctx, sessionmessaging.TopicDisconnected, func(_ context.Context, message transport.Message) error {
 		disconnects <- message
 		return nil
 	})
@@ -73,7 +75,7 @@ func TestGatewayWebSocketFlow(t *testing.T) {
 	if count := gateway.Sessions().Count(); count != 1 {
 		t.Fatalf("expected one active session, got %d", count)
 	}
-	if err := bus.Publish(ctx, transport.SessionOutputTopic("1"), []byte("out")); err != nil {
+	if err := bus.Publish(ctx, sessionmessaging.OutputTopic("1"), []byte("out")); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	messageType, payload, err := conn.ReadMessage()

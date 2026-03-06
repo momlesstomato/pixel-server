@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	sessionmessaging "pixelsv/internal/sessionconnection/messaging"
 	"pixelsv/pkg/codec"
 	"pixelsv/pkg/core/session"
 	"pixelsv/pkg/core/transport"
@@ -34,7 +35,7 @@ func (g *Gateway) handleSessionOutput(ctx context.Context, message transport.Mes
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	sessionID, ok := transport.ParseSessionOutputTopic(message.Topic)
+	sessionID, ok := sessionmessaging.ParseOutputTopic(message.Topic)
 	if !ok {
 		return nil
 	}

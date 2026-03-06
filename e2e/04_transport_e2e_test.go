@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"pixelsv/pkg/core/transport"
+	sessionmessaging "pixelsv/internal/sessionconnection/messaging"
+	coretransport "pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/factory"
 )
 
@@ -19,14 +20,14 @@ func Test04LocalTransportComposition(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	out := make(chan string, 1)
-	_, err = bus.Subscribe(ctx, transport.SessionOutputTopic("1"), func(_ context.Context, message transport.Message) error {
+	_, err = bus.Subscribe(ctx, sessionmessaging.OutputTopic("1"), func(_ context.Context, message coretransport.Message) error {
 		out <- string(message.Payload)
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if err := bus.Publish(ctx, transport.SessionOutputTopic("1"), []byte("ok")); err != nil {
+	if err := bus.Publish(ctx, sessionmessaging.OutputTopic("1"), []byte("ok")); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	select {

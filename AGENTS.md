@@ -22,6 +22,9 @@ This document is mandatory for all contributors and agents working in this repos
 - Domain-specific ports/adapters belong to realm packages under `internal/<realm>/...`.
 - Runtime wiring (CLI/bootstrap/composition) belongs to `pkg/core/...`, separated from realm business modules.
 - `internal/` contains realm bounded contexts directly (`internal/<realm>/...`), not an extra `internal/realms/` layer.
+- Realm contracts are mandatory realm-owned artifacts: topic constants, messaging subjects, event names, HTTP route paths, and transport-facing domain contracts must be defined in their corresponding `internal/<realm>/...` packages.
+- Shared/reusable packages (`pkg/...`) may provide generic builders/parsers and transport primitives only; they must not declare realm-specific constants or business event names.
+- Cross-realm and runtime integration must avoid cyclic dependencies through ports/adapters and composition at startup boundaries.
 
 ## 3) Documentation and Commenting Rules
 

@@ -46,6 +46,25 @@ func TestBuildStartupPlanGameSkipsHTTP(t *testing.T) {
 	defer plan.Transport.Close()
 }
 
+// TestBuildStartupPlanAuthSkipsHTTP checks auth-only startup without HTTP requirement.
+func TestBuildStartupPlanAuthSkipsHTTP(t *testing.T) {
+	roles, err := newRoleSet("auth")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	v := viper.New()
+	v.Set("storage.postgres.url", "postgres://u:p@localhost:5432/pixelsv?sslmode=disable")
+	v.Set("storage.redis.url", "redis://localhost:6379/0")
+	plan, err := buildStartupPlan(v, config.RuntimeConfig{}, roles)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if plan.Transport == nil || plan.HTTP != nil || plan.Postgres == nil || plan.Redis == nil {
+		t.Fatalf("unexpected plan: %+v", plan)
+	}
+	defer plan.Transport.Close()
+}
+
 // TestBuildStartupPlanAPIRequiresAPIKey validates API key requirement when HTTP is active.
 func TestBuildStartupPlanAPIRequiresAPIKey(t *testing.T) {
 	roles, err := newRoleSet("api")

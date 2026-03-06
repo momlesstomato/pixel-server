@@ -3,8 +3,10 @@ package cli
 import (
 	"context"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"pixelsv/internal/auth"
 	"pixelsv/pkg/config"
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/factory"
@@ -101,13 +103,29 @@ func runRoleAwareStartup(ctx context.Context, v *viper.Viper, runtimeCfg config.
 		defer rdSvc.Close()
 		logger.Info("redis service started")
 	}
+	var server *httpserver.Server
 	if plan.HTTP != nil {
 		logger.Info("http service started", zap.String("address", plan.HTTP.Address))
 		srv, err := httpserver.New(*plan.HTTP, logger, plan.Transport)
 		if err != nil {
 			return err
 		}
-		return srv.ListenAndServe(ctx)
+		server = srv
+	}
+	if roles.runsAuthRealm() {
+		var fiberApp *fiber.App
+		apiKey := ""
+		if server != nil && plan.HTTP != nil {
+			fiberApp = server.App()
+			apiKey = plan.HTTP.APIKey
+		}
+		if _, err := auth.Register(ctx, fiberApp, plan.Transport, logger, apiKey); err != nil {
+			return err
+		}
+		logger.Info("auth realm runtime active")
+	}
+	if server != nil {
+		return server.ListenAndServe(ctx)
 	}
 	logger.Info("runtime started without http listener")
 	<-ctx.Done()

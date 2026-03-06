@@ -25,6 +25,8 @@ Core HTTP/WebSocket runtime implementation is provided by `pkg/http`.
 ## Administrative Endpoints
 
 - `GET /api/v1/admin/ping`
+- `POST /api/v1/auth/tickets`
+- `DELETE /api/v1/auth/tickets/:ticket`
 
 Administrative endpoints require header:
 
