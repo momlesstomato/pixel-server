@@ -3,7 +3,7 @@
 Document implemented core behavior here, for example:
 
 - startup and configuration
-- CLI commands and runtime modes
+- CLI commands and runtime modes (roles)
 - HTTP and WebSocket contracts
 - storage and migrations
 - observability and operations

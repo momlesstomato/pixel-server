@@ -12,13 +12,20 @@ Storage follows ports-and-adapters:
 
 - Connection pool service in `postgres.Service`
 - Generic query helper in `postgres.FetchOne`
-- Domain repositories must be implemented in higher-order domain packages, not in `pkg/storage/postgres`
+- Domain repositories must be implemented in realm adapter packages (`internal/realms/<realm>/adapters/postgres/`), not in `pkg/storage/postgres`
 
 ## Redis
 
 - Connection service in `redis.Service`
 - Generic key/value adapter via `redis.KVStore`
-- Domain stores must be implemented in higher-order domain packages, not in `pkg/storage/redis`
+- Domain stores must be implemented in realm adapter packages (`internal/realms/<realm>/adapters/redis/`), not in `pkg/storage/redis`
+
+## Role-Aware Access
+
+Each role process only connects to the storage backends it needs:
+- `gateway` needs Redis only (sessions, ban cache)
+- `game` needs both PostgreSQL and Redis
+- `catalog` needs PostgreSQL only
 
 ## E2E Steps
 

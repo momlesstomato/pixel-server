@@ -32,17 +32,17 @@ private RoomTile lowestFInOpen(Collection<RoomTile> openList) {
 }
 ```
 
-For a 64×64 room (4096 tiles) with a complex blocked layout this is O(n²) in open-list size. A trivial fix is a min-heap (Go's `container/heap`). The full fix is JPS.
+For a 64x64 room (4096 tiles) with a complex blocked layout this is O(n^2) in open-list size. A trivial fix is a min-heap (Go's `container/heap`). The full fix is JPS.
 
 ---
 
 ## Design goals for pixel-server
 
-1. **True X-Y-Z cost** – climbing costs more than flat movement; descending may cost less; the path naturally routes around tall obstacles.
-2. **Staircase traversal** – consecutive tiles with rising Z are treated as a ramp; the path prefers them over a vertical jump when both reach the same destination.
-3. **Flying mode** – an entity with the "flying" flag (effect ID) ignores floor height entirely; cost function becomes flat Euclidean.
-4. **Sub-millisecond** – a 64×64 room producing a path across ~100 tiles must complete in < 500 µs on a commodity core.
-5. **Deterministic** – given the same heightmap and entity positions, the same path is always produced. No randomness; the system is fully reproducible in tests.
+1. **True X-Y-Z cost** — climbing costs more than flat movement; descending may cost less; the path naturally routes around tall obstacles.
+2. **Staircase traversal** — consecutive tiles with rising Z are treated as a ramp; the path prefers them over a vertical jump when both reach the same destination.
+3. **Flying mode** — an entity with the "flying" flag (effect ID) ignores floor height entirely; cost function becomes flat Euclidean.
+4. **Sub-millisecond** — a 64x64 room producing a path across ~100 tiles must complete in < 500 us on a commodity core.
+5. **Deterministic** — given the same heightmap and entity positions, the same path is always produced. No randomness; the system is fully reproducible in tests.
 
 ---
 
@@ -89,10 +89,10 @@ type node struct {
 ```go
 const (
     CostFlat     = 1.0
-    CostDiagonal = 1.414 // √2
-    CostClimb    = 1.5   // per unit of positive Δz
-    CostDescend  = 0.8   // per unit of negative Δz (easier)
-    MaxStepUp    = 1.1   // maximum Δz for a single step (matches Habbo spec)
+    CostDiagonal = 1.414 // sqrt(2)
+    CostClimb    = 1.5   // per unit of positive dz
+    CostDescend  = 0.8   // per unit of negative dz (easier)
+    MaxStepUp    = 1.1   // maximum dz for a single step (matches Habbo spec)
     MaxStepDown  = 2.0   // can drop further than climbing
 )
 
@@ -140,32 +140,32 @@ A flat `[]bool` of size `width*height`. Index `y*width + x` is set when a tile i
 
 For rooms with large open areas (a common case in Habbo), A* with standard neighbor enumeration is suboptimal. JPS prunes symmetric paths by identifying "jump points" — tiles where a turn is forced — and skips straight runs entirely.
 
-JPS is applied **only on flat ground** (constant Z tiles). When a vertical transition is detected (Δz ≠ 0), the algorithm falls back to standard 8-directional A*.
+JPS is applied **only on flat ground** (constant Z tiles). When a vertical transition is detected (dz != 0), the algorithm falls back to standard 8-directional A*.
 
 This hybrid approach gives JPS speed on the common open floor case and correctness everywhere else.
 
 ```
 Flat run (JPS active):   O(k) where k = number of jump points
 Staircase / platform:    O(n log n) standard A*
-Combined cost estimate:  sub-100 µs for 64×64 rooms in practice
+Combined cost estimate:  sub-100 us for 64x64 rooms in practice
 ```
 
 ---
 
 ## Hierarchical Pre-computed Abstraction (HPA*)
 
-For very large rooms (128×128+) or room templates with complex multi-level layouts, a second-level HPA* layer is pre-computed at room load time.
+For very large rooms (128x128+) or room templates with complex multi-level layouts, a second-level HPA* layer is pre-computed at room load time.
 
 ### Cluster graph
 
-The room is divided into `16×16` clusters. Entrance/exit points between adjacent clusters are identified. A cluster-level graph is built with edges weighted by the intra-cluster A* cost between entrance points.
+The room is divided into `16x16` clusters. Entrance/exit points between adjacent clusters are identified. A cluster-level graph is built with edges weighted by the intra-cluster A* cost between entrance points.
 
 ```
 Room load:
-  1. Partition room into 16×16 clusters.
-  2. For each pair of adjacent clusters, find all border tile pairs (x,y)-(x±1,y) or (x,y)-(x,y±1).
+  1. Partition room into 16x16 clusters.
+  2. For each pair of adjacent clusters, find all border tile pairs.
   3. Run intra-cluster A* between pairs to compute edge weight.
-  4. Store as adjacency list: clusterGraph[clusterID] → []Edge{clusterID, weight}.
+  4. Store as adjacency list: clusterGraph[clusterID] -> []Edge{clusterID, weight}.
 
 Path request:
   1. Use cluster graph to get approximate corridor: [C1, C3, C7, C12, C_goal].
@@ -173,12 +173,12 @@ Path request:
   3. Stitch sub-paths together.
 ```
 
-For rooms < 32×32 (the majority), HPA* is skipped; plain JPS-A* is used directly.
+For rooms < 32x32 (the majority), HPA* is skipped; plain JPS-A* is used directly.
 
 ### Invalidation
 
 On item placement or removal that modifies heights/blockedness:
-- Identify affected clusters (usually 1–4).
+- Identify affected clusters (usually 1-4).
 - Recompute only the border edges for those clusters.
 - The intra-cluster sub-graph is rebuilt; the inter-cluster graph is partially updated.
 
@@ -226,6 +226,8 @@ func FindPath(l *Layout, from, to Tile, opts Options) []PathStep
 
 `FindPath` is **pure and stateless** with respect to `Layout` (which is read-only after room load). It allocates only the returned `[]PathStep`; all working memory (heap, gen array) is taken from a `sync.Pool` of pre-sized scratch buffers.
 
+The pathfinding package lives in `pkg/pathfinding/` — it is a reusable, domain-agnostic algorithm with zero infrastructure dependencies. The game realm's `MovementSystem` calls `FindPath` when processing walk commands.
+
 ---
 
 ## Testing strategy
@@ -234,9 +236,9 @@ Table-driven unit tests cover:
 - Straight horizontal path on flat floor.
 - Diagonal path.
 - Path around a wall.
-- Staircase: rising Z from 0→1→2, verify cost > flat equivalent.
+- Staircase: rising Z from 0->1->2, verify cost > flat equivalent.
 - Flying entity walks through blocked tile.
-- No path exists → `FindPath` returns nil.
-- Benchmark: 64×64 room, random 20% blocked, path from corner to corner — must complete < 500 µs.
+- No path exists -> `FindPath` returns nil.
+- Benchmark: 64x64 room, random 20% blocked, path from corner to corner — must complete < 500 us.
 
 All tests run without a database or network; `Layout` is constructed in-memory from a string heightmap for parity with the existing Habbo room model format.

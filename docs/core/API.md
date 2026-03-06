@@ -8,11 +8,13 @@ Core HTTP/WebSocket runtime implementation is provided by `pkg/http`.
 - `GET /ready` returns readiness JSON.
 - `GET /openapi.json` returns OpenAPI 3.1 JSON.
 - `GET /swagger` returns Swagger UI HTML bound to `/openapi.json`.
-- `GET /ws` upgrades to WebSocket and echoes frames.
+- `GET /ws` upgrades to WebSocket for binary protocol sessions.
 
-## Administrative Endpoint
+## Administrative Endpoints
 
 - `GET /api/v1/admin/ping`
+- `POST /api/v1/tickets` — create SSO ticket
+- `DELETE /api/v1/tickets/:ticket` — revoke SSO ticket
 
 Administrative endpoints require header:
 
@@ -25,14 +27,18 @@ Administrative endpoints require header:
 - Spec includes:
   - `ApiKeyAuth` security scheme (`X-API-Key`)
   - core probes (`/health`, `/ready`)
-  - admin endpoint (`/api/v1/admin/ping`)
+  - admin endpoints (`/api/v1/*`)
   - realtime endpoint documentation (`/ws`)
 
-## Implementation Caveat
+## Role-Aware Endpoint Availability
 
-Current implementation uses Fiber v2 runtime adapters (`fiberzap` and websocket contrib) for compatibility in this stage, while preserving the same endpoint contract planned in architecture.
+- `--role=api` or `--role=all`: serves REST admin endpoints, Swagger, OpenAPI.
+- `--role=gateway` or `--role=all`: serves `/ws` WebSocket endpoint.
+- All roles: serve `/health` and `/ready` probes.
 
 ## CLI
 
-- `pixelsv serve` starts the core HTTP/WebSocket runtime.
+- `pixelsv serve` starts all roles (HTTP + WebSocket + all realm modules).
+- `pixelsv serve --role=api` starts only the REST admin API.
+- `pixelsv serve --role=gateway` starts only the WebSocket gateway.
 - `pixelsv serve --env-file .env` loads environment from a specific file.

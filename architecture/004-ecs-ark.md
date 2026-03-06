@@ -2,8 +2,8 @@
 
 ## Correction Notice
 
-Previous drafts referenced `github.com/mlange-42/arche` (Arche). The correct library is  
-**`github.com/mlange-42/ark`** (Ark) — a distinct, newer, and more feature-rich project by the same author.  
+Previous drafts referenced `github.com/mlange-42/arche` (Arche). The correct library is
+**`github.com/mlange-42/ark`** (Ark) — a distinct, newer, and more feature-rich project by the same author.
 All code samples below use the Ark v0.7.x API.
 
 ---
@@ -17,9 +17,9 @@ A room contains four types of entities: **Avatars** (players), **Bots**, **Pets*
 Legacy emulators model this with inheritance hierarchies:
 
 ```
-RoomUnit → Habbo
-         → Bot
-         → Pet
+RoomUnit -> Habbo
+          -> Bot
+          -> Pet
 HabboItem (flat, but state grows via interaction sub-types)
 ```
 
@@ -36,15 +36,15 @@ ECS separates **data** (components) from **logic** (queries/systems) and stores 
 
 | Property | Details |
 |---|---|
-| Architecture | Archetype-based → contiguous component storage per archetype |
-| API style | Typed generics (`NewMap2[T1,T2]`, `NewFilter3[T1,T2,T3]`, …) — fully type-safe, no reflection in hot paths |
-| Entity relationships | First-class support via `ecs.Relation` — models owner→pet, group→member without manual join tables |
+| Architecture | Archetype-based: contiguous component storage per archetype |
+| API style | Typed generics (`NewMap2[T1,T2]`, `NewFilter3[T1,T2,T3]`, ...) — fully type-safe, no reflection in hot paths |
+| Entity relationships | First-class support via `ecs.Relation` — models owner/pet, group/member without manual join tables |
 | Event system | Built-in filterable events (`EntityCreated`, `EntityRemoved`, `ComponentAdded/Removed`) |
 | Batch operations | `batch.NewBatchQ[T]` for mass component mutation without iterating manually |
 | World serialization | `ark-serde` library for JSON World snapshots — useful for room save/restore |
 | Scheduler/systems | `ark-tools` provides a `Scheduler` and `System` interface if desired |
 | Dependencies | **Zero** external dependencies in the core `ecs` package |
-| Coverage | 100% test coverage; 222 GitHub stars; MIT + Apache 2.0 |
+| Coverage | 100% test coverage; MIT + Apache 2.0 |
 | Scope per room | One `*ecs.World` per room goroutine — no global state |
 
 ---
@@ -59,14 +59,14 @@ go get github.com/mlange-42/ark-tools@latest   # optional: system scheduler
 
 ---
 
-## Component definitions (`pkg/ecs/components.go`)
+## Component definitions (`internal/realms/game/domain/components.go`)
 
 ```go
-package ecs
+package domain
 
 import "github.com/mlange-42/ark/ecs"
 
-// Position in tile-space. Z is stack height (e.g. 1.0, 1.5, 2.0 …).
+// Position in tile-space. Z is stack height (e.g. 1.0, 1.5, 2.0 ...).
 type Position struct {
     X, Y float32
     Z    float32
@@ -96,7 +96,7 @@ type AvatarID struct {
 
 // Status encodes posture and visual effects as compact bit fields.
 type Status struct {
-    Posture uint8  // sit=1 stand=2 lay=3 wave=4 …
+    Posture uint8  // sit=1 stand=2 lay=3 wave=4 ...
     Effects uint32 // bitmask of active effect IDs
 }
 
@@ -130,16 +130,18 @@ type ItemInteraction struct {
 type Dirty struct{}
 ```
 
+ECS components are **domain types** and live in `internal/realms/game/domain/`. They have no framework imports except `github.com/mlange-42/ark/ecs` which is the ECS framework itself — this is an accepted domain-level dependency for the game realm specifically.
+
 ---
 
 ## World initialization
 
-Ark's `World` returns a pointer from `ecs.NewWorld()` (changed in v0.7.0). Each room goroutine creates its own World:
+Ark's `World` returns a pointer from `ecs.NewWorld()` (changed in v0.7.0). Each room worker goroutine creates its own World:
 
 ```go
-import "github.com/mlange-42/ark/ecs"
+// internal/realms/game/domain/world.go
 
-type roomWorld struct {
+type RoomWorld struct {
     world *ecs.World
 
     // Mappers (constructed once, reused every tick)
@@ -156,9 +158,9 @@ type roomWorld struct {
     dirtyFilter  *ecs.Filter1[Dirty]
 }
 
-func newRoomWorld() *roomWorld {
+func NewRoomWorld() *RoomWorld {
     w := ecs.NewWorld()
-    return &roomWorld{
+    return &RoomWorld{
         world:        w,
         avatarMapper: ecs.NewMap4[Position, TileRef, WalkPath, AvatarID](w),
         itemMapper:   ecs.NewMap3[Position, TileRef, ItemInteraction](w),
@@ -177,96 +179,65 @@ func newRoomWorld() *roomWorld {
 
 ---
 
-## Entity lifecycle
+## Room Worker Integration
 
-### Player enters room
-
-```go
-entity := rw.avatarMapper.NewEntity(
-    &Position{X: float32(spawnX), Y: float32(spawnY), Z: 0},
-    &TileRef{X: int16(spawnX), Y: int16(spawnY)},
-    &WalkPath{},
-    &AvatarID{UserID: userID, RoomUnit: nextUnitID()},
-)
-```
-
-### Player leaves room
+The room worker is the primary consumer of ECS. It lives in `internal/realms/game/domain/` and owns one `RoomWorld`:
 
 ```go
-rw.world.RemoveEntity(entity)
-```
+// internal/realms/game/domain/worker.go
 
-### Item placed
+type RoomWorker struct {
+    roomID    int64
+    rw        *RoomWorld
+    inbox     chan Envelope
+    sessions  map[string]SessionWriter // active sessions in this room
+    tickCount uint64
+}
 
-```go
-entity := rw.itemMapper.NewEntity(
-    &Position{X: float32(x), Y: float32(y), Z: z},
-    &TileRef{X: int16(x), Y: int16(y)},
-    &ItemInteraction{FurniID: furniID, ExtraData: extra},
-)
-```
-
-### Entity starts walking
-
-Ark's component update mutates in-place through the query pointer — no special "set" call needed:
-
-```go
-// During handle of walk command:
-query := rw.walkFilter.Query()
-for query.Next() {
-    _, _, path := query.Get()
-    if /* this entity */ {
-        path.Steps = computedPath
-        path.Cursor = 0
-        break
+func (w *RoomWorker) Run(ctx context.Context) {
+    ticker := time.NewTicker(50 * time.Millisecond) // 20 Hz
+    defer ticker.Stop()
+    for {
+        select {
+        case <-ctx.Done():
+            w.shutdown()
+            return
+        case env := <-w.inbox:
+            w.handleCommand(env)
+        case <-ticker.C:
+            w.tick()
+            w.tickCount++
+        }
     }
 }
-query.Close()
 ```
 
-For single-entity lookup, use a stored `ecs.Entity` handle + component mapper's `Get` method:
-
-```go
-// rw.avatarMapper.Get(entity) → (*Position, *TileRef, *WalkPath, *AvatarID)
-pos, _, path, _ := rw.avatarMapper.Get(entity)
-path.Steps = computedPath
-path.Cursor = 0
-pos.Z = targetZ
-```
+`SessionWriter` is a port interface — in all-in-one mode it writes directly to the WebSocket connection; in distributed mode it publishes via NATS.
 
 ---
 
 ## ECS Systems (at 20 Hz)
 
-Ark explicitly has **no built-in system runner** — systems are plain Go functions. The `ark-tools` scheduler is available for optional use. For pixel-server, plain sequential function calls inside the tick loop are preferred for simplicity and predictable execution order.
+Systems are plain Go functions called sequentially inside the tick loop:
 
 ```go
-func (w *roomWorker) tick() {
-    // 1. Advance walk paths, update Position + TileRef
-    MovementSystem(rw)
-    // 2. Detect arrival, trigger sit/stand posture
-    ArrivalSystem(rw)
-    // 3. Tick roller items, move entities on conveyor tiles
-    RollerSystem(rw)
-    // 4. Cycle interactive items (gate timers, crackables, etc.)
-    ItemInteractionSystem(rw)
-    // 5. Update pet happiness, energy, follow logic
-    PetAISystem(rw)
-    // 6. Bot chat timers, movement schedules
-    BotAISystem(rw)
-    // 7. Decrement chat rate-limit counters on odd ticks
-    ChatCooldownSystem(rw)
-    // 8. Evaluate WIRED condition → effect chains
-    WiredSystem(rw)
-    // 9. Collect Dirty entities and publish to session output topic
-    BroadcastSystem(rw)
+func (w *RoomWorker) tick() {
+    MovementSystem(w.rw)
+    ArrivalSystem(w.rw)
+    RollerSystem(w.rw)
+    ItemInteractionSystem(w.rw)
+    PetAISystem(w.rw)
+    BotAISystem(w.rw)
+    ChatCooldownSystem(w.rw, w.tickCount)
+    WiredSystem(w.rw)
+    BroadcastSystem(w.rw, w.sessions)
 }
 ```
 
 ### MovementSystem (full example)
 
 ```go
-func MovementSystem(rw *roomWorld) {
+func MovementSystem(rw *RoomWorld) {
     query := rw.walkFilter.Query()
     for query.Next() {
         pos, tile, path := query.Get()
@@ -281,23 +252,21 @@ func MovementSystem(rw *roomWorld) {
         tile.Y = int16(step.Y)
         path.Cursor++
     }
-    // query.Close() is implicit when the loop exhausts all entities;
-    // call explicitly if breaking early.
 }
 ```
 
-### ChatCooldownSystem (odd-tick only)
+### BroadcastSystem
+
+In the single-binary model, `BroadcastSystem` writes directly to session WebSocket connections via the `SessionWriter` port. No NATS round-trip for state broadcasts:
 
 ```go
-func ChatCooldownSystem(rw *roomWorld, tick uint64) {
-    if tick%2 == 0 {
-        return // only every other tick
-    }
-    query := rw.chatFilter.Query()
+func BroadcastSystem(rw *RoomWorld, sessions map[string]SessionWriter) {
+    query := rw.dirtyFilter.Query()
     for query.Next() {
-        _, cooldown := query.Get()
-        if cooldown.Counter > 0 {
-            cooldown.Counter--
+        // Encode entity state update packet
+        // Write to every session in the room
+        for _, sess := range sessions {
+            sess.Send(encoded)
         }
     }
 }
@@ -307,43 +276,21 @@ func ChatCooldownSystem(rw *roomWorld, tick uint64) {
 
 ## Entity Relationships (Ark first-class feature)
 
-Ark supports entity relationships natively, which is directly useful for:
+Ark supports entity relationships natively:
 
-- Pet → Owner: `ecs.Relation` from pet entity to its owner entity.
-- Item → Room: linking items to their room world (less useful when each room has its own World, but useful for cross-room lookups in the game supervisor).
-- Group → Member: managed in the social module's own world.
+- Pet to Owner: `ecs.Relation` from pet entity to its owner entity.
+- Item to Room: linking items to their room world.
 
 ```go
-// Example: pet owns a relation to its owner avatar
-petOwnerRel := ecs.NewRelation[PetAI]()  // PetAI is the relation component type
+petOwnerRel := ecs.NewRelation[PetAI]()
 
-// When placing a pet:
 petEntity := rw.world.NewEntityRel(petOwnerRel.Make(ownerEntity),
     &Position{...}, &TileRef{...}, &PetAI{HappyLevel: 100, Energy: 100})
 
-// Query all pets owned by a specific avatar:
 petQuery := rw.world.Query(petOwnerRel.Filter(ownerEntity))
 for petQuery.Next() {
     // found a pet owned by this avatar
 }
-```
-
----
-
-## Event System (Ark built-in)
-
-Use Ark's event system to trigger side effects without coupling systems:
-
-```go
-// Listen for entity removal to clean up Redis presence
-ecs.Subscribe(rw.world, func(world *ecs.World, evt ecs.EntityEvent) {
-    if !evt.Contains(ecs.ComponentID[AvatarID](world)) {
-        return
-    }
-    _, _, _, avatarID := rw.avatarMapper.Get(evt.Entity)
-    // Remove from room presence in Redis
-    redisClient.SRem(ctx, fmt.Sprintf("room:presence:%d", roomID), avatarID.UserID)
-})
 ```
 
 ---
@@ -355,22 +302,24 @@ For room state persistence (crash recovery, room templates):
 ```go
 import arkserde "github.com/mlange-42/ark-serde"
 
-// Save room state
+// Save room state to Redis
 jsonBytes, err := arkserde.Serialize(rw.world)
+redisClient.Set(ctx, fmt.Sprintf("room:snapshot:%d", roomID), jsonBytes, 0)
 
-// Restore room state
-err = arkserde.Deserialize(rw.world, jsonBytes)
+// Restore room state from Redis
+data, _ := redisClient.Get(ctx, fmt.Sprintf("room:snapshot:%d", roomID)).Bytes()
+err = arkserde.Deserialize(rw.world, data)
 ```
 
-This replaces the manual per-item flush loops in legacy emulators. The full ECS world snapshot is written to Redis on clean shutdown and reloaded on startup, minimising DB load.
+This enables crash recovery in distributed mode: when a game worker restarts, it loads room state from Redis snapshots instead of rebuilding from PostgreSQL.
 
 ---
 
 ## Why NOT to use ECS everywhere
 
-ECS is appropriate inside the `game` module for room simulation only.
+ECS is appropriate inside the `game` realm for room simulation only.
 
-| Service | Use ECS? | Reason |
+| Realm | Use ECS? | Reason |
 |---|---|---|
 | `auth` | No | Stateless request/response |
 | `catalog` | No | DB read dominated |
@@ -382,13 +331,11 @@ ECS is appropriate inside the `game` module for room simulation only.
 
 ## Performance estimate (Ark v0.7.x)
 
-Ark's benchmarks (from its published benchmark suite) show ~2–5 ns per entity per query iteration on hot archetypes. For pixel-server:
-
 | System | Entities | Estimate per tick |
 |---|---|---|
-| MovementSystem | 200 walking entities | ~1–2 µs |
-| ItemInteractionSystem | 100 interactive items | ~3–10 µs |
-| BroadcastSystem (dirty scan) | 200 entities | ~5–20 µs (session output publish dominates) |
-| All systems combined | 200+100 | ~30–80 µs per 50 ms tick |
+| MovementSystem | 200 walking entities | ~1-2 us |
+| ItemInteractionSystem | 100 interactive items | ~3-10 us |
+| BroadcastSystem (dirty scan) | 200 entities | ~5-20 us (session write dominates) |
+| All systems combined | 200+100 | ~30-80 us per 50 ms tick |
 
-At 100 active rooms per process, total ECS CPU ≈ 8 ms/s = well under 1% of one core. I/O (Redis, storage adapters) dominates at scale, not ECS iteration.
+At 100 active rooms per process, total ECS CPU is approximately 8 ms/s — well under 1% of one core. I/O (Redis, storage adapters) dominates at scale, not ECS iteration.
