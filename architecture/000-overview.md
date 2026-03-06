@@ -59,6 +59,8 @@ The runtime is modular, but not microservice-based. Bounded contexts exist as in
 - HTTP and WebSocket are served by GoFiber v3.
 - Prefer Fiber-compatible websocket middleware for realtime endpoints.
 - REST and WebSocket both map into application ports, never directly into domain state mutation.
+- WebSocket ingress publishes decoded packets to `packet.c2s.<realm>.<sessionID>`.
+- Session egress consumes binary payloads from `session.output.<sessionID>`.
 
 ## Repository Intent
 
@@ -89,6 +91,7 @@ pixel-server/
 ├── pkg/
 │   ├── core/
 │   │   ├── cli/            <- Cobra command graph and runtime composition
+│   │   ├── session/        <- Runtime session manager and writer port
 │   │   ├── transport/      <- local + NATS adapters
 │   │   └── supervisor/     <- goroutine lifecycle, panic recovery
 │   ├── config/             <- Viper config loading

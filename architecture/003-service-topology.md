@@ -63,8 +63,8 @@ Multiple processes of the same binary, each running specific roles. Inter-module
 
 | Module | Role Flag | Responsibility | Transport In | Transport Out |
 |---|---|---|---|---|
-| `gateway` | `gateway` | WebSocket session lifecycle, packet ingress/egress | WS frames | session.output, room.input |
-| `auth` | `auth` | Handshake, identity, SSO ticket validation | handshake.c2s | session.authenticated |
+| `gateway` | `gateway` | WebSocket session lifecycle, packet ingress/egress | WS frames | packet.c2s.<realm>.<sessionID>, session.disconnected |
+| `auth` | `auth` | Handshake, identity, SSO ticket validation | packet.c2s.handshake-security.* | session.authenticated, session.output |
 | `game` | `game` | ECS room workers, 20 Hz tick, pathfinding | room.input | session.output (broadcasts) |
 | `social` | `social` | Friend graph, messaging, notifications | session.authenticated | session.output |
 | `navigator` | `navigator` | Room discovery and search | navigator topics | session.output |
@@ -117,6 +117,7 @@ When a game instance crashes and restarts:
 ## Concurrency Model
 
 - WebSocket ingress is handled by Fiber middleware and handed to application ports.
+- Gateway decodes binary packets before publish to packet realm topics.
 - Game simulation uses room-owned goroutines with fixed 20 Hz tick loops.
 - ECS world mutation stays single-writer per room worker.
 - Cross-module handoff is via typed Go interfaces — in-process when co-located, NATS when distributed.

@@ -3,6 +3,8 @@ package transport
 import "strings"
 
 const (
+	// TopicPacketC2S is the gateway inbound packet topic prefix.
+	TopicPacketC2S = "packet.c2s"
 	// TopicHandshakeC2S is the gateway to auth handshake input topic prefix.
 	TopicHandshakeC2S = "handshake.c2s"
 	// TopicSessionAuthenticated broadcasts successful session authentication.
@@ -22,6 +24,11 @@ const (
 	// TopicModerationBanIssued is the moderation ban notification topic prefix.
 	TopicModerationBanIssued = "moderation.ban.issued"
 )
+
+// PacketC2STopic builds a packet ingress topic for one realm and session.
+func PacketC2STopic(realm string, sessionID string) string {
+	return joinTopic(TopicPacketC2S, realm, sessionID)
+}
 
 // HandshakeC2STopic builds a handshake ingress topic for one session.
 func HandshakeC2STopic(sessionID string) string {
@@ -51,6 +58,18 @@ func NavigatorRoomUpdatedTopic(roomID string) string {
 // ModerationBanIssuedTopic builds a ban issued topic for one user.
 func ModerationBanIssuedTopic(userID string) string {
 	return joinTopic(TopicModerationBanIssued, userID)
+}
+
+// ParseSessionOutputTopic extracts session id from session output topic.
+func ParseSessionOutputTopic(topic string) (string, bool) {
+	tokens := strings.Split(topic, ".")
+	if len(tokens) != 3 {
+		return "", false
+	}
+	if tokens[0] != "session" || tokens[1] != "output" || tokens[2] == "" {
+		return "", false
+	}
+	return tokens[2], true
 }
 
 // joinTopic concatenates non-empty topic parts using dot separators.

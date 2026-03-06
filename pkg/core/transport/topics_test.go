@@ -4,6 +4,9 @@ import "testing"
 
 // TestTopicBuilders validates concrete topic builders.
 func TestTopicBuilders(t *testing.T) {
+	if got := PacketC2STopic("handshake-security", "abc"); got != "packet.c2s.handshake-security.abc" {
+		t.Fatalf("unexpected packet topic: %s", got)
+	}
 	if got := HandshakeC2STopic("abc"); got != "handshake.c2s.abc" {
 		t.Fatalf("unexpected handshake topic: %s", got)
 	}
@@ -21,6 +24,19 @@ func TestTopicBuilders(t *testing.T) {
 	}
 	if got := ModerationBanIssuedTopic("9"); got != "moderation.ban.issued.9" {
 		t.Fatalf("unexpected moderation topic: %s", got)
+	}
+}
+
+// TestParseSessionOutputTopic validates session output topic parsing.
+func TestParseSessionOutputTopic(t *testing.T) {
+	if value, ok := ParseSessionOutputTopic("session.output.abc"); !ok || value != "abc" {
+		t.Fatalf("expected parsed value, got %q %v", value, ok)
+	}
+	if _, ok := ParseSessionOutputTopic("session.output"); ok {
+		t.Fatalf("expected parse failure")
+	}
+	if _, ok := ParseSessionOutputTopic("session.output.abc.extra"); ok {
+		t.Fatalf("expected parse failure")
 	}
 }
 

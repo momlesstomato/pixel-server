@@ -4,6 +4,7 @@
 - `02_storage_e2e_test.go`: validates storage adapter round-trips and optional live PostgreSQL ping.
 - `03_api_e2e_test.go`: validates HTTP runtime composition with API-key protected admin endpoint.
 - `04_transport_e2e_test.go`: validates transport factory selection and local bus round-trip flow.
+- `05_protocol_e2e_test.go`: validates websocket binary protocol ingress decode/publish and session output fan-out.
 
 Run all e2e tests:
 

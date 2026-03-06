@@ -12,3 +12,5 @@ Document implemented core behavior here, for example:
 - [STORAGE.md](STORAGE.md) for storage ports and adapters
 - [TRANSPORT.md](TRANSPORT.md) for runtime local/NATS event transport behavior
 - [API.md](API.md) for HTTP, Swagger, WebSocket, and admin API-key endpoints
+- [PROTOCOL.md](PROTOCOL.md) for generated packet contracts and frame codec usage
+- [SESSIONS.md](SESSIONS.md) for websocket session manager behavior

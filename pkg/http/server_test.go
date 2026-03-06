@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"pixelsv/pkg/core/transport/local"
 )
 
 // TestServerRoutes validates core route behavior.
@@ -17,7 +19,7 @@ func TestServerRoutes(t *testing.T) {
 		SwaggerPath:           "/swagger",
 		APIKey:                "secret",
 	}
-	server, err := New(cfg, nil)
+	server, err := New(cfg, nil, local.New())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

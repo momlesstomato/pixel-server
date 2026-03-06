@@ -37,6 +37,9 @@ The current core implementation may temporarily run on Fiber v2-compatible middl
 ### Gateway Role (`--role=gateway` or `--role=all`)
 
 - `GET /ws` — WebSocket upgrade for binary protocol sessions
+- WebSocket binary frames are decoded into protocol packets before transport publish
+- Packet ingress topic shape: `packet.c2s.<realm>.<sessionID>`
+- Packet egress topic shape: `session.output.<sessionID>`
 
 ## Administrative REST Endpoints
 

@@ -93,6 +93,7 @@ func (b *Bus) Subscribe(topic string, handler func(any)) error {
 Topic names are stable regardless of transport. They are defined as constants:
 
 ```
+packet.c2s.<realm>.<sessionID>     <- gateway -> realm consumers
 handshake.c2s.<sessionID>         <- gateway -> auth
 session.authenticated             <- auth -> game, social, navigator
 session.disconnected              <- gateway -> game, social
@@ -111,6 +112,7 @@ moderation.ban.issued.<userID>    <- moderation -> gateway
 - Include correlation metadata for tracing (`sessionID`, `userID`, `roomID`, `requestID`).
 - In local transport, envelopes are passed by reference (zero-copy).
 - In NATS transport, envelopes are serialized to binary (codec-encoded or JSON).
+- Gateway currently publishes packet ingress payload as binary body (`header + payload`) after decode and topic routing.
 
 ## Delivery and Idempotency
 

@@ -28,6 +28,7 @@ Factory behavior:
 
 Implemented topic constants include:
 
+- `packet.c2s.<realm>.<sessionID>`
 - `handshake.c2s.<sessionID>`
 - `session.authenticated`
 - `session.disconnected`
@@ -44,6 +45,13 @@ Implemented topic constants include:
 - Local wildcard matching supports NATS-like `*` and `>` semantics.
 - NATS adapter preserves the same topic contract for distributed mode.
 - Local bus benchmark exists in `pkg/core/transport/local/bus_benchmark_test.go`.
+- WebSocket ingress decode/publish benchmark exists in `pkg/http/ws/benchmark_test.go`.
+
+Current baseline (`go test -run '^$' -bench BenchmarkHandleBinary -benchmem ./pkg/http/ws`):
+
+- `~232 ns/op`
+- `352 B/op`
+- `9 allocs/op`
 
 ## Usage
 
@@ -54,3 +62,7 @@ defer bus.Close()
 ```
 
 Runtime startup wiring is in `pkg/core/cli/startup.go`.
+
+Session output parsing helper:
+
+- `transport.ParseSessionOutputTopic(topic string) (sessionID string, ok bool)`

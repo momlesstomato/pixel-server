@@ -103,7 +103,7 @@ func runRoleAwareStartup(ctx context.Context, v *viper.Viper, runtimeCfg config.
 	}
 	if plan.HTTP != nil {
 		logger.Info("http service started", zap.String("address", plan.HTTP.Address))
-		srv, err := httpserver.New(*plan.HTTP, logger)
+		srv, err := httpserver.New(*plan.HTTP, logger, plan.Transport)
 		if err != nil {
 			return err
 		}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"pixelsv/pkg/config"
+	"pixelsv/pkg/core/transport/local"
 	httpserver "pixelsv/pkg/http"
 	logpkg "pixelsv/pkg/log"
 )
@@ -37,7 +38,7 @@ func Test03CoreAPIComposition(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	defer logger.Sync()
-	srv, err := httpserver.New(httpCfg, logger)
+	srv, err := httpserver.New(httpCfg, logger, local.New())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

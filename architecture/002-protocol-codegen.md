@@ -34,17 +34,11 @@ Currently 922 packets are defined; the generator handles all of them.
 
 ```
 tools/protogen/
-  main.go           <- CLI entry-point (flags: -spec, -out, -package)
-  loader.go         <- parses protocol.yaml -> internal AST
-  types.go          <- YAML type -> Go type mapping
-  struct_gen.go     <- emits packet struct declarations
-  codec_gen.go      <- emits Encode / Decode methods
-  router_gen.go     <- emits RouterTable with HeaderID constants
-  handler_gen.go    <- emits handler interface stubs (skips if file exists)
-  template/
-    packet.go.tmpl
-    router.go.tmpl
-    handler.go.tmpl
+  main.go           <- CLI entry-point (flags: -spec, -out, -realm, -direction)
+  run.go            <- generation orchestration and output formatting
+  spec.go           <- parses protocol.yaml -> internal AST
+  render.go         <- emits packet structs/methods/registry lines
+  codec_lines.go    <- YAML type mapping and encode/decode line generation
 ```
 
 ### Internal AST (Go structs)

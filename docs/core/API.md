@@ -10,6 +10,18 @@ Core HTTP/WebSocket runtime implementation is provided by `pkg/http`.
 - `GET /swagger` returns Swagger UI HTML bound to `/openapi.json`.
 - `GET /ws` upgrades to WebSocket for binary protocol sessions.
 
+## WebSocket Runtime Flow
+
+- WebSocket endpoint is implemented through Fiber websocket middleware.
+- Incoming binary payloads are parsed as one or many protocol frames (`uint32` length + `uint16` header + payload).
+- Each frame is decoded with `pkg/protocol` c2s registry.
+- Decoded packet realm is routed through transport topic:
+  - `packet.c2s.<realm>.<sessionID>`
+- Outbound payloads are consumed from:
+  - `session.output.<sessionID>`
+- Session lifecycle publishes disconnect events on:
+  - `session.disconnected`
+
 ## Administrative Endpoints
 
 - `GET /api/v1/admin/ping`
@@ -32,7 +44,7 @@ Administrative endpoints require header:
 
 - HTTP listener enabled roles: `all`, `gateway`, `api`, `jobs`.
 - HTTP listener disabled roles: `game`, `auth`, `social`, `navigator`, `catalog`, `moderation`.
-- Phase 0 behavior: any role that enables HTTP serves the same core endpoints listed above.
+- Current behavior: any role that enables HTTP serves the same core endpoints listed above.
 
 ## CLI
 

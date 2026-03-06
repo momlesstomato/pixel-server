@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
+	"pixelsv/pkg/core/transport/local"
 )
 
 // TestRequestLogsDisabledOutsideDebug validates that request logs are skipped above debug level.
@@ -14,7 +15,7 @@ func TestRequestLogsDisabledOutsideDebug(t *testing.T) {
 	core, observed := observer.New(zapcore.InfoLevel)
 	logger := zap.New(core)
 	cfg := Config{Address: ":0", DisableStartupMessage: true, ReadTimeoutSeconds: 10, OpenAPIPath: "/openapi.json", SwaggerPath: "/swagger", APIKey: "secret"}
-	srv, err := New(cfg, logger)
+	srv, err := New(cfg, logger, local.New())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -32,7 +33,7 @@ func TestRequestLogsEnabledAtDebug(t *testing.T) {
 	core, observed := observer.New(zapcore.DebugLevel)
 	logger := zap.New(core)
 	cfg := Config{Address: ":0", DisableStartupMessage: true, ReadTimeoutSeconds: 10, OpenAPIPath: "/openapi.json", SwaggerPath: "/swagger", APIKey: "secret"}
-	srv, err := New(cfg, logger)
+	srv, err := New(cfg, logger, local.New())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
