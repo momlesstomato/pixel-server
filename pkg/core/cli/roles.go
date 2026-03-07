@@ -59,6 +59,11 @@ func (r roleSet) runsAuthRealm() bool {
 	return r.has("all") || r.has("auth")
 }
 
+// runsSessionConnectionRealm reports whether session-connection realm should be active.
+func (r roleSet) runsSessionConnectionRealm() bool {
+	return r.has("all") || r.has("gateway") || r.has("api")
+}
+
 // names returns a sorted list of active role names.
 func (r roleSet) names() []string {
 	values := make([]string, 0, len(r))

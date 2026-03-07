@@ -72,6 +72,8 @@ This document is mandatory for all contributors and agents working in this repos
 - Keep HTTP access logs disabled by default; enable per-request Fiber logging only at `debug` log level.
 - Keep logs focused on actionable events: framework/app errors, startup/shutdown transitions, and relevant operational state.
 - At `debug` level, all relevant runtime operations must emit diagnostic logs in console output (for example: database queries/commands, packet ingress/egress, transport publish/consume paths, and session control actions).
+- Server-initiated disconnects on protocol/runtime failures must send a protocol-level disconnect packet (`disconnect.reason`) before closing the socket when the connection is still writable.
+- All session-bound modules must subscribe to session lifecycle contracts and perform idempotent cleanup on `session.disconnected` (and equivalent control events); this includes future state such as ECS entities, room occupancy, and scheduled workers.
 
 ## 6.1) Plugin Extensibility Policy (Strict)
 
@@ -85,6 +87,7 @@ This document is mandatory for all contributors and agents working in this repos
 - Plugin integrations must be fail-safe: plugin errors/panics cannot crash realm flows or server lifecycle.
 - Packet interception hooks must be treated as hot-path code and kept within performance budgets defined in this contract.
 - Any new feature intended for realm behavior must define plugin extension semantics (events/hooks or explicit non-extensible rationale) before implementation.
+- Every implemented packet handler must emit at least one realm-owned plugin event so packet flows are observable/extensible without modifying core handlers.
 
 ## 6.2) Performance Policy (Strict)
 
@@ -136,3 +139,5 @@ This document is mandatory for all contributors and agents working in this repos
 - Package file-count policy validated (`<=5` core files per package unless exception).
 - Plugin extensibility validated for new/touched features and boilerplates (events/hooks/contracts aligned with `011-plugin-system`).
 - Plugin boundaries respected (`plugin.EventBus` vs transport bus, route scoping, realm-scoped topic/event ownership).
+- Disconnect semantics validated: protocol `disconnect.reason` is emitted on server-side failure paths when possible, and session lifecycle cleanup is idempotent across modules.
+- Packet handlers validated for plugin event emission coverage.

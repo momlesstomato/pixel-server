@@ -21,6 +21,12 @@ Fields without a `default` tag are treated as required and must pass validation.
 - `APP_ENV` default: `development`
 - `HTTP_ADDR` default: `:8080`
 - `HTTP_READ_TIMEOUT_SECONDS` default: `10`
+- `WS_PING_INTERVAL_SECONDS` default: `30`
+- `WS_PONG_TIMEOUT_SECONDS` default: `90`
+- `WS_AVAILABILITY_OPEN` default: `true`
+- `WS_AVAILABILITY_ON_SHUTDOWN` default: `false`
+- `WS_AVAILABILITY_AUTHENTIC` default: `true`
+- `WS_TELEMETRY_MIN_INTERVAL_MS` default: `1000`
 - `OPENAPI_PATH` default: `/openapi.json`
 - `SWAGGER_PATH` default: `/swagger`
 - `API_KEY` required

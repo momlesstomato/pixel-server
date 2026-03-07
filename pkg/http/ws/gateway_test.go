@@ -120,10 +120,59 @@ func TestStartSessionDisconnectControl(t *testing.T) {
 	}
 }
 
+// TestShutdownDisconnectsSessions validates graceful gateway shutdown behavior.
+func TestShutdownDisconnectsSessions(t *testing.T) {
+	previousDelay := shutdownDisconnectFlushDelay
+	shutdownDisconnectFlushDelay = 0
+	defer func() { shutdownDisconnectFlushDelay = previousDelay }()
+	bus := local.New()
+	gateway, err := NewGateway(bus, nil)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	disconnected := make(chan transport.Message, 2)
+	_, _ = bus.Subscribe(ctx, sessionmessaging.TopicDisconnected, func(_ context.Context, message transport.Message) error {
+		disconnected <- message
+		return nil
+	})
+	connection := &stubConnection{}
+	if err := gateway.Sessions().Register("s1", connection); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	gateway.Shutdown(ctx, sessionmessaging.DisconnectReasonMaintenance)
+	if gateway.Sessions().Count() != 0 {
+		t.Fatalf("expected no active sessions")
+	}
+	if !connection.closed {
+		t.Fatalf("expected connection to be closed")
+	}
+	frames, err := codec.SplitFrames(connection.last)
+	if err != nil || len(frames) != 1 || frames[0].Header != 4000 {
+		t.Fatalf("unexpected disconnect frame")
+	}
+	reader := codec.NewReader(frames[0].Payload)
+	reason, err := reader.ReadInt32()
+	if err != nil || reason != sessionmessaging.DisconnectReasonMaintenance {
+		t.Fatalf("unexpected disconnect reason: %d %v", reason, err)
+	}
+	select {
+	case message := <-disconnected:
+		if string(message.Payload) != "s1" {
+			t.Fatalf("unexpected disconnected payload: %s", string(message.Payload))
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected session.disconnected event")
+	}
+}
+
 // stubConnection stores the last payload written by session manager.
 type stubConnection struct {
 	// last stores the latest payload write.
 	last []byte
+	// closed reports close invocation.
+	closed bool
 }
 
 // WriteBinary stores one binary payload.
@@ -134,5 +183,6 @@ func (s *stubConnection) WriteBinary(payload []byte) error {
 
 // Close implements session.Connection close semantics.
 func (s *stubConnection) Close() error {
+	s.closed = true
 	return nil
 }

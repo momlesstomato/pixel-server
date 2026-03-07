@@ -5,7 +5,6 @@ import (
 
 	"pixelsv/internal/auth/adapters/memory"
 	authmessaging "pixelsv/internal/auth/messaging"
-	"pixelsv/pkg/codec"
 	"pixelsv/pkg/plugin"
 	"pixelsv/pkg/plugin/eventbus"
 	"pixelsv/pkg/protocol"
@@ -43,19 +42,5 @@ func TestServiceTicketFlow(t *testing.T) {
 	}
 	if err := service.RevokeTicket("revoked"); err != nil {
 		t.Fatalf("expected no error, got %v", err)
-	}
-}
-
-// TestEncodeAuthenticatedEvent validates event encoding format.
-func TestEncodeAuthenticatedEvent(t *testing.T) {
-	raw := EncodeAuthenticatedEvent("s1", 9)
-	reader := codec.NewReader(raw)
-	sessionID, err := reader.ReadString()
-	if err != nil || sessionID != "s1" {
-		t.Fatalf("unexpected session id: %q %v", sessionID, err)
-	}
-	userID, err := reader.ReadInt32()
-	if err != nil || userID != 9 {
-		t.Fatalf("unexpected user id: %d %v", userID, err)
 	}
 }

@@ -7,7 +7,6 @@ import (
 
 	"pixelsv/internal/auth/domain"
 	authmessaging "pixelsv/internal/auth/messaging"
-	"pixelsv/pkg/codec"
 	"pixelsv/pkg/plugin"
 )
 
@@ -107,12 +106,4 @@ func (s *Service) ValidateTicket(sessionID string, ticket string) (int32, error)
 // RevokeTicket revokes one ticket.
 func (s *Service) RevokeTicket(ticket string) error {
 	return s.store.Revoke(ticket)
-}
-
-// EncodeAuthenticatedEvent encodes one session authenticated event payload.
-func EncodeAuthenticatedEvent(sessionID string, userID int32) []byte {
-	writer := codec.NewWriter(32)
-	writer.WriteString(sessionID)
-	writer.WriteInt32(userID)
-	return writer.Bytes()
 }

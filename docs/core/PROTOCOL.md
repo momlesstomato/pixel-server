@@ -30,6 +30,9 @@ Current generated scope:
 - realm: `handshake-security`
 - direction: `c2s`
 - file: `pkg/protocol/handshake_security_c2s_gen.go`
+- realm: `session-connection`
+- direction: `c2s`
+- file: `pkg/protocol/session_connection_c2s_gen.go`
 
 Decoder registry entrypoint:
 
@@ -38,6 +41,7 @@ Decoder registry entrypoint:
 Unknown header behavior at gateway ingress:
 
 - unknown C2S headers are logged at `debug` with header id and ignored (they do not tear down the websocket loop by default)
+- malformed/invalid frame payloads trigger server-side disconnect signaling (`disconnect.reason`) followed by socket teardown
 
 ## Generation Command
 

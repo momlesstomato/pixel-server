@@ -86,7 +86,7 @@ func (s *Subscriber) handleSSOTicket(ctx context.Context, sessionID string, tick
 		}
 		return err
 	}
-	authenticated := app.EncodeAuthenticatedEvent(sessionID, userID)
+	authenticated := sessionmessaging.EncodeAuthenticatedEvent(sessionID, userID)
 	if err := s.bus.Publish(ctx, sessionmessaging.TopicAuthenticated, authenticated); err != nil {
 		return err
 	}

@@ -91,6 +91,7 @@ func (g *Gateway) handleConnectionReadLoop(ctx context.Context, sessionID string
 	for {
 		messageType, raw, err := conn.ReadMessage()
 		if err != nil {
+			g.logger.Debug("websocket read loop ended", zap.String("session_id", sessionID), zap.Error(err))
 			return
 		}
 		if messageType != websocket.BinaryMessage {
@@ -102,6 +103,9 @@ func (g *Gateway) handleConnectionReadLoop(ctx context.Context, sessionID string
 				zap.String("session_id", sessionID),
 				zap.Error(err),
 			)
+			if writeErr := writeDisconnectReason(conn, sessionmessaging.DisconnectReasonGeneric); writeErr != nil {
+				g.logger.Debug("failed to write disconnect.reason frame", zap.String("session_id", sessionID), zap.Error(writeErr))
+			}
 			return
 		}
 	}

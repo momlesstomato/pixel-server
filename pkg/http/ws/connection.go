@@ -1,6 +1,10 @@
 package ws
 
-import "github.com/gofiber/contrib/websocket"
+import (
+	"time"
+
+	"github.com/gofiber/contrib/websocket"
+)
 
 // FiberConnectionAdapter adapts fiber websocket connections into session ports.
 type FiberConnectionAdapter struct {
@@ -20,5 +24,7 @@ func (a *FiberConnectionAdapter) WriteBinary(payload []byte) error {
 
 // Close closes the underlying websocket connection.
 func (a *FiberConnectionAdapter) Close() error {
+	deadline := time.Now().Add(time.Second)
+	_ = a.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "shutdown"), deadline)
 	return a.conn.Close()
 }

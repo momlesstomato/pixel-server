@@ -10,6 +10,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	sessionmessaging "pixelsv/internal/sessionconnection/messaging"
+	cfgpkg "pixelsv/pkg/config"
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/http/ws"
 )
@@ -24,6 +26,9 @@ type Server struct {
 
 // New creates a new Server instance.
 func New(cfg Config, logger *zap.Logger, bus transport.Bus) (*Server, error) {
+	if err := cfgpkg.FillDefaultsFromTags(&cfg); err != nil {
+		return nil, err
+	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -79,8 +84,9 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		s.logger.Info("http server shutdown requested")
-		_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		s.wsGateway.Shutdown(shutdownCtx, sessionmessaging.DisconnectReasonMaintenance)
 		_ = s.app.Shutdown()
 	}()
 	return s.app.Listen(s.cfg.Address)

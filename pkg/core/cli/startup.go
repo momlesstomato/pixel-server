@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"pixelsv/internal/auth"
+	"pixelsv/internal/sessionconnection"
 	"pixelsv/pkg/config"
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/factory"
@@ -84,11 +85,7 @@ func runRoleAwareStartup(ctx context.Context, v *viper.Viper, runtimeCfg config.
 	}
 	defer plan.Transport.Close()
 	events := eventbus.New()
-	logger.Info(
-		"runtime startup initialized",
-		zap.Strings("roles", roles.names()),
-		zap.String("transport_mode", transportMode(runtimeCfg, roles)),
-	)
+	logger.Info("runtime startup initialized", zap.Strings("roles", roles.names()), zap.String("transport_mode", transportMode(runtimeCfg, roles)))
 	if plan.Postgres != nil {
 		pgSvc, err := postgres.New(ctx, *plan.Postgres)
 		if err != nil {
@@ -125,6 +122,13 @@ func runRoleAwareStartup(ctx context.Context, v *viper.Viper, runtimeCfg config.
 			return err
 		}
 		logger.Info("auth realm runtime active")
+	}
+	if roles.runsSessionConnectionRealm() {
+		cfg := sessionConnectionConfigFromHTTP(plan.HTTP)
+		if _, err := sessionconnection.Register(ctx, plan.Transport, events, logger, cfg); err != nil {
+			return err
+		}
+		logger.Info("session-connection realm runtime active")
 	}
 	if server != nil {
 		return server.ListenAndServe(ctx)

@@ -59,10 +59,11 @@ func NewSubscriber(bus coretransport.Bus, service Service, logger *zap.Logger) *
 
 // Start subscribes handshake-security packet ingress and lifecycle topics.
 func (s *Subscriber) Start(ctx context.Context) error {
-	if _, err := s.bus.Subscribe(ctx, authmessaging.PacketIngressWildcardTopic(), s.handlePacket); err != nil {
+	subscriptionsCtx := context.Background()
+	if _, err := s.bus.Subscribe(subscriptionsCtx, authmessaging.PacketIngressWildcardTopic(), s.handlePacket); err != nil {
 		return err
 	}
-	if _, err := s.bus.Subscribe(ctx, sessionmessaging.TopicDisconnected, s.handleSessionDisconnected); err != nil {
+	if _, err := s.bus.Subscribe(subscriptionsCtx, sessionmessaging.TopicDisconnected, s.handleSessionDisconnected); err != nil {
 		return err
 	}
 	go s.monitorHandshakeTimeouts(ctx)
@@ -96,6 +97,7 @@ func (s *Subscriber) handleSessionDisconnected(ctx context.Context, message core
 	sessionID := string(message.Payload)
 	if sessionID != "" {
 		s.service.RemoveSession(sessionID)
+		s.logger.Debug("auth session cleanup handled", zap.String("session_id", sessionID))
 	}
 	return nil
 }

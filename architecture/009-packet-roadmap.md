@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `pixel-protocol` spec defines **922 packets** (461 c2s + 461 s2c as of spec v1.0.0) across 21 realms. This document defines the implementation order, grouped into phases that each produce a system that is usable and testable end-to-end even before later phases are complete.
+The `pixel-protocol` spec defines **922 packets** (463 c2s + 459 s2c as of spec v1.0.0) across 21 realms. This document defines the implementation order, grouped into phases that each produce a system that is usable and testable end-to-end even before later phases are complete.
 
 Terminology for this roadmap:
 
@@ -42,15 +42,15 @@ Each phase lists:
 | `room-entities` | 34 | ~17 | ~17 |
 | `quests-campaigns` | 33 | ~17 | ~16 |
 | `inventory` | 33 | ~17 | ~16 |
-| `session-connection` | 30 | ~15 | ~15 |
+| `session-connection` | 30 | 10 | 20 |
 | `messenger-social` | 30 | ~15 | ~15 |
 | `achievements-talents` | 24 | ~12 | ~12 |
 | `notifications-landing` | 22 | ~11 | ~11 |
 | `catalog-store` | 21 | ~11 | ~10 |
 | `crafting-recycling` | 16 | ~8 | ~8 |
-| `handshake-security` | 13 | ~7 | ~6 |
+| `handshake-security` | 13 | 8 | 5 |
 | `other` | 10 | ~5 | ~5 |
-| **Total** | **922** | **461** | **461** |
+| **Total** | **922** | **463** | **459** |
 
 ---
 
@@ -102,9 +102,9 @@ Exit: `go build ./...` green; all tables created; `pkg/pathfinding` 100% test co
 ### session-connection (30 packets)
 
 Key packets:
-- `session.ping` / `session.pong` — keep-alive (handled inline by gateway, no cross-module round-trip)
-- `session.latency_measure` (c2s + s2c) — round-trip time tracking
-- `session.disconnect` (s2c) — graceful close with reason code
+- `client.ping` / `client.pong` — keep-alive (handled inline by gateway, no cross-module round-trip)
+- `client.latency_test` / `client.latency_response` — round-trip time tracking
+- `client.disconnect` + `disconnect.reason` — graceful close with reason code
 - `availability.status` (s2c) — hotel open/closed flag on login
 - `connection.error` (s2c) — general error envelope
 

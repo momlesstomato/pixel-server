@@ -11,6 +11,7 @@ import (
 func TestFromViper(t *testing.T) {
 	t.Setenv("API_KEY", "secret")
 	t.Setenv("HTTP_ADDR", ":9090")
+	t.Setenv("WS_PING_INTERVAL_SECONDS", "25")
 	v := viper.New()
 	if err := BindViper(v); err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -19,7 +20,7 @@ func TestFromViper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if cfg.Address != ":9090" || cfg.APIKey != "secret" {
+	if cfg.Address != ":9090" || cfg.APIKey != "secret" || cfg.WebSocketPingIntervalSeconds != 25 {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 }
@@ -31,6 +32,12 @@ func TestConfigValidate(t *testing.T) {
 	}
 	if err := (Config{Address: ":8080", APIKey: "secret", ReadTimeoutSeconds: 0}).Validate(); err == nil {
 		t.Fatalf("expected invalid timeout error")
+	}
+	if err := (Config{Address: ":8080", APIKey: "secret", ReadTimeoutSeconds: 10, WebSocketPingIntervalSeconds: 0, WebSocketPongTimeoutSeconds: 10}).Validate(); err == nil {
+		t.Fatalf("expected invalid websocket ping interval error")
+	}
+	if err := (Config{Address: ":8080", APIKey: "secret", ReadTimeoutSeconds: 10, WebSocketPingIntervalSeconds: 20, WebSocketPongTimeoutSeconds: 10}).Validate(); err == nil {
+		t.Fatalf("expected invalid websocket pong timeout error")
 	}
 }
 

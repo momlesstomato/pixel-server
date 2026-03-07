@@ -25,6 +25,18 @@ type Config struct {
 	SwaggerPath string `mapstructure:"swagger_path" default:"/swagger"`
 	// APIKey protects administrative endpoints.
 	APIKey string `mapstructure:"api_key"`
+	// WebSocketPingIntervalSeconds sets server ping interval in seconds.
+	WebSocketPingIntervalSeconds int `mapstructure:"websocket_ping_interval_seconds" default:"30"`
+	// WebSocketPongTimeoutSeconds sets max pong silence timeout in seconds.
+	WebSocketPongTimeoutSeconds int `mapstructure:"websocket_pong_timeout_seconds" default:"90"`
+	// WebSocketAvailabilityOpen sets availability.status isOpen field.
+	WebSocketAvailabilityOpen bool `mapstructure:"websocket_availability_open" default:"true"`
+	// WebSocketAvailabilityOnShutdown sets availability.status onShutdown field.
+	WebSocketAvailabilityOnShutdown bool `mapstructure:"websocket_availability_on_shutdown" default:"false"`
+	// WebSocketAvailabilityAuthentic sets availability.status isAuthentic field.
+	WebSocketAvailabilityAuthentic bool `mapstructure:"websocket_availability_authentic" default:"true"`
+	// WebSocketTelemetryMinIntervalMS sets telemetry log throttle interval in milliseconds.
+	WebSocketTelemetryMinIntervalMS int `mapstructure:"websocket_telemetry_min_interval_ms" default:"1000"`
 }
 
 // BindViper configures defaults and env bindings.
@@ -48,11 +60,35 @@ func BindViper(v *viper.Viper) error {
 	if err := v.BindEnv("http.read_timeout_seconds", "HTTP_READ_TIMEOUT_SECONDS"); err != nil {
 		return fmt.Errorf("bind HTTP_READ_TIMEOUT_SECONDS: %w", err)
 	}
+	if err := v.BindEnv("http.websocket_ping_interval_seconds", "WS_PING_INTERVAL_SECONDS"); err != nil {
+		return fmt.Errorf("bind WS_PING_INTERVAL_SECONDS: %w", err)
+	}
+	if err := v.BindEnv("http.websocket_pong_timeout_seconds", "WS_PONG_TIMEOUT_SECONDS"); err != nil {
+		return fmt.Errorf("bind WS_PONG_TIMEOUT_SECONDS: %w", err)
+	}
+	if err := v.BindEnv("http.websocket_availability_open", "WS_AVAILABILITY_OPEN"); err != nil {
+		return fmt.Errorf("bind WS_AVAILABILITY_OPEN: %w", err)
+	}
+	if err := v.BindEnv("http.websocket_availability_on_shutdown", "WS_AVAILABILITY_ON_SHUTDOWN"); err != nil {
+		return fmt.Errorf("bind WS_AVAILABILITY_ON_SHUTDOWN: %w", err)
+	}
+	if err := v.BindEnv("http.websocket_availability_authentic", "WS_AVAILABILITY_AUTHENTIC"); err != nil {
+		return fmt.Errorf("bind WS_AVAILABILITY_AUTHENTIC: %w", err)
+	}
+	if err := v.BindEnv("http.websocket_telemetry_min_interval_ms", "WS_TELEMETRY_MIN_INTERVAL_MS"); err != nil {
+		return fmt.Errorf("bind WS_TELEMETRY_MIN_INTERVAL_MS: %w", err)
+	}
 	setBoundValue(v, "http.address", "HTTP_ADDR")
 	setBoundValue(v, "http.api_key", "API_KEY")
 	setBoundValue(v, "http.openapi_path", "OPENAPI_PATH")
 	setBoundValue(v, "http.swagger_path", "SWAGGER_PATH")
 	setBoundValue(v, "http.read_timeout_seconds", "HTTP_READ_TIMEOUT_SECONDS")
+	setBoundValue(v, "http.websocket_ping_interval_seconds", "WS_PING_INTERVAL_SECONDS")
+	setBoundValue(v, "http.websocket_pong_timeout_seconds", "WS_PONG_TIMEOUT_SECONDS")
+	setBoundValue(v, "http.websocket_availability_open", "WS_AVAILABILITY_OPEN")
+	setBoundValue(v, "http.websocket_availability_on_shutdown", "WS_AVAILABILITY_ON_SHUTDOWN")
+	setBoundValue(v, "http.websocket_availability_authentic", "WS_AVAILABILITY_AUTHENTIC")
+	setBoundValue(v, "http.websocket_telemetry_min_interval_ms", "WS_TELEMETRY_MIN_INTERVAL_MS")
 	return nil
 }
 
@@ -78,6 +114,15 @@ func (c Config) Validate() error {
 	}
 	if c.ReadTimeoutSeconds < 1 {
 		return fmt.Errorf("invalid read timeout: %d", c.ReadTimeoutSeconds)
+	}
+	if c.WebSocketPingIntervalSeconds < 1 {
+		return fmt.Errorf("invalid websocket ping interval: %d", c.WebSocketPingIntervalSeconds)
+	}
+	if c.WebSocketPongTimeoutSeconds < c.WebSocketPingIntervalSeconds {
+		return fmt.Errorf("invalid websocket pong timeout: %d", c.WebSocketPongTimeoutSeconds)
+	}
+	if c.WebSocketTelemetryMinIntervalMS < 0 {
+		return fmt.Errorf("invalid websocket telemetry min interval: %d", c.WebSocketTelemetryMinIntervalMS)
 	}
 	return nil
 }

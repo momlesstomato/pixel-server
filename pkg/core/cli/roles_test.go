@@ -52,6 +52,9 @@ func TestRoleSetNeeds(t *testing.T) {
 	if !auth.runsAuthRealm() || !all.runsAuthRealm() || gateway.runsAuthRealm() {
 		t.Fatalf("unexpected auth realm activation rules")
 	}
+	if !gateway.runsSessionConnectionRealm() || !all.runsSessionConnectionRealm() || auth.runsSessionConnectionRealm() {
+		t.Fatalf("unexpected session-connection realm activation rules")
+	}
 }
 
 // TestRoleSetNames validates sorted role name rendering.

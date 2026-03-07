@@ -30,6 +30,14 @@ This document describes implemented plugin core infrastructure in code.
   - `auth.handshake.diffie.completed`
   - `auth.handshake.machine_id.received`
   - `auth.ticket.validated`
+- Session-connection realm emits runtime/packet events:
+  - `sessionconnection.session.connected`
+  - `sessionconnection.session.disconnected`
+  - `sessionconnection.session.authenticated`
+  - `sessionconnection.packet.received`
+  - `sessionconnection.client.pong.received`
+  - `sessionconnection.client.latency_test.received`
+  - `sessionconnection.session.desktop_view.received`
 - Gateway packet interception integration remains pending.
 - Route registrar, storage, and room service concrete plugin adapters are pending integration phases.
 

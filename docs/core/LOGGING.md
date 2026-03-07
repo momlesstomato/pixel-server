@@ -51,3 +51,6 @@ defer logger.Sync()
 - WebSocket and auth transport:
   - inbound packet decode and topic routing emit debug lines.
   - outbound packet writes and session disconnect control publishes emit debug lines.
+- Session-connection runtime:
+  - keepalive output (`client.ping`) and timeout disconnect publishes emit debug lines.
+  - accepted telemetry packets emit throttled debug diagnostics per session/header.
