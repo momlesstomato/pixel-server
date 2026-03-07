@@ -46,6 +46,10 @@ func NewGateway(bus transport.Bus, logger *zap.Logger) (*Gateway, error) {
 // Start subscribes to session output topics for websocket fan-out writes.
 func (g *Gateway) Start(ctx context.Context) error {
 	_, err := g.bus.Subscribe(ctx, sessionmessaging.OutputWildcardTopic(), g.handleSessionOutput)
+	if err != nil {
+		return err
+	}
+	_, err = g.bus.Subscribe(ctx, sessionmessaging.DisconnectWildcardTopic(), g.handleSessionDisconnect)
 	return err
 }
 
@@ -71,8 +75,11 @@ func (g *Gateway) HandleConnection(conn *websocket.Conn) {
 		return
 	}
 	g.logger.Info("websocket session connected", zap.String("session_id", sessionID))
+	_ = g.bus.Publish(context.Background(), sessionmessaging.TopicConnected, []byte(sessionID))
+	g.logger.Debug("session connected event published", zap.String("session_id", sessionID), zap.String("topic", sessionmessaging.TopicConnected))
 	g.handleConnectionReadLoop(context.Background(), sessionID, conn)
 	_ = g.bus.Publish(context.Background(), sessionmessaging.TopicDisconnected, []byte(sessionID))
+	g.logger.Debug("session disconnected event published", zap.String("session_id", sessionID), zap.String("topic", sessionmessaging.TopicDisconnected))
 	if err := g.sessions.Remove(sessionID); err != nil {
 		g.logger.Debug("websocket session remove failed", zap.Error(err))
 	}

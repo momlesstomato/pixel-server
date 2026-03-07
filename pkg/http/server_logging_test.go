@@ -45,3 +45,23 @@ func TestRequestLogsEnabledAtDebug(t *testing.T) {
 		t.Fatalf("expected request logs at debug level")
 	}
 }
+
+// Test404ClientErrorIsNotErrorLevel validates 404 logs do not use error severity.
+func Test404ClientErrorIsNotErrorLevel(t *testing.T) {
+	core, observed := observer.New(zapcore.DebugLevel)
+	logger := zap.New(core)
+	cfg := Config{Address: ":0", DisableStartupMessage: true, ReadTimeoutSeconds: 10, OpenAPIPath: "/openapi.json", SwaggerPath: "/swagger", APIKey: "secret"}
+	srv, err := New(cfg, logger, local.New())
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	req := httptest.NewRequest("GET", "/", nil)
+	if _, err := srv.App().Test(req); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	for _, entry := range observed.All() {
+		if entry.Level == zapcore.ErrorLevel {
+			t.Fatalf("expected no error-level logs for 404, got %s", entry.Message)
+		}
+	}
+}

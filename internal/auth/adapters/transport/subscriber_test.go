@@ -19,7 +19,7 @@ import (
 // TestSubscriberSSOTicketFlow validates authenticated publish and auth-ok output.
 func TestSubscriberSSOTicketFlow(t *testing.T) {
 	store := memory.NewTicketStore()
-	service := app.NewService(store)
+	service := app.NewService(store, nil)
 	ticket, _, err := service.CreateTicket(33, 60)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -41,6 +41,10 @@ func TestSubscriberSSOTicketFlow(t *testing.T) {
 		output <- message.Payload
 		return nil
 	})
+	release := &protocol.HandshakeReleaseVersionPacket{ReleaseVersion: "NITRO-1-6-6", ClientType: "HTML5", Platform: 2, DeviceCategory: 1}
+	if err := bus.Publish(ctx, authmessaging.PacketIngressTopic("s1"), encodeBody(t, release)); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 	packet := &protocol.SecuritySsoTicketPacket{Ticket: ticket}
 	if err := bus.Publish(ctx, authmessaging.PacketIngressTopic("s1"), encodeBody(t, packet)); err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -59,7 +63,7 @@ func TestSubscriberSSOTicketFlow(t *testing.T) {
 	select {
 	case value := <-output:
 		frames, err := codec.SplitFrames(value)
-		if err != nil || len(frames) != 1 || frames[0].Header != 2491 {
+		if err != nil || len(frames) != 2 || frames[0].Header != 2491 || frames[1].Header != 3523 {
 			t.Fatalf("unexpected output payload")
 		}
 	case <-time.After(time.Second):
@@ -69,7 +73,7 @@ func TestSubscriberSSOTicketFlow(t *testing.T) {
 
 // TestSubscriberInvalidTicket validates invalid tickets do not publish auth events.
 func TestSubscriberInvalidTicket(t *testing.T) {
-	service := app.NewService(memory.NewTicketStore())
+	service := app.NewService(memory.NewTicketStore(), nil)
 	bus := local.New()
 	subscriber := NewSubscriber(bus, service, nil)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -78,10 +82,19 @@ func TestSubscriberInvalidTicket(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	authenticated := make(chan []byte, 1)
+	disconnect := make(chan []byte, 1)
 	_, _ = bus.Subscribe(ctx, sessionmessaging.TopicAuthenticated, func(_ context.Context, message coretransport.Message) error {
 		authenticated <- message.Payload
 		return nil
 	})
+	_, _ = bus.Subscribe(ctx, sessionmessaging.DisconnectTopic("s1"), func(_ context.Context, message coretransport.Message) error {
+		disconnect <- message.Payload
+		return nil
+	})
+	release := &protocol.HandshakeReleaseVersionPacket{ReleaseVersion: "NITRO-1-6-6", ClientType: "HTML5", Platform: 2, DeviceCategory: 1}
+	if err := bus.Publish(ctx, authmessaging.PacketIngressTopic("s1"), encodeBody(t, release)); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 	packet := &protocol.SecuritySsoTicketPacket{Ticket: "missing"}
 	if err := bus.Publish(ctx, authmessaging.PacketIngressTopic("s1"), encodeBody(t, packet)); err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -91,8 +104,18 @@ func TestSubscriberInvalidTicket(t *testing.T) {
 		t.Fatalf("did not expect authenticated event")
 	case <-time.After(100 * time.Millisecond):
 	}
+	select {
+	case <-disconnect:
+	case <-time.After(time.Second):
+		t.Fatalf("expected disconnect control event")
+	}
+	expired := service.ExpireUnauthenticatedSessions(time.Now().Add(24 * time.Hour))
+	if len(expired) != 0 {
+		t.Fatalf("expected session cleanup on reject, got expired=%v", expired)
+	}
 }
 
+// encodeBody encodes one packet into subscriber message body format.
 func encodeBody(t *testing.T, packet protocol.Packet) []byte {
 	t.Helper()
 	writer := codec.NewWriter(64)

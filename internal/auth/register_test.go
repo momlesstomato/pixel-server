@@ -14,6 +14,7 @@ import (
 	"pixelsv/pkg/codec"
 	coretransport "pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/local"
+	"pixelsv/pkg/plugin/eventbus"
 	"pixelsv/pkg/protocol"
 )
 
@@ -23,7 +24,7 @@ func TestRegisterHTTPRoutes(t *testing.T) {
 	bus := local.New()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := Register(ctx, app, bus, nil, "secret")
+	_, err := Register(ctx, app, bus, eventbus.New(), nil, "secret")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -41,7 +42,7 @@ func TestRegisterTransportFlow(t *testing.T) {
 	bus := local.New()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	runtime, err := Register(ctx, nil, bus, nil, "")
+	runtime, err := Register(ctx, nil, bus, eventbus.New(), nil, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -55,6 +56,10 @@ func TestRegisterTransportFlow(t *testing.T) {
 		return nil
 	})
 	packet := &protocol.SecuritySsoTicketPacket{Ticket: ticket}
+	release := &protocol.HandshakeReleaseVersionPacket{ReleaseVersion: "NITRO-1-6-6", ClientType: "HTML5", Platform: 2, DeviceCategory: 1}
+	if err := bus.Publish(ctx, authmessaging.PacketIngressTopic("s1"), encodeBody(t, release)); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 	if err := bus.Publish(ctx, authmessaging.PacketIngressTopic("s1"), encodeBody(t, packet)); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -71,6 +76,7 @@ func TestRegisterTransportFlow(t *testing.T) {
 	}
 }
 
+// encodeBody encodes one packet into transport body format.
 func encodeBody(t *testing.T, packet protocol.Packet) []byte {
 	t.Helper()
 	writer := codec.NewWriter(64)

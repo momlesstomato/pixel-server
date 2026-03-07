@@ -28,3 +28,15 @@ func TestServiceNewInvalidURL(t *testing.T) {
 		t.Fatalf("expected parse error")
 	}
 }
+
+// TestDebugLoggingEnabled validates LOG_LEVEL debug detection.
+func TestDebugLoggingEnabled(t *testing.T) {
+	t.Setenv("LOG_LEVEL", "debug")
+	if !debugLoggingEnabled() {
+		t.Fatalf("expected debug logging enabled")
+	}
+	t.Setenv("LOG_LEVEL", "warn")
+	if debugLoggingEnabled() {
+		t.Fatalf("expected debug logging disabled")
+	}
+}

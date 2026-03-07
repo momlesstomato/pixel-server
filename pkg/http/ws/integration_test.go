@@ -30,6 +30,7 @@ func TestGatewayWebSocketFlow(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	ingress := make(chan transport.Message, 1)
+	connected := make(chan transport.Message, 1)
 	disconnects := make(chan transport.Message, 1)
 	_, _ = bus.Subscribe(ctx, authmessaging.PacketIngressTopic("1"), func(_ context.Context, message transport.Message) error {
 		ingress <- message
@@ -37,6 +38,10 @@ func TestGatewayWebSocketFlow(t *testing.T) {
 	})
 	_, _ = bus.Subscribe(ctx, sessionmessaging.TopicDisconnected, func(_ context.Context, message transport.Message) error {
 		disconnects <- message
+		return nil
+	})
+	_, _ = bus.Subscribe(ctx, sessionmessaging.TopicConnected, func(_ context.Context, message transport.Message) error {
+		connected <- message
 		return nil
 	})
 	app := fiber.New()
@@ -58,6 +63,14 @@ func TestGatewayWebSocketFlow(t *testing.T) {
 	conn, _, err := websocket.DefaultDialer.Dial("ws://"+listener.Addr().String()+"/ws", nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+	select {
+	case message := <-connected:
+		if string(message.Payload) != "1" {
+			t.Fatalf("unexpected connected payload: %s", string(message.Payload))
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected connected event")
 	}
 	writer := codec.NewWriter(64)
 	packet := protocol.HandshakeReleaseVersionPacket{ReleaseVersion: "NITRO-1-6-6", ClientType: "HTML5", Platform: 2, DeviceCategory: 1}

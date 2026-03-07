@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"time"
 
 	"go.uber.org/zap"
 	"pixelsv/internal/auth/app"
-	"pixelsv/internal/auth/domain"
 	authmessaging "pixelsv/internal/auth/messaging"
 	sessionmessaging "pixelsv/internal/sessionconnection/messaging"
 	"pixelsv/pkg/codec"
@@ -17,15 +17,33 @@ import (
 
 // Service defines auth application behavior consumed by transport adapter.
 type Service interface {
+	// RecordReleaseVersion stores release metadata for one session.
+	RecordReleaseVersion(sessionID string, packet *protocol.HandshakeReleaseVersionPacket) error
+	// RecordClientVariables stores client metadata for one session.
+	RecordClientVariables(sessionID string, packet *protocol.HandshakeClientVariablesPacket) error
+	// InitDiffie initializes diffie values and returns response fields.
+	InitDiffie(sessionID string) (app.InitDiffieResponse, error)
+	// CompleteDiffie finalizes diffie values and returns response fields.
+	CompleteDiffie(sessionID string, encryptedPublicKey string) (app.CompleteDiffieResponse, error)
+	// UpdateMachineID stores machine metadata and returns normalization details.
+	UpdateMachineID(sessionID string, machineID string, fingerprint string, capabilities string) (string, bool, error)
+	// MarkLatencyMeasure tracks latency packet receipt.
+	MarkLatencyMeasure(sessionID string) error
+	// MarkClientPolicy tracks client policy packet receipt.
+	MarkClientPolicy(sessionID string) error
 	// ValidateTicket validates and consumes one SSO ticket.
-	ValidateTicket(ticket string) (int32, error)
+	ValidateTicket(sessionID string, ticket string) (int32, error)
+	// RemoveSession removes one session handshake state.
+	RemoveSession(sessionID string)
+	// ExpireUnauthenticatedSessions evicts expired handshake sessions.
+	ExpireUnauthenticatedSessions(now time.Time) []string
 }
 
 // Subscriber consumes handshake packet topics and emits auth events.
 type Subscriber struct {
 	// bus is the runtime transport bus.
 	bus coretransport.Bus
-	// service provides ticket validation use cases.
+	// service provides ticket and handshake use cases.
 	service Service
 	// logger stores adapter logs.
 	logger *zap.Logger
@@ -39,12 +57,19 @@ func NewSubscriber(bus coretransport.Bus, service Service, logger *zap.Logger) *
 	return &Subscriber{bus: bus, service: service, logger: logger}
 }
 
-// Start subscribes handshake-security packet ingress topics.
+// Start subscribes handshake-security packet ingress and lifecycle topics.
 func (s *Subscriber) Start(ctx context.Context) error {
-	_, err := s.bus.Subscribe(ctx, authmessaging.PacketIngressWildcardTopic(), s.handlePacket)
-	return err
+	if _, err := s.bus.Subscribe(ctx, authmessaging.PacketIngressWildcardTopic(), s.handlePacket); err != nil {
+		return err
+	}
+	if _, err := s.bus.Subscribe(ctx, sessionmessaging.TopicDisconnected, s.handleSessionDisconnected); err != nil {
+		return err
+	}
+	go s.monitorHandshakeTimeouts(ctx)
+	return nil
 }
 
+// handlePacket decodes one ingress packet and routes known actions.
 func (s *Subscriber) handlePacket(ctx context.Context, message coretransport.Message) error {
 	sessionID, ok := authmessaging.ParsePacketIngressTopic(message.Topic)
 	if !ok {
@@ -54,30 +79,42 @@ func (s *Subscriber) handlePacket(ctx context.Context, message coretransport.Mes
 	if err != nil || packet == nil {
 		return err
 	}
-	switch value := packet.(type) {
-	case *protocol.SecuritySsoTicketPacket:
-		return s.handleSSOTicket(ctx, sessionID, value.Ticket)
-	default:
-		return nil
-	}
+	s.logger.Debug(
+		"auth packet received",
+		zap.String("session_id", sessionID),
+		zap.Uint16("header", packet.HeaderID()),
+		zap.String("packet", packet.PacketName()),
+	)
+	return s.dispatchPacket(ctx, sessionID, packet)
 }
 
-func (s *Subscriber) handleSSOTicket(ctx context.Context, sessionID string, ticket string) error {
-	userID, err := s.service.ValidateTicket(ticket)
-	if err != nil {
-		if errors.Is(err, domain.ErrTicketNotFound) || errors.Is(err, domain.ErrInvalidTicket) {
-			s.logger.Warn("ticket validation failed", zap.String("session_id", sessionID), zap.Error(err))
-			return nil
+// handleSessionDisconnected clears auth session state on gateway disconnect events.
+func (s *Subscriber) handleSessionDisconnected(ctx context.Context, message coretransport.Message) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sessionID := string(message.Payload)
+	if sessionID != "" {
+		s.service.RemoveSession(sessionID)
+	}
+	return nil
+}
+
+// monitorHandshakeTimeouts disconnects sessions that do not authenticate in time.
+func (s *Subscriber) monitorHandshakeTimeouts(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			s.handleExpiredSessions(ctx, now)
 		}
-		return err
 	}
-	authenticated := app.EncodeAuthenticatedEvent(sessionID, userID)
-	if err := s.bus.Publish(ctx, sessionmessaging.TopicAuthenticated, authenticated); err != nil {
-		return err
-	}
-	return s.bus.Publish(ctx, sessionmessaging.OutputTopic(sessionID), codec.EncodeFrame(2491, nil))
 }
 
+// decodePacket decodes one packet payload body into a protocol packet.
 func decodePacket(body []byte) (protocol.Packet, error) {
 	if len(body) < 2 {
 		return nil, codec.ErrInvalidFrame

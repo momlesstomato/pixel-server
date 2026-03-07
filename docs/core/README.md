@@ -14,3 +14,4 @@ Document implemented core behavior here, for example:
 - [API.md](API.md) for HTTP, Swagger, WebSocket, and admin API-key endpoints
 - [PROTOCOL.md](PROTOCOL.md) for generated packet contracts and frame codec usage
 - [SESSIONS.md](SESSIONS.md) for websocket session manager behavior
+- [PLUGINS.md](PLUGINS.md) for plugin contracts, event bus, interceptor, and loader behavior

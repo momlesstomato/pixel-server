@@ -31,5 +31,7 @@ Behavior:
 - connection lifecycle registration/removal
 - frame decode and packet-topic publish
 - transport subscription for `session.output.<sessionID>`
+- transport subscription for `session.disconnect.<sessionID>` to close sessions by control command
+- lifecycle publish for `session.connected` and `session.disconnected`
 
 Session ids are generated as monotonic base36 values (`1`, `2`, `3`, ...).

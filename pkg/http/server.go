@@ -2,12 +2,14 @@ package httpserver
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/http/ws"
 )
@@ -36,7 +38,16 @@ func New(cfg Config, logger *zap.Logger, bus transport.Bus) (*Server, error) {
 		DisableStartupMessage: cfg.DisableStartupMessage,
 		ReadTimeout:           time.Duration(cfg.ReadTimeoutSeconds) * time.Second,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			logger.Error("fiber request error", zap.String("path", c.Path()), zap.Error(err))
+			statusCode := fiber.StatusInternalServerError
+			var fiberErr *fiber.Error
+			if errors.As(err, &fiberErr) {
+				statusCode = fiberErr.Code
+			}
+			if statusCode >= fiber.StatusInternalServerError {
+				logger.Error("fiber request error", zap.String("path", c.Path()), zap.Int("status", statusCode), zap.Error(err))
+			} else if logger.Core().Enabled(zap.DebugLevel) {
+				logger.Debug("fiber client request error", zap.String("path", c.Path()), zap.Int("status", statusCode), zap.Error(err))
+			}
 			return fiber.DefaultErrorHandler(c, err)
 		},
 	})
@@ -45,6 +56,9 @@ func New(cfg Config, logger *zap.Logger, bus transport.Bus) (*Server, error) {
 		Next: func(*fiber.Ctx) bool {
 			return !logger.Core().Enabled(zap.DebugLevel)
 		},
+		Levels:   []zapcore.Level{zap.ErrorLevel, zap.DebugLevel, zap.DebugLevel},
+		Messages: []string{"Server error", "Client request", "Request"},
+		Fields:   []string{"ip", "latency", "status", "method", "url", "error"},
 	}))
 	server := &Server{app: app, cfg: cfg, logger: logger, wsGateway: wsGateway}
 	server.registerRoutes()

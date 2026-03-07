@@ -71,6 +71,7 @@ This document is mandatory for all contributors and agents working in this repos
 - Emit structured `info` logs for lifecycle milestones (runtime start, role activation, worker/service start, listening addresses, shutdown).
 - Keep HTTP access logs disabled by default; enable per-request Fiber logging only at `debug` log level.
 - Keep logs focused on actionable events: framework/app errors, startup/shutdown transitions, and relevant operational state.
+- At `debug` level, all relevant runtime operations must emit diagnostic logs in console output (for example: database queries/commands, packet ingress/egress, transport publish/consume paths, and session control actions).
 
 ## 6.1) Plugin Extensibility Policy (Strict)
 

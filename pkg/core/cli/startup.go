@@ -11,6 +11,7 @@ import (
 	"pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/factory"
 	httpserver "pixelsv/pkg/http"
+	"pixelsv/pkg/plugin/eventbus"
 	"pixelsv/pkg/storage/postgres"
 	"pixelsv/pkg/storage/redis"
 )
@@ -82,6 +83,7 @@ func runRoleAwareStartup(ctx context.Context, v *viper.Viper, runtimeCfg config.
 		return err
 	}
 	defer plan.Transport.Close()
+	events := eventbus.New()
 	logger.Info(
 		"runtime startup initialized",
 		zap.Strings("roles", roles.names()),
@@ -119,7 +121,7 @@ func runRoleAwareStartup(ctx context.Context, v *viper.Viper, runtimeCfg config.
 			fiberApp = server.App()
 			apiKey = plan.HTTP.APIKey
 		}
-		if _, err := auth.Register(ctx, fiberApp, plan.Transport, logger, apiKey); err != nil {
+		if _, err := auth.Register(ctx, fiberApp, plan.Transport, events, logger, apiKey); err != nil {
 			return err
 		}
 		logger.Info("auth realm runtime active")

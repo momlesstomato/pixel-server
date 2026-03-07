@@ -28,3 +28,15 @@ func TestNewAndPingFailure(t *testing.T) {
 		t.Fatalf("expected non-nil pool")
 	}
 }
+
+// TestDebugLoggingEnabled validates LOG_LEVEL debug detection.
+func TestDebugLoggingEnabled(t *testing.T) {
+	t.Setenv("LOG_LEVEL", "debug")
+	if !debugLoggingEnabled() {
+		t.Fatalf("expected debug logging enabled")
+	}
+	t.Setenv("LOG_LEVEL", "info")
+	if debugLoggingEnabled() {
+		t.Fatalf("expected debug logging disabled")
+	}
+}

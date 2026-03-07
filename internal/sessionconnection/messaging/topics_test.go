@@ -18,3 +18,20 @@ func TestOutputTopics(t *testing.T) {
 		t.Fatalf("expected parse failure")
 	}
 }
+
+// TestDisconnectTopics validates disconnect topic builders and parser.
+func TestDisconnectTopics(t *testing.T) {
+	if got := DisconnectTopic("abc"); got != "session.disconnect.abc" {
+		t.Fatalf("unexpected disconnect topic: %s", got)
+	}
+	if got := DisconnectWildcardTopic(); got != "session.disconnect.>" {
+		t.Fatalf("unexpected wildcard topic: %s", got)
+	}
+	value, ok := ParseDisconnectTopic("session.disconnect.abc")
+	if !ok || value != "abc" {
+		t.Fatalf("unexpected parse result: %q %v", value, ok)
+	}
+	if _, ok := ParseDisconnectTopic("session.disconnect"); ok {
+		t.Fatalf("expected parse failure")
+	}
+}

@@ -15,6 +15,7 @@ import (
 	coretransport "pixelsv/pkg/core/transport"
 	"pixelsv/pkg/core/transport/local"
 	httpserver "pixelsv/pkg/http"
+	"pixelsv/pkg/plugin/eventbus"
 	"pixelsv/pkg/protocol"
 )
 
@@ -33,7 +34,7 @@ func Test06AuthPhase3Flow(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	authRuntime, err := auth.Register(ctx, server.App(), bus, nil, "secret")
+	authRuntime, err := auth.Register(ctx, server.App(), bus, eventbus.New(), nil, "secret")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -66,6 +67,10 @@ func Test06AuthPhase3Flow(t *testing.T) {
 	}
 	defer connection.Close()
 	packet := &protocol.SecuritySsoTicketPacket{Ticket: ticket}
+	release := &protocol.HandshakeReleaseVersionPacket{ReleaseVersion: "NITRO-1-6-6", ClientType: "HTML5", Platform: 2, DeviceCategory: 1}
+	if err := connection.WriteMessage(websocket.BinaryMessage, encodeFrame(t, release)); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 	if err := connection.WriteMessage(websocket.BinaryMessage, encodeFrame(t, packet)); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -88,7 +93,7 @@ func Test06AuthPhase3Flow(t *testing.T) {
 		t.Fatalf("unexpected websocket message type: %d", messageType)
 	}
 	frames, err := codec.SplitFrames(payload)
-	if err != nil || len(frames) != 1 || frames[0].Header != 2491 {
+	if err != nil || len(frames) != 2 || frames[0].Header != 2491 || frames[1].Header != 3523 {
 		t.Fatalf("unexpected auth output frame")
 	}
 	cancel()

@@ -10,6 +10,7 @@ import (
 	transportadapter "pixelsv/internal/auth/adapters/transport"
 	"pixelsv/internal/auth/app"
 	coretransport "pixelsv/pkg/core/transport"
+	"pixelsv/pkg/plugin"
 )
 
 // Runtime holds auth realm runtime dependencies.
@@ -19,11 +20,18 @@ type Runtime struct {
 }
 
 // Register initializes auth realm adapters and subscriptions.
-func Register(ctx context.Context, fiberApp *fiber.App, bus coretransport.Bus, logger *zap.Logger, apiKey string) (*Runtime, error) {
+func Register(
+	ctx context.Context,
+	fiberApp *fiber.App,
+	bus coretransport.Bus,
+	events plugin.EventBus,
+	logger *zap.Logger,
+	apiKey string,
+) (*Runtime, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	service := app.NewService(memory.NewTicketStore())
+	service := app.NewService(memory.NewTicketStore(), events)
 	if fiberApp != nil && apiKey != "" {
 		httpadapter.RegisterRoutes(fiberApp, service, apiKey)
 	}

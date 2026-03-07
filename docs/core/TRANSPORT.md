@@ -34,6 +34,10 @@ Implemented topic constants are split by realm packages:
   - `internal/auth/messaging`
 - session-connection realm:
   - `internal/sessionconnection/messaging`
+  - `session.connected`
+  - `session.disconnected`
+  - `session.output.<sessionID>`
+  - `session.disconnect.<sessionID>`
 
 ## Performance Direction
 
@@ -63,3 +67,4 @@ Topic parsing helpers:
 
 - `transport.ParsePacketC2STopic(topic string) (realm string, sessionID string, ok bool)`
 - `sessionconnection/messaging.ParseOutputTopic(topic string) (sessionID string, ok bool)`
+- `sessionconnection/messaging.ParseDisconnectTopic(topic string) (sessionID string, ok bool)`

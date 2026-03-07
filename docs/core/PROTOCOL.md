@@ -35,6 +35,10 @@ Decoder registry entrypoint:
 
 - `protocol.DecodeC2S(header, payload)`
 
+Unknown header behavior at gateway ingress:
+
+- unknown C2S headers are logged at `debug` with header id and ignored (they do not tear down the websocket loop by default)
+
 ## Generation Command
 
 ```bash

@@ -57,6 +57,21 @@ func TestHandleBinaryPublishesPacket(t *testing.T) {
 	}
 }
 
+// TestHandleBinaryUnknownHeaderIgnored validates unknown packets do not break read loop.
+func TestHandleBinaryUnknownHeaderIgnored(t *testing.T) {
+	bus := local.New()
+	gateway, err := NewGateway(bus, nil)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	unknown := codec.EncodeFrame(65535, []byte{1, 2, 3})
+	if err := gateway.handleBinary(ctx, "s1", unknown); err != nil {
+		t.Fatalf("expected no error for unknown header, got %v", err)
+	}
+}
+
 // TestStartSessionOutputForward validates session output fan-out writes.
 func TestStartSessionOutputForward(t *testing.T) {
 	bus := local.New()
@@ -78,6 +93,30 @@ func TestStartSessionOutputForward(t *testing.T) {
 	}
 	if got := string(connection.last); got != "out" {
 		t.Fatalf("unexpected session output: %s", got)
+	}
+}
+
+// TestStartSessionDisconnectControl validates runtime disconnect control handling.
+func TestStartSessionDisconnectControl(t *testing.T) {
+	bus := local.New()
+	gateway, err := NewGateway(bus, nil)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := gateway.Start(ctx); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	connection := &stubConnection{}
+	if err := gateway.Sessions().Register("s1", connection); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if err := bus.Publish(ctx, sessionmessaging.DisconnectTopic("s1"), []byte{0, 0, 0, 4}); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if count := gateway.Sessions().Count(); count != 0 {
+		t.Fatalf("expected session removal, got %d", count)
 	}
 }
 
