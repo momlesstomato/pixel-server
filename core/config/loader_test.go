@@ -14,6 +14,7 @@ func TestLoadCombinesEnvFileAndEnvironment(t *testing.T) {
 	envFile := writeEnvFile(t, strings.Join([]string{
 		"APP_BIND_IP=127.0.0.1",
 		"APP_PORT=8080",
+		"APP_API_KEY=file-key",
 		"REDIS_ADDRESS=localhost:6379",
 		"POSTGRES_DSN=postgres://pixel:pixel@localhost:5432/pixel?sslmode=disable",
 		"USERS_JWT_SECRET=from-file",
@@ -48,7 +49,7 @@ func TestLoadFailsOnMissingMandatoryFields(t *testing.T) {
 		t.Fatalf("expected load to fail when mandatory fields are missing")
 	}
 	message := err.Error()
-	required := []string{"CFG_MISSING_POSTGRES_DSN", "CFG_MISSING_REDIS_ADDRESS", "CFG_MISSING_USERS_JWT_SECRET"}
+	required := []string{"CFG_MISSING_APP_API_KEY", "CFG_MISSING_POSTGRES_DSN", "CFG_MISSING_REDIS_ADDRESS", "CFG_MISSING_USERS_JWT_SECRET"}
 	for _, expected := range required {
 		if !strings.Contains(message, expected) {
 			t.Fatalf("expected error to contain %q, got: %s", expected, message)
@@ -61,6 +62,7 @@ func TestLoadWithoutEnvFile(t *testing.T) {
 	t.Setenv("CFG_ONLY_REDIS_ADDRESS", "localhost:6379")
 	t.Setenv("CFG_ONLY_POSTGRES_DSN", "postgres://pixel:pixel@localhost:5432/pixel?sslmode=disable")
 	t.Setenv("CFG_ONLY_USERS_JWT_SECRET", "secret")
+	t.Setenv("CFG_ONLY_APP_API_KEY", "env-key")
 	loaded, err := Load(LoaderOptions{
 		EnvFile:   filepath.Join(t.TempDir(), "missing.env"),
 		EnvPrefix: "CFG_ONLY",
@@ -87,6 +89,7 @@ func TestLoadFailsOnUnreadableConfigPath(t *testing.T) {
 // TestInitializerLoadsConfiguration verifies package-owned initializer behavior.
 func TestInitializerLoadsConfiguration(t *testing.T) {
 	envFile := writeEnvFile(t, strings.Join([]string{
+		"APP_API_KEY=secret-key",
 		"REDIS_ADDRESS=localhost:6379",
 		"POSTGRES_DSN=postgres://pixel:pixel@localhost:5432/pixel?sslmode=disable",
 		"USERS_JWT_SECRET=secret",

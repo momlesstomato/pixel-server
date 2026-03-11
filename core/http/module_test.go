@@ -9,7 +9,7 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
-	coreconfig "github.com/momlesstomato/pixel-server/core/config"
+	coreapp "github.com/momlesstomato/pixel-server/core/app"
 	corelogging "github.com/momlesstomato/pixel-server/core/logging"
 	"go.uber.org/zap"
 )
@@ -17,7 +17,7 @@ import (
 // TestNewRegistersZapMiddleware verifies middleware emits request logs.
 func TestNewRegistersZapMiddleware(t *testing.T) {
 	buffer := bytes.NewBuffer(nil)
-	logger, err := corelogging.New(coreconfig.LoggingConfig{Format: "json", Level: "info"}, buffer)
+	logger, err := corelogging.New(corelogging.Config{Format: "json", Level: "info"}, buffer)
 	if err != nil {
 		t.Fatalf("expected logger creation to succeed, got %v", err)
 	}
@@ -74,7 +74,7 @@ func TestDisposeShutsDownModule(t *testing.T) {
 
 // TestInitializerBuildsHTTPModule verifies package-owned initializer behavior.
 func TestInitializerBuildsHTTPModule(t *testing.T) {
-	module, err := (Initializer{APIKey: "secret"}).InitializeHTTP(zap.NewNop())
+	module, err := (Initializer{}).InitializeHTTP(coreapp.Config{APIKey: "secret"}, zap.NewNop())
 	if err != nil {
 		t.Fatalf("expected http initializer success, got %v", err)
 	}
@@ -85,14 +85,14 @@ func TestInitializerBuildsHTTPModule(t *testing.T) {
 
 // TestInitializerRejectsNilLogger verifies logger precondition checks.
 func TestInitializerRejectsNilLogger(t *testing.T) {
-	if _, err := (Initializer{}).InitializeHTTP(nil); err == nil {
+	if _, err := (Initializer{}).InitializeHTTP(coreapp.Config{APIKey: "secret"}, nil); err == nil {
 		t.Fatalf("expected http initializer error for nil logger")
 	}
 }
 
 // TestInitializerRejectsEmptyAPIKey verifies API key precondition checks.
 func TestInitializerRejectsEmptyAPIKey(t *testing.T) {
-	if _, err := (Initializer{}).InitializeHTTP(zap.NewNop()); err == nil {
+	if _, err := (Initializer{}).InitializeHTTP(coreapp.Config{}, zap.NewNop()); err == nil {
 		t.Fatalf("expected http initializer error for empty api key")
 	}
 }

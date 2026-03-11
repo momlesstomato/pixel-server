@@ -9,6 +9,7 @@ import (
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	"github.com/momlesstomato/pixel-server/core/logging"
+	rediscore "github.com/momlesstomato/pixel-server/core/redis"
 	"github.com/spf13/cobra"
 )
 
@@ -31,8 +32,6 @@ type ServeOptions struct {
 	EnvPrefix string
 	// WebSocketPath defines websocket endpoint route.
 	WebSocketPath string
-	// APIKey defines the required API key for every route.
-	APIKey string
 	// APIKeyHeader defines the header name used for API key transport.
 	APIKeyHeader string
 	// Output defines logger output stream.
@@ -53,9 +52,7 @@ func NewServeCommand(dependencies ServeDependencies) *cobra.Command {
 	command.Flags().StringVar(&options.EnvFile, "env-file", ".env", "Environment file path")
 	command.Flags().StringVar(&options.EnvPrefix, "env-prefix", "", "Environment key prefix")
 	command.Flags().StringVar(&options.WebSocketPath, "ws-path", "/ws", "WebSocket endpoint path")
-	command.Flags().StringVar(&options.APIKey, "api-key", "", "Required API key for all routes")
 	command.Flags().StringVar(&options.APIKeyHeader, "api-key-header", corehttp.DefaultAPIKeyHeader, "API key header name")
-	_ = command.MarkFlagRequired("api-key")
 	return command
 }
 
@@ -65,8 +62,9 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 		config.Initializer{Options: config.LoaderOptions{
 			EnvFile: options.EnvFile, EnvPrefix: options.EnvPrefix,
 		}},
+		rediscore.Initializer{},
 		logging.Initializer{Output: options.Output},
-		corehttp.Initializer{APIKey: options.APIKey, APIKeyHeader: options.APIKeyHeader},
+		corehttp.Initializer{APIKeyHeader: options.APIKeyHeader},
 		corehttp.WebSocketInitializer{Path: options.WebSocketPath, Handler: EchoWebSocketHandler},
 	)
 	runtime, err := runner.Run()

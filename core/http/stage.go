@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
+	"github.com/momlesstomato/pixel-server/core/app"
 	"go.uber.org/zap"
 )
 
@@ -13,7 +14,7 @@ type Stage interface {
 	// Name returns a stable startup unit identifier.
 	Name() string
 	// InitializeHTTP creates an HTTP module from the configured logger.
-	InitializeHTTP(*zap.Logger) (*Module, error)
+	InitializeHTTP(app.Config, *zap.Logger) (*Module, error)
 }
 
 // WebSocketStage defines websocket startup behavior.
@@ -28,8 +29,6 @@ type WebSocketStage interface {
 type Initializer struct {
 	// FiberConfig defines the Fiber app configuration.
 	FiberConfig fiber.Config
-	// APIKey defines the shared key required by all HTTP routes.
-	APIKey string
 	// APIKeyHeader defines the request header used for key transport.
 	APIKeyHeader string
 }
@@ -40,12 +39,12 @@ func (initializer Initializer) Name() string {
 }
 
 // InitializeHTTP builds and returns an HTTP module.
-func (initializer Initializer) InitializeHTTP(logger *zap.Logger) (*Module, error) {
+func (initializer Initializer) InitializeHTTP(loaded app.Config, logger *zap.Logger) (*Module, error) {
 	if logger == nil {
 		return nil, fmt.Errorf("logger is required")
 	}
 	module := New(Options{Logger: logger, FiberConfig: initializer.FiberConfig})
-	if err := module.ProtectWithAPIKey(initializer.APIKey, initializer.APIKeyHeader); err != nil {
+	if err := module.ProtectWithAPIKey(loaded.APIKey, initializer.APIKeyHeader); err != nil {
 		return nil, err
 	}
 	return module, nil

@@ -16,6 +16,8 @@ This document defines mandatory project constraints and success criteria.
 - Structs, interfaces, and function definitions must live in their corresponding package/module domain.
 - Cross-cutting contracts must be avoided in centralized files when ownership is clear (for example, config contracts in `core/config`, logging contracts in `core/logging`, transport contracts in `core/http`).
 - Package design must stay distributed by responsibility to avoid bloated "catch-all" files and to keep future realm/packet growth isolated by module.
+- Configuration models must also follow distributed ownership by section and must not be centralized in a monolithic `core/config/types.go`.
+- Configuration section types must live in their owning module package (for example, `core/redis/config.go`, `core/logging/config.go`, `core/postgres/config.go`, `core/users/config.go`, `core/app/config.go`).
 - Code must follow HashiCorp and Linux philosophy:
   - small focused units,
   - composability,
@@ -62,9 +64,11 @@ This document defines mandatory project constraints and success criteria.
 - Configuration must be section-structured using composed structs.
 - Base application config must include app-level settings such as bind IP and port.
 - Base application config must compose dedicated sections (Redis, PostgreSQL, Users, and others as needed).
+- Configuration section structs must be split by responsibility (for example, app, redis, postgres, users, logging) in dedicated files or subpackages.
 - Any struct property with a `default` Go tag uses that default value.
 - Any struct property without a `default` tag is mandatory.
 - Startup must fail when a mandatory configuration value is missing.
+- Every new environment variable must be added to `.env.example` in the same change.
 
 ## 7) Logging Module Rules
 

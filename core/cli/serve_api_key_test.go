@@ -3,7 +3,6 @@ package cli
 import (
 	nethttp "net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
@@ -12,7 +11,7 @@ import (
 // TestExecuteServeProtectsRoutesWithAPIKey verifies auth middleware protection.
 func TestExecuteServeProtectsRoutesWithAPIKey(t *testing.T) {
 	err := ExecuteServe(ServeOptions{
-		EnvFile: writeServeEnvFile(t), WebSocketPath: "/realtime", APIKey: "test-key",
+		EnvFile: writeServeEnvFile(t), WebSocketPath: "/realtime",
 	}, func(module *corehttp.Module, _ string) error {
 		request := httptest.NewRequest(nethttp.MethodGet, "/realtime", nil)
 		response, testErr := module.App().Test(request)
@@ -29,15 +28,13 @@ func TestExecuteServeProtectsRoutesWithAPIKey(t *testing.T) {
 	}
 }
 
-// TestNewServeCommandRequiresAPIKey verifies required flag validation.
-func TestNewServeCommandRequiresAPIKey(t *testing.T) {
-	command := NewServeCommand(ServeDependencies{})
+// TestNewServeCommandDoesNotRequireAPIKeyFlag verifies config-driven API key behavior.
+func TestNewServeCommandDoesNotRequireAPIKeyFlag(t *testing.T) {
+	command := NewServeCommand(ServeDependencies{
+		Listen: func(_ *corehttp.Module, _ string) error { return nil },
+	})
 	command.SetArgs([]string{"--env-file", writeServeEnvFile(t), "--ws-path", "/events"})
-	err := command.Execute()
-	if err == nil {
-		t.Fatalf("expected command execution failure when api key is missing")
-	}
-	if !strings.Contains(err.Error(), "api-key") {
-		t.Fatalf("expected missing api-key error, got %v", err)
+	if err := command.Execute(); err != nil {
+		t.Fatalf("expected command execution success without api-key flag, got %v", err)
 	}
 }

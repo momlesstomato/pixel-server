@@ -21,7 +21,7 @@ func TestExecuteServeBuildsServer(t *testing.T) {
 	envFile := writeServeEnvFile(t)
 	listenCalled := false
 	err := ExecuteServe(ServeOptions{
-		EnvFile: envFile, WebSocketPath: "/realtime", APIKey: "test-key", Output: logBuffer,
+		EnvFile: envFile, WebSocketPath: "/realtime", Output: logBuffer,
 	}, func(module *corehttp.Module, _ string) error {
 		listenCalled = true
 		request := httptest.NewRequest(nethttp.MethodGet, "/realtime", nil)
@@ -49,7 +49,7 @@ func TestExecuteServeBuildsServer(t *testing.T) {
 // TestExecuteServeFailsWithMissingConfig verifies startup error propagation.
 func TestExecuteServeFailsWithMissingConfig(t *testing.T) {
 	err := ExecuteServe(ServeOptions{
-		EnvFile: filepath.Join(t.TempDir(), ".env"), APIKey: "test-key",
+		EnvFile: filepath.Join(t.TempDir(), ".env"),
 	}, nil)
 	if err == nil {
 		t.Fatalf("expected serve execution failure for missing mandatory config")
@@ -63,7 +63,7 @@ func TestNewServeCommandAppliesFlags(t *testing.T) {
 	command := NewServeCommand(ServeDependencies{
 		Listen: func(_ *corehttp.Module, address string) error { captured = address; return nil },
 	})
-	command.SetArgs([]string{"--env-file", envFile, "--ws-path", "/events", "--api-key", "test-key"})
+	command.SetArgs([]string{"--env-file", envFile, "--ws-path", "/events"})
 	if err := command.Execute(); err != nil {
 		t.Fatalf("expected command execution success, got %v", err)
 	}
@@ -76,7 +76,7 @@ func TestNewServeCommandAppliesFlags(t *testing.T) {
 func TestExecuteServePropagatesListenError(t *testing.T) {
 	expected := errors.New("listen error")
 	err := ExecuteServe(ServeOptions{
-		EnvFile: writeServeEnvFile(t), APIKey: "test-key",
+		EnvFile: writeServeEnvFile(t),
 	}, func(_ *corehttp.Module, _ string) error {
 		return expected
 	})
@@ -142,7 +142,7 @@ func dialWebSocket(t *testing.T, url string) *gws.Conn {
 func writeServeEnvFile(t *testing.T) string {
 	t.Helper()
 	filePath := filepath.Join(t.TempDir(), ".env")
-	content := []byte("APP_BIND_IP=127.0.0.1\nAPP_PORT=3987\nREDIS_ADDRESS=localhost:6379\nPOSTGRES_DSN=dsn\nUSERS_JWT_SECRET=secret\n")
+	content := []byte("APP_BIND_IP=127.0.0.1\nAPP_PORT=3987\nAPP_API_KEY=test-key\nREDIS_ADDRESS=localhost:6379\nPOSTGRES_DSN=dsn\nUSERS_JWT_SECRET=secret\n")
 	if err := os.WriteFile(filePath, content, 0o600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}

@@ -50,15 +50,15 @@ Client                                    Server
 
 | ID   | Name                            | Phase    | Fields                                                               | Status          |
 |------|---------------------------------|----------|----------------------------------------------------------------------|-----------------|
-| 4000 | `handshake.release_version`     | pre-auth | `releaseVersion: string`, `clientType: string`, `platform: int32`, `deviceCategory: int32` | PLANNED         |
-| 1053 | `handshake.client_variables`    | pre-auth | `clientId: int32`, `clientUrl: string`, `externalVariablesUrl: string` | PLANNED         |
-| 2490 | `security.machine_id`          | pre-auth | `machineId: string(64 hex)`, `fingerprint: string`, `capabilities: string` | PLANNED         |
+| 4000 | `handshake.release_version`     | pre-auth | `releaseVersion: string`, `clientType: string`, `platform: int32`, `deviceCategory: int32` | DONE            |
+| 1053 | `handshake.client_variables`    | pre-auth | `clientId: int32`, `clientUrl: string`, `externalVariablesUrl: string` | DONE            |
+| 2490 | `security.machine_id`          | pre-auth | `machineId: string(64 hex)`, `fingerprint: string`, `capabilities: string` | DONE            |
 | 3110 | `handshake.init_diffie`        | crypto   | _(empty)_                                                            | DEFERRED        |
 | 773  | `handshake.complete_diffie`    | crypto   | `encryptedPublicKey: string`                                         | DEFERRED        |
-| 2419 | `security.sso_ticket`          | auth     | `ticket: string`, `timestamp: int32 (optional)`                      | PLANNED         |
-| 2596 | `client.pong`                  | session  | _(empty)_                                                            | PLANNED         |
-| 295  | `client.latency_test`          | session  | `requestId: int32`                                                   | PLANNED         |
-| 2445 | `client.disconnect`            | session  | _(empty)_                                                            | PLANNED         |
+| 2419 | `security.sso_ticket`          | auth     | `ticket: string`, `timestamp: int32 (optional)`                      | DONE            |
+| 2596 | `client.pong`                  | session  | _(empty)_                                                            | DONE            |
+| 295  | `client.latency_test`          | session  | `requestId: int32`                                                   | DONE            |
+| 2445 | `client.disconnect`            | session  | _(empty)_                                                            | DONE            |
 
 ### Server-to-Client (S2C)
 
@@ -66,11 +66,11 @@ Client                                    Server
 |------|---------------------------------|----------|----------------------------------------------------------------------|-----------------|
 | 1347 | `handshake.init_diffie`        | crypto   | `encryptedPrime: string`, `encryptedGenerator: string`               | DEFERRED        |
 | 3885 | `handshake.complete_diffie`    | crypto   | `encryptedPublicKey: string`, `serverClientEncryption: bool`         | DEFERRED        |
-| 1488 | `security.machine_id`          | auth     | `machineId: string(64 hex)`                                         | PLANNED         |
-| 2491 | `authentication.ok`            | auth     | _(empty)_                                                            | PLANNED         |
-| 3523 | `handshake.identity_accounts`  | auth     | `count: int32`, `accounts: [{id: int32, name: string}]`             | PLANNED         |
-| 3928 | `client.ping`                  | session  | _(empty)_                                                            | PLANNED         |
-| 10   | `client.latency_response`      | session  | `requestId: int32`                                                   | PLANNED         |
+| 1488 | `security.machine_id`          | auth     | `machineId: string(64 hex)`                                         | DONE            |
+| 2491 | `authentication.ok`            | auth     | _(empty)_                                                            | DONE            |
+| 3523 | `handshake.identity_accounts`  | auth     | `count: int32`, `accounts: [{id: int32, name: string}]`             | DONE            |
+| 3928 | `client.ping`                  | session  | _(empty)_                                                            | DONE            |
+| 10   | `client.latency_response`      | session  | `requestId: int32`                                                   | DONE            |
 
 ### Status Legend
 
@@ -93,23 +93,24 @@ Client                                    Server
 ### Package Layout
 
 ```
-internal/realms/handshake/
-  domain/
-    session.go          <- Session entity (connID, userID, machineID, state)
-    sso.go              <- SSO token value object
-    ports.go            <- Port interfaces (SessionStore, SSOStore, Transport)
-  app/
-    authenticate.go     <- AuthenticateUseCase (SSO validation + session creation)
-    disconnect.go       <- DisconnectUseCase (cleanup + kick)
-    heartbeat.go        <- HeartbeatUseCase (ping/pong lifecycle)
-  adapters/
-    redis_sso.go        <- Redis SSO token store (SET with TTL, GET+DEL atomic)
-    ws_transport.go     <- WebSocket packet read/write adapter
-    session_registry.go <- In-memory session registry (ConcurrentMap)
+pkg/handshake/packet/
+  bootstrap/            <- Release negotiation packets (4000, 1053)
+  security/             <- Machine and SSO packets (2490, 1488, 2419)
+  authentication/       <- Auth success/account list packets (2491, 3523)
+  session/              <- Lifecycle heartbeat/disconnect packets (3928, 2596, 2445)
+  telemetry/            <- Latency test/response packets (295, 10)
 
 core/connection/
-    registry.go         <- Connection registry interface + in-memory impl
-    conn.go             <- Connection abstraction (read, write, close)
+  conn.go               <- Connection abstraction (read, write, close)
+  session_registry.go   <- Session registry interface + Redis-backed impl
+
+core/codec/
+  frame.go              <- Frame encode/decode (wire header + body)
+  primitives.go         <- Typed payload reader/writer primitives
+
+core/redis/
+  client.go             <- Redis client factory
+  stage.go              <- Redis initializer stage
 ```
 
 ### Domain Model
@@ -323,11 +324,11 @@ breaking changes.
 
 | # | Task                                         | Depends On | Status  |
 |---|----------------------------------------------|------------|---------|
-| 1 | Add `go-redis/v9` dependency                 | -          | PENDING |
-| 2 | Implement Redis client initializer in `core/` | 1          | PENDING |
-| 3 | Define packet codec (header + body encoding) | -          | PENDING |
-| 4 | Define connection abstraction in `core/connection/` | -     | PENDING |
-| 5 | Implement in-memory session registry         | 4          | PENDING |
+| 1 | Add `go-redis/v9` dependency                 | -          | DONE    |
+| 2 | Implement Redis client initializer in `core/` | 1          | DONE    |
+| 3 | Define packet codec (header + body encoding) | -          | DONE    |
+| 4 | Define connection abstraction in `core/connection/` | -     | DONE    |
+| 5 | Implement Redis-backed session registry      | 4          | DONE    |
 
 ### Milestone 2: SSO Token Management
 
@@ -343,31 +344,31 @@ breaking changes.
 
 | # | Task                                         | Depends On | Status  |
 |---|----------------------------------------------|------------|---------|
-| 11| Parse `release_version` (4000) C2S           | 3          | PENDING |
-| 12| Parse `client_variables` (1053) C2S          | 3          | PENDING |
-| 13| Parse `security.machine_id` (2490) C2S       | 3          | PENDING |
-| 14| Compose `security.machine_id` (1488) S2C     | 3          | PENDING |
+| 11| Parse `release_version` (4000) C2S           | 3          | DONE    |
+| 12| Parse `client_variables` (1053) C2S          | 3          | DONE    |
+| 13| Parse `security.machine_id` (2490) C2S       | 3          | DONE    |
+| 14| Compose `security.machine_id` (1488) S2C     | 3          | DONE    |
 | 15| Machine ID validation logic (64 hex chars)   | 13, 14     | PENDING |
 
 ### Milestone 4: Authentication Flow
 
 | # | Task                                         | Depends On | Status  |
 |---|----------------------------------------------|------------|---------|
-| 16| Parse `security.sso_ticket` (2419) C2S       | 3          | PENDING |
+| 16| Parse `security.sso_ticket` (2419) C2S       | 3          | DONE    |
 | 17| `AuthenticateUseCase` (validate + register)  | 5, 6, 16   | PENDING |
 | 18| Duplicate login detection + kick             | 5, 17      | PENDING |
-| 19| Compose `authentication.ok` (2491) S2C       | 3          | PENDING |
-| 20| Compose `identity_accounts` (3523) S2C       | 3          | PENDING |
+| 19| Compose `authentication.ok` (2491) S2C       | 3          | DONE    |
+| 20| Compose `identity_accounts` (3523) S2C       | 3          | DONE    |
 | 21| Auth timeout (30s no-ticket -> close)        | 17         | PENDING |
 
 ### Milestone 5: Session Lifecycle
 
 | # | Task                                         | Depends On | Status  |
 |---|----------------------------------------------|------------|---------|
-| 22| Compose `client.ping` (3928) S2C             | 3          | PENDING |
-| 23| Parse `client.pong` (2596) C2S               | 3          | PENDING |
+| 22| Compose `client.ping` (3928) S2C             | 3          | DONE    |
+| 23| Parse `client.pong` (2596) C2S               | 3          | DONE    |
 | 24| Heartbeat goroutine (30s ping, 60s timeout)  | 22, 23     | PENDING |
-| 25| Parse `client.disconnect` (2445) C2S         | 3          | PENDING |
+| 25| Parse `client.disconnect` (2445) C2S         | 3          | DONE    |
 | 26| `DisconnectUseCase` (cleanup + close)        | 5, 25      | PENDING |
 | 27| Abrupt disconnect handler (onclose/onerror)  | 5          | PENDING |
 
@@ -375,8 +376,8 @@ breaking changes.
 
 | # | Task                                         | Depends On | Status  |
 |---|----------------------------------------------|------------|---------|
-| 28| Parse `client.latency_test` (295) C2S        | 3          | PENDING |
-| 29| Compose `client.latency_response` (10) S2C   | 3          | PENDING |
+| 28| Parse `client.latency_test` (295) C2S        | 3          | DONE    |
+| 29| Compose `client.latency_response` (10) S2C   | 3          | DONE    |
 | 30| Latency measurement handler                  | 28, 29     | PENDING |
 | 31| E2E test: full handshake flow                | 17, 24     | PENDING |
 | 32| E2E test: duplicate login kick               | 18         | PENDING |
@@ -414,9 +415,9 @@ implemented. The session stores the user ID as an integer, no user model needed.
 - **Key namespace** - all SSO keys prefixed with `sso:` to avoid collisions
 - **No persistence needed** - SSO tokens are ephemeral; Redis `RDB` or `AOF`
   persistence is not required for this use case
-- **Failure mode** - if Redis is down, no SSO validation is possible; all new
-  connections will fail auth. Existing authenticated sessions are unaffected
-  (session registry is in-memory)
+- **Failure mode** - if Redis is down, no SSO validation is possible and
+  session registry reads/writes fail; existing sockets may stay open but
+  lifecycle operations that require session state cannot progress
 
 ### WebSocket
 
@@ -439,7 +440,7 @@ The Habbo protocol uses a binary format:
 - **Body**: variable-length, type-specific encoding
 - **Types**: int32 (4 bytes BE), string (2 bytes BE length + UTF-8), bool (1 byte)
 
-This codec must be implemented in `pkg/protocol/` as a reusable library before
+This codec must be implemented in `core/codec/` as a reusable library before
 any packet can be parsed or composed. All vendors agree on this wire format.
 
 ### Concurrency

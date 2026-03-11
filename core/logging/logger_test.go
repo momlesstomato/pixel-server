@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"strings"
 	"testing"
-
-	"github.com/momlesstomato/pixel-server/core/config"
 )
 
 // TestNewBuildsJSONLogger verifies JSON encoder output.
 func TestNewBuildsJSONLogger(t *testing.T) {
 	buffer := bytes.NewBuffer(nil)
-	logger, err := New(config.LoggingConfig{Format: "json", Level: "info"}, buffer)
+	logger, err := New(Config{Format: "json", Level: "info"}, buffer)
 	if err != nil {
 		t.Fatalf("expected logger build to succeed, got error: %v", err)
 	}
@@ -25,7 +23,7 @@ func TestNewBuildsJSONLogger(t *testing.T) {
 // TestNewBuildsConsoleLogger verifies console encoder output.
 func TestNewBuildsConsoleLogger(t *testing.T) {
 	buffer := bytes.NewBuffer(nil)
-	logger, err := New(config.LoggingConfig{Format: "console", Level: "info"}, buffer)
+	logger, err := New(Config{Format: "console", Level: "info"}, buffer)
 	if err != nil {
 		t.Fatalf("expected logger build to succeed, got error: %v", err)
 	}
@@ -38,7 +36,7 @@ func TestNewBuildsConsoleLogger(t *testing.T) {
 
 // TestNewRejectsInvalidFormat verifies validation for unsupported formats.
 func TestNewRejectsInvalidFormat(t *testing.T) {
-	_, err := New(config.LoggingConfig{Format: "xml", Level: "info"}, bytes.NewBuffer(nil))
+	_, err := New(Config{Format: "xml", Level: "info"}, bytes.NewBuffer(nil))
 	if err == nil {
 		t.Fatalf("expected logger build to fail for invalid format")
 	}
@@ -46,7 +44,7 @@ func TestNewRejectsInvalidFormat(t *testing.T) {
 
 // TestNewRejectsInvalidLevel verifies validation for unsupported levels.
 func TestNewRejectsInvalidLevel(t *testing.T) {
-	_, err := New(config.LoggingConfig{Format: "json", Level: "verbose"}, bytes.NewBuffer(nil))
+	_, err := New(Config{Format: "json", Level: "verbose"}, bytes.NewBuffer(nil))
 	if err == nil {
 		t.Fatalf("expected logger build to fail for invalid level")
 	}
@@ -54,7 +52,7 @@ func TestNewRejectsInvalidLevel(t *testing.T) {
 
 // TestNewUsesStdoutWhenOutputIsNil verifies nil output fallback.
 func TestNewUsesStdoutWhenOutputIsNil(t *testing.T) {
-	logger, err := New(config.LoggingConfig{Format: "console", Level: "info"}, nil)
+	logger, err := New(Config{Format: "console", Level: "info"}, nil)
 	if err != nil {
 		t.Fatalf("expected logger build to succeed, got error: %v", err)
 	}
@@ -66,7 +64,7 @@ func TestNewUsesStdoutWhenOutputIsNil(t *testing.T) {
 // TestInitializerBuildsLogger verifies package-owned initializer behavior.
 func TestInitializerBuildsLogger(t *testing.T) {
 	buffer := bytes.NewBuffer(nil)
-	loaded := &config.Config{Logging: config.LoggingConfig{Format: "json", Level: "info"}}
+	loaded := Config{Format: "json", Level: "info"}
 	logger, err := (Initializer{Output: buffer}).InitializeLogger(loaded)
 	if err != nil {
 		t.Fatalf("expected initializer success, got %v", err)
@@ -77,9 +75,9 @@ func TestInitializerBuildsLogger(t *testing.T) {
 	}
 }
 
-// TestInitializerRejectsNilConfig verifies config precondition checks.
-func TestInitializerRejectsNilConfig(t *testing.T) {
-	if _, err := (Initializer{}).InitializeLogger(nil); err == nil {
-		t.Fatalf("expected initializer error for nil config")
+// TestInitializerRejectsEmptyConfig verifies config precondition checks.
+func TestInitializerRejectsEmptyConfig(t *testing.T) {
+	if _, err := (Initializer{}).InitializeLogger(Config{}); err == nil {
+		t.Fatalf("expected initializer error for empty logging config")
 	}
 }

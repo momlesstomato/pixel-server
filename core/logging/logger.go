@@ -6,13 +6,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/momlesstomato/pixel-server/core/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 // New builds a zap logger using configuration-driven format and level.
-func New(cfg config.LoggingConfig, output io.Writer) (*zap.Logger, error) {
+func New(cfg Config, output io.Writer) (*zap.Logger, error) {
 	level, err := zapcore.ParseLevel(strings.ToLower(cfg.Level))
 	if err != nil {
 		return nil, fmt.Errorf("parse logging level %q: %w", cfg.Level, err)

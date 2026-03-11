@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/momlesstomato/pixel-server/core/config"
 	"go.uber.org/zap"
 )
 
@@ -13,7 +12,7 @@ type Stage interface {
 	// Name returns a stable startup unit identifier.
 	Name() string
 	// InitializeLogger creates a logger from loaded configuration.
-	InitializeLogger(*config.Config) (*zap.Logger, error)
+	InitializeLogger(Config) (*zap.Logger, error)
 }
 
 // Initializer provides default logger startup behavior.
@@ -28,9 +27,9 @@ func (initializer Initializer) Name() string {
 }
 
 // InitializeLogger builds and returns a configured logger.
-func (initializer Initializer) InitializeLogger(loaded *config.Config) (*zap.Logger, error) {
-	if loaded == nil {
-		return nil, fmt.Errorf("config is required")
+func (initializer Initializer) InitializeLogger(loaded Config) (*zap.Logger, error) {
+	if loaded.Level == "" {
+		return nil, fmt.Errorf("logging level is required")
 	}
-	return New(loaded.Logging, initializer.Output)
+	return New(loaded, initializer.Output)
 }
