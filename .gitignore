@@ -1,0 +1,63 @@
+# OS files
+.DS_Store
+.Ds_Store
+**/.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Go build and test artifacts
+*.test
+*.out
+*.prof
+*.pprof
+coverage.out
+coverage.*
+
+# Binaries and distributables
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+/bin/
+/dist/
+/build/
+
+# Logs and runtime artifacts
+*.log
+*.trace
+*.pid
+logs/
+/tmp/
+
+# JSON artifacts (runtime/generated)
+*.json
+*.ndjson
+
+# IDE and editor
+.idea/
+.vscode/
+.fleet/
+.zed/
+*.iml
+.history/
+
+# Local env
+.env
+.env.*
+.envrc
+.direnv/
+
+# AI/tooling workdirs
+.claude
+.claude/
+.codex
+.codex/
+.aider/
+.roo/
+.windsurf/
+
+# Local reference sources
+vendor/*
+!vendor/.gitignore
+!vendor/README.md
