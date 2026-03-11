@@ -1,8 +1,10 @@
 package http
 
 import (
+	"crypto/subtle"
 	"errors"
 	nethttp "net/http"
+	"strings"
 
 	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/contrib/websocket"
@@ -11,9 +13,13 @@ import (
 )
 
 var errNilWebSocketHandler = errors.New("websocket handler is required")
+var errAPIKeyRequired = errors.New("api key is required")
 
 // WebSocketHandler defines the websocket endpoint handler signature.
 type WebSocketHandler func(*websocket.Conn)
+
+// DefaultAPIKeyHeader defines the default header used for API key auth.
+const DefaultAPIKeyHeader = "X-API-Key"
 
 // Options defines configurable dependencies for the HTTP module.
 type Options struct {
@@ -48,6 +54,29 @@ func (module *Module) App() *fiber.App {
 // RegisterGET registers an HTTP GET endpoint on the Fiber application.
 func (module *Module) RegisterGET(path string, handler fiber.Handler) {
 	module.app.Get(path, handler)
+}
+
+// ProtectWithAPIKey protects all registered routes using API key middleware.
+func (module *Module) ProtectWithAPIKey(apiKey string, header string) error {
+	trimmed := strings.TrimSpace(apiKey)
+	if trimmed == "" {
+		return errAPIKeyRequired
+	}
+	keyHeader := header
+	if keyHeader == "" {
+		keyHeader = DefaultAPIKeyHeader
+	}
+	module.app.Use(func(ctx *fiber.Ctx) error {
+		provided := ctx.Get(keyHeader)
+		if provided == "" {
+			provided = ctx.Query("api_key")
+		}
+		if subtle.ConstantTimeCompare([]byte(provided), []byte(trimmed)) != 1 {
+			return fiber.NewError(nethttp.StatusUnauthorized, "invalid api key")
+		}
+		return ctx.Next()
+	})
+	return nil
 }
 
 // RegisterWebSocket registers websocket upgrade and endpoint handlers.

@@ -62,3 +62,24 @@ func TestNewUsesStdoutWhenOutputIsNil(t *testing.T) {
 		t.Fatalf("expected non-nil logger")
 	}
 }
+
+// TestInitializerBuildsLogger verifies package-owned initializer behavior.
+func TestInitializerBuildsLogger(t *testing.T) {
+	buffer := bytes.NewBuffer(nil)
+	loaded := &config.Config{Logging: config.LoggingConfig{Format: "json", Level: "info"}}
+	logger, err := (Initializer{Output: buffer}).InitializeLogger(loaded)
+	if err != nil {
+		t.Fatalf("expected initializer success, got %v", err)
+	}
+	logger.Info("hello")
+	if !strings.Contains(buffer.String(), "\"msg\":\"hello\"") {
+		t.Fatalf("expected logger output to contain message, got %s", buffer.String())
+	}
+}
+
+// TestInitializerRejectsNilConfig verifies config precondition checks.
+func TestInitializerRejectsNilConfig(t *testing.T) {
+	if _, err := (Initializer{}).InitializeLogger(nil); err == nil {
+		t.Fatalf("expected initializer error for nil config")
+	}
+}

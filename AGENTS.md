@@ -9,7 +9,13 @@ This document defines mandatory project constraints and success criteria.
 - Repository structure must include:
   - `core/` for essential platform and application-wide capabilities.
   - `pkg/` for realm-only logic.
+- CLI implementation must live under `core/cli`.
 - Domain ownership belongs to each realm present in the pixel protocol.
+- God objects are forbidden, including broad dependency registries or unbounded shared containers.
+- Dependencies must be explicit and typed, passed only to modules that need them.
+- Structs, interfaces, and function definitions must live in their corresponding package/module domain.
+- Cross-cutting contracts must be avoided in centralized files when ownership is clear (for example, config contracts in `core/config`, logging contracts in `core/logging`, transport contracts in `core/http`).
+- Package design must stay distributed by responsibility to avoid bloated "catch-all" files and to keep future realm/packet growth isolated by module.
 - Code must follow HashiCorp and Linux philosophy:
   - small focused units,
   - composability,
@@ -82,3 +88,8 @@ This document defines mandatory project constraints and success criteria.
 - Packages must not exceed 6 files.
 - If a test exceeds 150 lines of code, that package must use an internal `tests/` folder.
 - Test files inside `tests/` must use descriptive names and never generic splits like `part1` or `part2`.
+
+## 10) Markdown Naming
+
+- All Markdown files must use uppercase filenames with lowercase `.md` extension.
+- Examples: `AGENTS.md`, `README.md`.

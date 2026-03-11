@@ -84,6 +84,22 @@ func TestLoadFailsOnUnreadableConfigPath(t *testing.T) {
 	}
 }
 
+// TestInitializerLoadsConfiguration verifies package-owned initializer behavior.
+func TestInitializerLoadsConfiguration(t *testing.T) {
+	envFile := writeEnvFile(t, strings.Join([]string{
+		"REDIS_ADDRESS=localhost:6379",
+		"POSTGRES_DSN=postgres://pixel:pixel@localhost:5432/pixel?sslmode=disable",
+		"USERS_JWT_SECRET=secret",
+	}, "\n"))
+	loaded, err := (Initializer{Options: LoaderOptions{EnvFile: envFile}}).InitializeConfig()
+	if err != nil {
+		t.Fatalf("expected initializer success, got %v", err)
+	}
+	if loaded == nil {
+		t.Fatalf("expected non-nil config")
+	}
+}
+
 // writeEnvFile creates a temporary .env file with the provided content.
 func writeEnvFile(t *testing.T, content string) string {
 	t.Helper()

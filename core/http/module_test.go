@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	coreconfig "github.com/momlesstomato/pixel-server/core/config"
 	corelogging "github.com/momlesstomato/pixel-server/core/logging"
+	"go.uber.org/zap"
 )
 
 // TestNewRegistersZapMiddleware verifies middleware emits request logs.
@@ -68,5 +69,58 @@ func TestDisposeShutsDownModule(t *testing.T) {
 	module := New(Options{})
 	if err := module.Dispose(); err != nil {
 		t.Fatalf("expected dispose to succeed, got %v", err)
+	}
+}
+
+// TestInitializerBuildsHTTPModule verifies package-owned initializer behavior.
+func TestInitializerBuildsHTTPModule(t *testing.T) {
+	module, err := (Initializer{APIKey: "secret"}).InitializeHTTP(zap.NewNop())
+	if err != nil {
+		t.Fatalf("expected http initializer success, got %v", err)
+	}
+	if module == nil {
+		t.Fatalf("expected non-nil module")
+	}
+}
+
+// TestInitializerRejectsNilLogger verifies logger precondition checks.
+func TestInitializerRejectsNilLogger(t *testing.T) {
+	if _, err := (Initializer{}).InitializeHTTP(nil); err == nil {
+		t.Fatalf("expected http initializer error for nil logger")
+	}
+}
+
+// TestInitializerRejectsEmptyAPIKey verifies API key precondition checks.
+func TestInitializerRejectsEmptyAPIKey(t *testing.T) {
+	if _, err := (Initializer{}).InitializeHTTP(zap.NewNop()); err == nil {
+		t.Fatalf("expected http initializer error for empty api key")
+	}
+}
+
+// TestWebSocketInitializerRegistersRoute verifies websocket stage behavior.
+func TestWebSocketInitializerRegistersRoute(t *testing.T) {
+	module := New(Options{})
+	stage := WebSocketInitializer{Path: "/events", Handler: func(_ *websocket.Conn) {}}
+	if err := stage.InitializeWebSocket(module); err != nil {
+		t.Fatalf("expected websocket initializer success, got %v", err)
+	}
+	request := httptest.NewRequest(nethttp.MethodGet, "/events", nil)
+	response, err := module.App().Test(request)
+	if err != nil {
+		t.Fatalf("expected request success, got %v", err)
+	}
+	if response.StatusCode != nethttp.StatusUpgradeRequired {
+		t.Fatalf("expected status 426, got %d", response.StatusCode)
+	}
+}
+
+// TestWebSocketInitializerRejectsInvalidInputs verifies stage precondition checks.
+func TestWebSocketInitializerRejectsInvalidInputs(t *testing.T) {
+	if err := (WebSocketInitializer{}).InitializeWebSocket(nil); err == nil {
+		t.Fatalf("expected websocket initializer error for nil module")
+	}
+	module := New(Options{})
+	if err := (WebSocketInitializer{}).InitializeWebSocket(module); err == nil {
+		t.Fatalf("expected websocket initializer error for nil handler")
 	}
 }
