@@ -1,4 +1,4 @@
-package system
+package user
 
 import (
 	"time"
@@ -6,14 +6,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// Setting stores system bootstrap key-value configuration.
-type Setting struct {
-	// ID stores stable setting identifier.
-	ID uint `gorm:"primaryKey"`
-	// Key stores unique setting key.
-	Key string `gorm:"size:120;uniqueIndex;not null"`
-	// Value stores setting value payload.
-	Value string `gorm:"size:1024;not null"`
+// Record stores one persisted user row.
+type Record struct {
+	// ID stores stable user identifier.
+	ID uint `gorm:"primaryKey;autoIncrement"`
+	// Username stores unique user name value.
+	Username string `gorm:"size:64;uniqueIndex;not null"`
 	// OwnerID stores optional creator owner identifier.
 	OwnerID *uint `gorm:"index"`
 	// CreatedAt stores row creation timestamp.

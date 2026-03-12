@@ -5,6 +5,7 @@ import (
 
 	"github.com/momlesstomato/pixel-server/core/postgres/migrations"
 	systemmodel "github.com/momlesstomato/pixel-server/core/postgres/model/system"
+	usermodel "github.com/momlesstomato/pixel-server/core/postgres/model/user"
 	"github.com/momlesstomato/pixel-server/core/postgres/seeds"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -30,6 +31,33 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if !database.Migrator().HasTable(&systemmodel.Setting{}) {
 		t.Fatalf("expected migrated settings table to exist")
 	}
+	if !database.Migrator().HasTable(&usermodel.Record{}) {
+		t.Fatalf("expected migrated users table to exist")
+	}
+	user := usermodel.Record{Username: "tester"}
+	if err := database.Create(&user).Error; err != nil {
+		t.Fatalf("expected user insert success, got %v", err)
+	}
+	if user.ID == 0 || user.CreatedAt.IsZero() || user.UpdatedAt.IsZero() || user.OwnerID != nil {
+		t.Fatalf("expected generated id, timestamps, and nil owner for inserted user")
+	}
+	if err := database.Delete(&user).Error; err != nil {
+		t.Fatalf("expected user soft delete success, got %v", err)
+	}
+	var visibleUsers int64
+	if err := database.Model(&usermodel.Record{}).Where("username = ?", user.Username).Count(&visibleUsers).Error; err != nil {
+		t.Fatalf("expected visible user count query success, got %v", err)
+	}
+	if visibleUsers != 0 {
+		t.Fatalf("expected zero visible users after soft delete, got %d", visibleUsers)
+	}
+	var storedUser usermodel.Record
+	if err := database.Unscoped().Where("id = ?", user.ID).First(&storedUser).Error; err != nil {
+		t.Fatalf("expected unscoped user lookup success, got %v", err)
+	}
+	if !storedUser.DeletedAt.Valid {
+		t.Fatalf("expected deleted_at to be set after soft delete")
+	}
 	if err := manager.SeedUp(); err != nil {
 		t.Fatalf("expected seed up success, got %v", err)
 	}
@@ -40,6 +68,13 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if seededCount != 1 {
 		t.Fatalf("expected one seeded setting, got %d", seededCount)
 	}
+	var setting systemmodel.Setting
+	if err := database.Where("key = ?", "bootstrap_version").First(&setting).Error; err != nil {
+		t.Fatalf("expected seeded setting lookup success, got %v", err)
+	}
+	if setting.ID == 0 || setting.CreatedAt.IsZero() || setting.UpdatedAt.IsZero() || setting.OwnerID != nil {
+		t.Fatalf("expected seeded setting id, timestamps, and nil owner")
+	}
 	if err := manager.SeedDown(); err != nil {
 		t.Fatalf("expected seed down success, got %v", err)
 	}
@@ -48,6 +83,18 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	}
 	if seededCount != 0 {
 		t.Fatalf("expected zero seeded settings after rollback, got %d", seededCount)
+	}
+	if err := manager.MigrateDown(); err != nil {
+		t.Fatalf("expected migration down success, got %v", err)
+	}
+	if !database.Migrator().HasTable(&usermodel.Record{}) {
+		t.Fatalf("expected users table to exist after non-destructive rollback step")
+	}
+	if err := manager.MigrateDown(); err != nil {
+		t.Fatalf("expected migration down success, got %v", err)
+	}
+	if database.Migrator().HasTable(&usermodel.Record{}) {
+		t.Fatalf("expected users table to be dropped")
 	}
 	if err := manager.MigrateDown(); err != nil {
 		t.Fatalf("expected migration down success, got %v", err)
