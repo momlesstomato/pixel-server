@@ -45,13 +45,19 @@ func TestNewEchoWebSocketHandlerLogsPacketFlow(t *testing.T) {
 		t.Fatalf("expected module dispose success, got %v", disposeErr)
 	}
 	connection.SetReadDeadline(time.Now().Add(time.Second))
-	_, _, readErr := connection.ReadMessage()
-	if readErr == nil {
-		t.Fatalf("expected close frame after module disposal")
-	}
-	var closeErr *gws.CloseError
-	if !errors.As(readErr, &closeErr) || closeErr.Code != gws.CloseNormalClosure {
-		t.Fatalf("expected normal close frame, got %v", readErr)
+	for {
+		_, _, readErr := connection.ReadMessage()
+		if readErr == nil {
+			continue
+		}
+		var closeErr *gws.CloseError
+		if !errors.As(readErr, &closeErr) {
+			t.Fatalf("expected close frame after module disposal, got %v", readErr)
+		}
+		if closeErr.Code != corehttp.DefaultShutdownWebSocketCloseCode {
+			t.Fatalf("expected shutdown close code %d, got %d", corehttp.DefaultShutdownWebSocketCloseCode, closeErr.Code)
+		}
+		break
 	}
 	_ = <-serverErrors
 	_ = connection.Close()

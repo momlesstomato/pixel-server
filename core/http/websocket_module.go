@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
+	"github.com/momlesstomato/pixel-server/core/codec"
 )
 
 // isPublicPath reports whether a request path bypasses API key enforcement.
@@ -89,9 +90,14 @@ func (module *Module) closeWebSocketConnections() error {
 		if connection == nil {
 			continue
 		}
+		writer := codec.NewWriter()
+		writer.WriteInt32(DefaultShutdownDisconnectReasonCode)
+		if err := connection.WriteMessage(websocket.BinaryMessage, codec.EncodeFrame(DefaultDisconnectReasonPacketID, writer.Bytes())); err != nil {
+			closeErrors = append(closeErrors, err)
+		}
 		if err := connection.WriteControl(
 			websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "server shutdown"),
+			websocket.FormatCloseMessage(DefaultShutdownWebSocketCloseCode, "server shutdown"),
 			time.Now().Add(DefaultWebSocketCloseTimeout),
 		); err != nil {
 			closeErrors = append(closeErrors, err)

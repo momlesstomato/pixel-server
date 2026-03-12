@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -37,8 +38,20 @@ func TestDisposeSendsCloseFrameToWebSocketClients(t *testing.T) {
 	if disposeErr := module.Dispose(); disposeErr != nil {
 		t.Fatalf("expected dispose success, got %v", disposeErr)
 	}
-	if _, _, readErr := connection.ReadMessage(); readErr == nil {
-		t.Fatalf("expected close frame after dispose")
+	connection.SetReadDeadline(time.Now().Add(time.Second))
+	for {
+		_, _, readErr := connection.ReadMessage()
+		if readErr == nil {
+			continue
+		}
+		var closeErr *gws.CloseError
+		if !errors.As(readErr, &closeErr) {
+			t.Fatalf("expected close frame after dispose, got %v", readErr)
+		}
+		if closeErr.Code != corehttp.DefaultShutdownWebSocketCloseCode {
+			t.Fatalf("expected shutdown close code %d, got %d", corehttp.DefaultShutdownWebSocketCloseCode, closeErr.Code)
+		}
+		break
 	}
 	_ = <-serverErrors
 }

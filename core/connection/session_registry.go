@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	redislib "github.com/redis/go-redis/v9"
@@ -72,7 +71,7 @@ func (registry *RedisSessionRegistry) Register(session Session) error {
 		return fmt.Errorf("session connection id is required")
 	}
 	ctx := context.Background()
-	existingUserSession, existingUserSessionFound, err := registry.fetchByConnID(ctx, session.ConnID)
+	existing, found, err := registry.fetchByConnID(ctx, session.ConnID)
 	if err != nil {
 		return err
 	}
@@ -88,8 +87,8 @@ func (registry *RedisSessionRegistry) Register(session Session) error {
 		return err
 	}
 	pipeline := registry.client.TxPipeline()
-	if existingUserSessionFound && existingUserSession.UserID > 0 && existingUserSession.UserID != session.UserID {
-		pipeline.Del(ctx, registry.userKey(existingUserSession.UserID))
+	if found && existing.UserID > 0 && existing.UserID != session.UserID {
+		pipeline.Del(ctx, registry.userKey(existing.UserID))
 	}
 	if session.UserID > 0 {
 		if previousConnID != "" && previousConnID != session.ConnID {
@@ -104,12 +103,11 @@ func (registry *RedisSessionRegistry) Register(session Session) error {
 
 // FindByUserID retrieves an active session by user ID.
 func (registry *RedisSessionRegistry) FindByUserID(userID int) (Session, bool) {
-	ctx := context.Background()
-	connID, err := registry.client.Get(ctx, registry.userKey(userID)).Result()
+	connID, err := registry.client.Get(context.Background(), registry.userKey(userID)).Result()
 	if err != nil {
 		return Session{}, false
 	}
-	session, found, fetchErr := registry.fetchByConnID(ctx, connID)
+	session, found, fetchErr := registry.fetchByConnID(context.Background(), connID)
 	if fetchErr != nil || !found {
 		return Session{}, false
 	}
@@ -138,30 +136,4 @@ func (registry *RedisSessionRegistry) Remove(connID string) {
 		pipeline.Del(ctx, registry.userKey(session.UserID))
 	}
 	_, _ = pipeline.Exec(ctx)
-}
-
-// fetchByConnID loads one session record by connection identifier.
-func (registry *RedisSessionRegistry) fetchByConnID(ctx context.Context, connID string) (Session, bool, error) {
-	payload, err := registry.client.Get(ctx, registry.connKey(connID)).Bytes()
-	if err == redislib.Nil {
-		return Session{}, false, nil
-	}
-	if err != nil {
-		return Session{}, false, err
-	}
-	var session Session
-	if unmarshalErr := json.Unmarshal(payload, &session); unmarshalErr != nil {
-		return Session{}, false, unmarshalErr
-	}
-	return session, true, nil
-}
-
-// connKey returns the namespaced Redis key for one connection session record.
-func (registry *RedisSessionRegistry) connKey(connID string) string {
-	return registry.prefix + ":conn:" + connID
-}
-
-// userKey returns the namespaced Redis key for one user-to-connection index.
-func (registry *RedisSessionRegistry) userKey(userID int) string {
-	return registry.prefix + ":user:" + strconv.Itoa(userID)
 }

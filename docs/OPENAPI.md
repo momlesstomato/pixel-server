@@ -20,7 +20,7 @@ Both routes are public and do not require API key.
 ## Ownership
 
 - Core OpenAPI document assembly and docs routes: `core/http/openapi`
-- Authentication HTTP route specs: `pkg/authentication/httpapi`
+- Authentication HTTP route specs: `pkg/authentication/adapter/httpapi`
 
 ## Update Rule
 

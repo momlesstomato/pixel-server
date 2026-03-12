@@ -6,7 +6,7 @@ import (
 	"github.com/momlesstomato/pixel-server/core/postgres"
 	"github.com/momlesstomato/pixel-server/core/redis"
 	"github.com/momlesstomato/pixel-server/core/users"
-	"github.com/momlesstomato/pixel-server/pkg/authentication"
+	authenticationdomain "github.com/momlesstomato/pixel-server/pkg/authentication/domain"
 )
 
 // Config defines the complete application configuration tree.
@@ -22,7 +22,7 @@ type Config struct {
 	// Logging contains structured logger settings.
 	Logging logging.Config `mapstructure:"logging"`
 	// Authentication contains SSO ticket policy settings.
-	Authentication authentication.Config `mapstructure:"authentication"`
+	Authentication authenticationdomain.Config `mapstructure:"authentication"`
 }
 
 // AppConfig aliases app runtime configuration shape.
@@ -41,4 +41,4 @@ type UsersConfig = users.Config
 type LoggingConfig = logging.Config
 
 // AuthenticationConfig aliases authentication runtime configuration shape.
-type AuthenticationConfig = authentication.Config
+type AuthenticationConfig = authenticationdomain.Config

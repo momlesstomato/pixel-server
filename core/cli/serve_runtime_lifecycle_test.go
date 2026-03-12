@@ -69,13 +69,19 @@ func TestRunServeLifecycleWithSignalsDisposesResources(t *testing.T) {
 		t.Fatalf("expected lifecycle completion after interrupt")
 	}
 	connection.SetReadDeadline(time.Now().Add(time.Second))
-	_, _, readErr := connection.ReadMessage()
-	if readErr == nil {
-		t.Fatalf("expected websocket close after interrupt")
-	}
-	var closeErr *gws.CloseError
-	if !errors.As(readErr, &closeErr) || closeErr.Code != gws.CloseNormalClosure {
-		t.Fatalf("expected normal close frame, got %v", readErr)
+	for {
+		_, _, readErr := connection.ReadMessage()
+		if readErr == nil {
+			continue
+		}
+		var closeErr *gws.CloseError
+		if !errors.As(readErr, &closeErr) {
+			t.Fatalf("expected websocket close after interrupt, got %v", readErr)
+		}
+		if closeErr.Code != corehttp.DefaultShutdownWebSocketCloseCode {
+			t.Fatalf("expected shutdown close code %d, got %d", corehttp.DefaultShutdownWebSocketCloseCode, closeErr.Code)
+		}
+		break
 	}
 	if logBuffer.SyncCount() == 0 {
 		t.Fatalf("expected logger sync to execute during cleanup")
@@ -98,4 +104,19 @@ func TestRunServeLifecycleRejectsInvalidInputs(t *testing.T) {
 	if err := runServeLifecycle(&initializer.Runtime{Logger: logger}, nil, "127.0.0.1:0", nil); err == nil {
 		t.Fatalf("expected http module precondition failure")
 	}
+}
+
+// dialWebSocket creates a websocket client connection with retries.
+func dialWebSocket(t *testing.T, url string) *gws.Conn {
+	t.Helper()
+	dialer := gws.Dialer{HandshakeTimeout: time.Second}
+	for attempt := 0; attempt < 10; attempt++ {
+		connection, _, err := dialer.Dial(url, nil)
+		if err == nil {
+			return connection
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("expected websocket dial success")
+	return nil
 }

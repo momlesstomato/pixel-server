@@ -1,7 +1,7 @@
 package cli
 
 import (
-	authcommand "github.com/momlesstomato/pixel-server/pkg/authentication/command"
+	authcommand "github.com/momlesstomato/pixel-server/pkg/authentication/adapter/command"
 	"github.com/spf13/cobra"
 )
 

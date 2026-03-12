@@ -14,11 +14,12 @@ import (
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	"github.com/momlesstomato/pixel-server/core/logging"
 	rediscore "github.com/momlesstomato/pixel-server/core/redis"
-	"github.com/momlesstomato/pixel-server/pkg/authentication"
-	"github.com/momlesstomato/pixel-server/pkg/authentication/httpapi"
-	"github.com/momlesstomato/pixel-server/pkg/handshake/authflow"
+	authenticationhttpapi "github.com/momlesstomato/pixel-server/pkg/authentication/adapter/httpapi"
+	authenticationapplication "github.com/momlesstomato/pixel-server/pkg/authentication/application"
+	authenticationredisstore "github.com/momlesstomato/pixel-server/pkg/authentication/infrastructure/redisstore"
+	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
+	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
-	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/realtime"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -78,19 +79,19 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	if err != nil {
 		return err
 	}
-	ssoStore, err := authentication.NewRedisStore(runtime.Redis, runtime.Config.Authentication.KeyPrefix)
+	ssoStore, err := authenticationredisstore.NewRedisStore(runtime.Redis, runtime.Config.Authentication.KeyPrefix)
 	if err != nil {
 		return err
 	}
-	ssoService := authentication.NewService(ssoStore, runtime.Config.Authentication)
+	ssoService := authenticationapplication.NewService(ssoStore, runtime.Config.Authentication)
 	module := runtime.HTTP
 	if err := registerServeWebSocket(module, options.WebSocketPath, runtime, ssoService, runtime.Logger); err != nil {
 		return err
 	}
-	if err := httpapi.RegisterRoutes(module, ssoService); err != nil {
+	if err := authenticationhttpapi.RegisterRoutes(module, ssoService); err != nil {
 		return err
 	}
-	openAPIDocument := httpopenapi.BuildDocument(options.WebSocketPath, httpapi.OpenAPIPaths())
+	openAPIDocument := httpopenapi.BuildDocument(options.WebSocketPath, authenticationhttpapi.OpenAPIPaths())
 	if err := httpopenapi.RegisterRoutes(module, openAPIDocument, "", ""); err != nil {
 		return err
 	}

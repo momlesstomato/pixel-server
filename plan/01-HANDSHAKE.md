@@ -10,6 +10,20 @@ fingerprinting, keep-alive heartbeat, and graceful disconnection.
 This realm is the **gateway boundary** - no game packet may be processed until
 `authentication.ok` has been sent to the client.
 
+## Current Status (2026-03-11)
+
+- Milestones 1 through 7 are implemented and covered with automated tests.
+- Handshake realm structure now follows explicit hexagonal boundaries:
+  - `pkg/handshake/application/*` for use cases,
+  - `pkg/handshake/adapter/*` for transport adapters,
+  - `pkg/handshake/packet/*` for protocol packet definitions.
+- Authentication realm structure now follows explicit hexagonal boundaries:
+  - `pkg/authentication/domain`,
+  - `pkg/authentication/application`,
+  - `pkg/authentication/infrastructure/*`,
+  - `pkg/authentication/adapter/*`.
+- Encryption milestone is implemented with Diffie-Hellman + RSA key handling + RC4 stream activation.
+
 ---
 
 ## Vendor Cross-Reference
@@ -53,8 +67,8 @@ Client                                    Server
 | 4000 | `handshake.release_version`     | pre-auth | `releaseVersion: string`, `clientType: string`, `platform: int32`, `deviceCategory: int32` | DONE            |
 | 1053 | `handshake.client_variables`    | pre-auth | `clientId: int32`, `clientUrl: string`, `externalVariablesUrl: string` | DONE            |
 | 2490 | `security.machine_id`          | pre-auth | `machineId: string(64 hex)`, `fingerprint: string`, `capabilities: string` | DONE            |
-| 3110 | `handshake.init_diffie`        | crypto   | _(empty)_                                                            | DEFERRED        |
-| 773  | `handshake.complete_diffie`    | crypto   | `encryptedPublicKey: string`                                         | DEFERRED        |
+| 3110 | `handshake.init_diffie`        | crypto   | _(empty)_                                                            | DONE            |
+| 773  | `handshake.complete_diffie`    | crypto   | `encryptedPublicKey: string`                                         | DONE            |
 | 2419 | `security.sso_ticket`          | auth     | `ticket: string`, `timestamp: int32 (optional)`                      | DONE            |
 | 2596 | `client.pong`                  | session  | _(empty)_                                                            | DONE            |
 | 295  | `client.latency_test`          | session  | `requestId: int32`                                                   | DONE            |
@@ -64,8 +78,8 @@ Client                                    Server
 
 | ID   | Name                            | Phase    | Fields                                                               | Status          |
 |------|---------------------------------|----------|----------------------------------------------------------------------|-----------------|
-| 1347 | `handshake.init_diffie`        | crypto   | `encryptedPrime: string`, `encryptedGenerator: string`               | DEFERRED        |
-| 3885 | `handshake.complete_diffie`    | crypto   | `encryptedPublicKey: string`, `serverClientEncryption: bool`         | DEFERRED        |
+| 1347 | `handshake.init_diffie`        | crypto   | `encryptedPrime: string`, `encryptedGenerator: string`               | DONE            |
+| 3885 | `handshake.complete_diffie`    | crypto   | `encryptedPublicKey: string`, `serverClientEncryption: bool`         | DONE            |
 | 1488 | `security.machine_id`          | auth     | `machineId: string(64 hex)`                                         | DONE            |
 | 2491 | `authentication.ok`            | auth     | _(empty)_                                                            | DONE            |
 | 3523 | `handshake.identity_accounts`  | auth     | `count: int32`, `accounts: [{id: int32, name: string}]`             | DONE            |
@@ -75,15 +89,13 @@ Client                                    Server
 ### Status Legend
 
 - **PLANNED** - Will be implemented in this realm
-- **DEFERRED** - Not in initial milestone (see reason below)
+- **DEFERRED** - Deferred intentionally due unsupported or deprecated behavior
 - **DONE** - Implemented and tested
 
 ### Deferred Packets - Rationale
 
 | Packet                     | Reason                                                                                                |
 |----------------------------|-------------------------------------------------------------------------------------------------------|
-| `handshake.init_diffie`    | RC4+RSA+DH encryption is optional; Nitro client works without it. Adds significant crypto complexity (RSA key management, RC4 stream cipher). Implement after core auth flow is stable. |
-| `handshake.complete_diffie`| Same as above - part of the crypto handshake pair.                                                    |
 | `handshake.client_policy`  | Not present in any vendor implementation analyzed. Likely deprecated or client-only.                  |
 
 ---
@@ -93,12 +105,29 @@ Client                                    Server
 ### Package Layout
 
 ```
-pkg/handshake/packet/
-  bootstrap/            <- Release negotiation packets (4000, 1053)
-  security/             <- Machine and SSO packets (2490, 1488, 2419)
-  authentication/       <- Auth success/account list packets (2491, 3523)
-  session/              <- Lifecycle heartbeat/disconnect packets (3928, 2596, 2445)
-  telemetry/            <- Latency test/response packets (295, 10)
+pkg/handshake/
+  application/
+    authflow/           <- Authentication use cases and policies
+    cryptoflow/         <- Diffie/RSA/RC4 orchestration per connection
+    sessionflow/        <- Session lifecycle use cases
+  adapter/
+    realtime/           <- Fiber WebSocket runtime adapter
+  packet/
+    bootstrap/          <- Release negotiation packets (4000, 1053)
+    security/           <- Machine and SSO packets (2490, 1488, 2419)
+    authentication/     <- Auth success/account list packets (2491, 3523)
+    crypto/             <- Diffie packet definitions (3110, 773, 1347, 3885)
+    session/            <- Lifecycle heartbeat/disconnect packets (3928, 2596, 2445)
+    telemetry/          <- Latency test/response packets (295, 10)
+
+pkg/authentication/
+  domain/               <- SSO domain config, models, and ports
+  application/          <- SSO issue/validate use case service
+  infrastructure/
+    redisstore/         <- Redis-backed SSO store adapter
+  adapter/
+    httpapi/            <- Fiber HTTP API adapter
+    command/            <- Cobra CLI adapter
 
 core/connection/
   conn.go               <- Connection abstraction (read, write, close)
@@ -107,6 +136,11 @@ core/connection/
 core/codec/
   frame.go              <- Frame encode/decode (wire header + body)
   primitives.go         <- Typed payload reader/writer primitives
+
+core/crypto/
+  diffie.go             <- Diffie-Hellman generation and shared-key derivation
+  rsa.go                <- RSA key generation and client public-key decoding
+  rc4_stream.go         <- RC4 inbound/outbound stream encryption
 
 core/redis/
   client.go             <- Redis client factory
@@ -237,7 +271,8 @@ connection. The Nitro client handles `onclose` gracefully.
 When `GETDEL sso:<ticket>` returns `redis.Nil`:
 
 1. Log warning with connection ID and (sanitized) ticket prefix
-2. Close WebSocket connection immediately (close frame 4001 "Unauthorized")
+2. Send `disconnect_reason` packet (`4000`, reason `22` invalid ticket)
+3. Close WebSocket connection immediately (close frame `1006`)
 3. No `authentication.ok` is sent
 
 **No dedicated "auth failed" packet exists across any vendor.** All vendors
@@ -287,28 +322,24 @@ WebSocket `onclose`/`onerror` handler:
 
 ---
 
-## Encryption Decision: DEFERRED
+## Encryption Decision: IMPLEMENTED
 
-RC4 + RSA + Diffie-Hellman encryption is **deferred** to a later milestone.
+RC4 + RSA + Diffie-Hellman encryption is implemented as an optional handshake
+phase between machine-id exchange and SSO authentication.
 
-### Rationale
+### Implementation Summary
 
-1. **Nitro client works without encryption** - the `encryption.forced` config
-   in Arcturus/comet defaults to `false`
-2. **WebSocket already provides TLS** - wss:// gives transport encryption that
-   the original Flash TCP socket lacked
-3. **Complexity** - RSA key management, DH parameter generation (128-bit
-   primes), RC4 stream cipher installation on every packet is significant
-   crypto code
-4. **No security benefit over TLS** - RC4 is deprecated (RFC 7465) and the
-   original protocol used it only because Flash TCP had no TLS
-
-### When to Implement
-
-If/when supporting non-TLS WebSocket connections or legacy Flash clients. The
-packet IDs (3110, 773, 1347, 3885) are reserved and the handshake flow is
-designed to slot encryption in between pre-auth and auth phases without
-breaking changes.
+1. `core/crypto` now owns reusable crypto primitives:
+   - Diffie-Hellman key generation (default 128-bit prime),
+   - RSA private-key generation (default 1024-bit key),
+   - RC4 inbound/outbound stream cipher creation.
+2. `pkg/handshake/application/cryptoflow` orchestrates per-connection key
+   exchange using those primitives.
+3. `pkg/handshake/packet/crypto` defines all crypto packets:
+   - C2S `init_diffie` (3110) and `complete_diffie` (773),
+   - S2C `init_diffie` (1347) and `complete_diffie` (3885).
+4. `pkg/handshake/adapter/realtime` enables transport encryption only after
+   successful `complete_diffie` exchange.
 
 ---
 
@@ -361,10 +392,10 @@ breaking changes.
 |---|----------------------------------------------|------------|---------|
 | 22| Compose `client.ping` (3928) S2C             | 3          | DONE    |
 | 23| Parse `client.pong` (2596) C2S               | 3          | DONE    |
-| 24| Heartbeat goroutine (30s ping, 60s timeout)  | 22, 23     | PENDING |
+| 24| Heartbeat goroutine (30s ping, 60s timeout)  | 22, 23     | DONE    |
 | 25| Parse `client.disconnect` (2445) C2S         | 3          | DONE    |
-| 26| `DisconnectUseCase` (cleanup + close)        | 5, 25      | PENDING |
-| 27| Abrupt disconnect handler (onclose/onerror)  | 5          | PENDING |
+| 26| `DisconnectUseCase` (cleanup + close)        | 5, 25      | DONE    |
+| 27| Abrupt disconnect handler (onclose/onerror)  | 5          | DONE    |
 
 ### Milestone 6: Latency & Polish
 
@@ -372,22 +403,23 @@ breaking changes.
 |---|----------------------------------------------|------------|---------|
 | 28| Parse `client.latency_test` (295) C2S        | 3          | DONE    |
 | 29| Compose `client.latency_response` (10) S2C   | 3          | DONE    |
-| 30| Latency measurement handler                  | 28, 29     | PENDING |
-| 31| E2E test: full handshake flow                | 17, 24     | PENDING |
-| 32| E2E test: duplicate login kick               | 18         | PENDING |
-| 33| E2E test: expired SSO rejection              | 17         | PENDING |
+| 30| Latency measurement handler                  | 28, 29     | DONE    |
+| 31| E2E test: full handshake flow                | 17, 24     | DONE    |
+| 32| E2E test: duplicate login kick               | 18         | DONE    |
+| 33| E2E test: expired SSO rejection              | 17         | DONE    |
 
-### Future Milestone: Encryption (Deferred)
+### Milestone 7: Encryption
 
-| # | Task                                         | Status   |
-|---|----------------------------------------------|----------|
-| - | RSA key pair generation/management           | DEFERRED |
-| - | DH parameter generation (128-bit primes)     | DEFERRED |
-| - | RC4 stream cipher (per-connection)            | DEFERRED |
-| - | Parse `init_diffie` (3110) C2S               | DEFERRED |
-| - | Compose `init_diffie` (1347) S2C             | DEFERRED |
-| - | Parse `complete_diffie` (773) C2S            | DEFERRED |
-| - | Compose `complete_diffie` (3885) S2C         | DEFERRED |
+| # | Task                                         | Status |
+|---|----------------------------------------------|--------|
+| 34| RSA key pair generation/management           | DONE   |
+| 35| DH parameter generation (128-bit primes)     | DONE   |
+| 36| RC4 stream cipher (per-connection)           | DONE   |
+| 37| Parse `init_diffie` (3110) C2S               | DONE   |
+| 38| Compose `init_diffie` (1347) S2C             | DONE   |
+| 39| Parse `complete_diffie` (773) C2S            | DONE   |
+| 40| Compose `complete_diffie` (3885) S2C         | DONE   |
+| 41| E2E test: encrypted SSO/authentication flow  | DONE   |
 
 ### User System Dependency Note
 
@@ -421,11 +453,11 @@ implemented. The session stores the user ID as an integer, no user model needed.
   `websocket.BinaryMessage` is used for reads/writes
 - **Message size limit** - configure max message size on WebSocket upgrade to
   prevent memory abuse (4KB reasonable for handshake packets)
-- **Close codes** - use custom close codes in 4000-4999 range:
-  - `4001` - Unauthorized (invalid SSO)
-  - `4002` - Duplicate login (kicked)
-  - `4003` - Auth timeout
-  - `4004` - Pong timeout
+- **Close codes** - use WebSocket close codes and pair them with `disconnect_reason` packet (`4000`):
+  - `1006` - Unauthorized (invalid SSO)
+  - `1008` - Duplicate login (kicked)
+  - `1008` - Auth timeout
+  - `1006` - Pong timeout
 
 ### Packet Codec
 
@@ -468,6 +500,6 @@ any packet can be parsed or composed. All vendors agree on this wire format.
 | SSO storage                         | **Redis** (not DB)        | Ephemeral tokens don't need persistence; Redis TTL is native |
 | SSO validation                      | **GETDEL** (atomic)       | Stronger single-use guarantee than DB query + delete          |
 | Duplicate login                     | **Explicit kick** (PlusEMU) | Clear intent, auditable, predictable behavior              |
-| Encryption                          | **Deferred**              | TLS via wss:// already provides transport security           |
+| Encryption                          | **Implemented (optional)**| Compatible with vendor handshake while keeping TLS support    |
 | Machine ID                          | **Validate + regenerate** (Arcturus) | Best security practice from vendors              |
 | Auth failed response                | **Close connection**      | All vendors agree - no error packet exists                   |

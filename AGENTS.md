@@ -45,6 +45,7 @@ This document defines mandatory project constraints and success criteria.
 - OpenAPI/Swagger is mandatory for HTTP APIs.
 - Every HTTP endpoint must have a corresponding OpenAPI path specification.
 - Swagger UI and raw OpenAPI document routes must be exposed and kept in sync with implemented endpoints.
+- Protocol-level disconnect packets and WebSocket close frames must be paired consistently (reason packet first, close frame second) using WebSocket-standard close codes.
 
 ## 4) Protocol Source of Truth
 

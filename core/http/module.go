@@ -36,6 +36,15 @@ const DefaultSwaggerUIPath = "/swagger"
 // DefaultWebSocketCloseTimeout defines close control write timeout.
 const DefaultWebSocketCloseTimeout = 2 * time.Second
 
+// DefaultShutdownWebSocketCloseCode defines close code used during server shutdown.
+const DefaultShutdownWebSocketCloseCode = websocket.CloseGoingAway
+
+// DefaultDisconnectReasonPacketID defines disconnect reason packet identifier.
+const DefaultDisconnectReasonPacketID uint16 = 4000
+
+// DefaultShutdownDisconnectReasonCode defines protocol disconnect reason for shutdown.
+const DefaultShutdownDisconnectReasonCode int32 = 19
+
 // DefaultShutdownTimeout defines graceful application shutdown timeout.
 const DefaultShutdownTimeout = 5 * time.Second
 
