@@ -54,3 +54,33 @@ func TestProtectWithAPIKeyRejectsEmptyKey(t *testing.T) {
 		t.Fatalf("expected api key middleware failure for empty key")
 	}
 }
+
+// TestProtectWithAPIKeyAllowsOpenAPIDocs verifies docs route bypass behavior.
+func TestProtectWithAPIKeyAllowsOpenAPIDocs(t *testing.T) {
+	module := New(Options{})
+	if err := module.ProtectWithAPIKey("secret", ""); err != nil {
+		t.Fatalf("expected api key middleware setup success, got %v", err)
+	}
+	module.RegisterGET(DefaultOpenAPISpecPath, func(ctx *fiber.Ctx) error {
+		return ctx.SendStatus(fiber.StatusOK)
+	})
+	module.RegisterGET(DefaultSwaggerUIPath, func(ctx *fiber.Ctx) error {
+		return ctx.SendStatus(fiber.StatusOK)
+	})
+	specRequest := httptest.NewRequest(nethttp.MethodGet, DefaultOpenAPISpecPath, nil)
+	specResponse, specErr := module.App().Test(specRequest)
+	if specErr != nil {
+		t.Fatalf("expected spec request success, got %v", specErr)
+	}
+	if specResponse.StatusCode != nethttp.StatusOK {
+		t.Fatalf("expected status 200 for spec, got %d", specResponse.StatusCode)
+	}
+	uiRequest := httptest.NewRequest(nethttp.MethodGet, DefaultSwaggerUIPath, nil)
+	uiResponse, uiErr := module.App().Test(uiRequest)
+	if uiErr != nil {
+		t.Fatalf("expected ui request success, got %v", uiErr)
+	}
+	if uiResponse.StatusCode != nethttp.StatusOK {
+		t.Fatalf("expected status 200 for ui, got %d", uiResponse.StatusCode)
+	}
+}

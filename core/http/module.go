@@ -21,6 +21,15 @@ type WebSocketHandler func(*websocket.Conn)
 // DefaultAPIKeyHeader defines the default header used for API key auth.
 const DefaultAPIKeyHeader = "X-API-Key"
 
+// DefaultReadBufferSize defines the default request read buffer size in bytes.
+const DefaultReadBufferSize = 16 * 1024
+
+// DefaultOpenAPISpecPath defines the raw OpenAPI document route.
+const DefaultOpenAPISpecPath = "/openapi.json"
+
+// DefaultSwaggerUIPath defines the Swagger UI route.
+const DefaultSwaggerUIPath = "/swagger"
+
 // Options defines configurable dependencies for the HTTP module.
 type Options struct {
 	// Logger defines the zap logger used by fiberzap middleware.
@@ -41,8 +50,18 @@ func New(options Options) *Module {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	app := fiber.New(options.FiberConfig)
-	app.Use(fiberzap.New(fiberzap.Config{Logger: logger}))
+	fiberConfig := options.FiberConfig
+	fiberConfig.DisableStartupMessage = true
+	if fiberConfig.ReadBufferSize <= 0 {
+		fiberConfig.ReadBufferSize = DefaultReadBufferSize
+	}
+	app := fiber.New(fiberConfig)
+	app.Use(fiberzap.New(fiberzap.Config{
+		Logger: logger,
+		Next: func(_ *fiber.Ctx) bool {
+			return !logger.Core().Enabled(zap.DebugLevel)
+		},
+	}))
 	return &Module{app: app}
 }
 
@@ -72,6 +91,9 @@ func (module *Module) ProtectWithAPIKey(apiKey string, header string) error {
 		keyHeader = DefaultAPIKeyHeader
 	}
 	module.app.Use(func(ctx *fiber.Ctx) error {
+		if isPublicDocsRoute(ctx.Path()) {
+			return ctx.Next()
+		}
 		provided := ctx.Get(keyHeader)
 		if provided == "" {
 			provided = ctx.Query("api_key")
@@ -82,6 +104,14 @@ func (module *Module) ProtectWithAPIKey(apiKey string, header string) error {
 		return ctx.Next()
 	})
 	return nil
+}
+
+// isPublicDocsRoute reports whether a route must bypass API key enforcement.
+func isPublicDocsRoute(path string) bool {
+	if path == DefaultOpenAPISpecPath || path == DefaultSwaggerUIPath {
+		return true
+	}
+	return strings.HasPrefix(path, DefaultSwaggerUIPath+"/")
 }
 
 // RegisterWebSocket registers websocket upgrade and endpoint handlers.

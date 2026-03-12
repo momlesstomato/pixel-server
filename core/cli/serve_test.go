@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,6 +44,9 @@ func TestExecuteServeBuildsServer(t *testing.T) {
 	}
 	if logBuffer.Len() == 0 {
 		t.Fatalf("expected log output to be written")
+	}
+	if !strings.Contains(logBuffer.String(), "http server starting") {
+		t.Fatalf("expected startup log entry, got %s", logBuffer.String())
 	}
 }
 
@@ -142,7 +146,7 @@ func dialWebSocket(t *testing.T, url string) *gws.Conn {
 func writeServeEnvFile(t *testing.T) string {
 	t.Helper()
 	filePath := filepath.Join(t.TempDir(), ".env")
-	content := []byte("APP_BIND_IP=127.0.0.1\nAPP_PORT=3987\nAPP_API_KEY=test-key\nREDIS_ADDRESS=localhost:6379\nPOSTGRES_DSN=dsn\nUSERS_JWT_SECRET=secret\n")
+	content := []byte("APP_BIND_IP=127.0.0.1\nAPP_PORT=3987\nAPP_API_KEY=test-key\nREDIS_ADDRESS=localhost:6379\nPOSTGRES_DSN=dsn\nUSERS_JWT_SECRET=secret\nLOGGING_LEVEL=debug\n")
 	if err := os.WriteFile(filePath, content, 0o600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}

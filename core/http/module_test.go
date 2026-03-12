@@ -17,7 +17,7 @@ import (
 // TestNewRegistersZapMiddleware verifies middleware emits request logs.
 func TestNewRegistersZapMiddleware(t *testing.T) {
 	buffer := bytes.NewBuffer(nil)
-	logger, err := corelogging.New(corelogging.Config{Format: "json", Level: "info"}, buffer)
+	logger, err := corelogging.New(corelogging.Config{Format: "json", Level: "debug"}, buffer)
 	if err != nil {
 		t.Fatalf("expected logger creation to succeed, got %v", err)
 	}
@@ -36,6 +36,38 @@ func TestNewRegistersZapMiddleware(t *testing.T) {
 	output := buffer.String()
 	if output == "" || !strings.Contains(output, "/health") {
 		t.Fatalf("expected zapfiber log output with request path, got %s", output)
+	}
+}
+
+// TestNewSkipsRequestLogsAboveDebug verifies request logging is disabled above debug level.
+func TestNewSkipsRequestLogsAboveDebug(t *testing.T) {
+	buffer := bytes.NewBuffer(nil)
+	logger, err := corelogging.New(corelogging.Config{Format: "json", Level: "info"}, buffer)
+	if err != nil {
+		t.Fatalf("expected logger creation to succeed, got %v", err)
+	}
+	module := New(Options{Logger: logger})
+	module.RegisterGET("/health", func(ctx *fiber.Ctx) error {
+		return ctx.SendStatus(fiber.StatusOK)
+	})
+	request := httptest.NewRequest(nethttp.MethodGet, "/health", nil)
+	response, err := module.App().Test(request)
+	if err != nil {
+		t.Fatalf("expected HTTP test request to succeed, got %v", err)
+	}
+	if response.StatusCode != fiber.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.StatusCode)
+	}
+	if buffer.Len() != 0 {
+		t.Fatalf("expected no request logs when level is info, got %s", buffer.String())
+	}
+}
+
+// TestNewDisablesStartupMessage verifies fiber startup message configuration.
+func TestNewDisablesStartupMessage(t *testing.T) {
+	module := New(Options{})
+	if !module.App().Config().DisableStartupMessage {
+		t.Fatalf("expected startup message to be disabled")
 	}
 }
 

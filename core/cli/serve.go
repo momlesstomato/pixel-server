@@ -7,12 +7,14 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	"github.com/momlesstomato/pixel-server/core/config"
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
+	httpopenapi "github.com/momlesstomato/pixel-server/core/http/openapi"
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	"github.com/momlesstomato/pixel-server/core/logging"
 	rediscore "github.com/momlesstomato/pixel-server/core/redis"
 	"github.com/momlesstomato/pixel-server/pkg/authentication"
 	"github.com/momlesstomato/pixel-server/pkg/authentication/httpapi"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // ServeListenFunc defines network startup behavior for the HTTP module.
@@ -82,10 +84,15 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	if err := httpapi.RegisterRoutes(module, authentication.NewService(store, cfg.Authentication)); err != nil {
 		return err
 	}
+	openAPIDocument := httpopenapi.BuildDocument(options.WebSocketPath, httpapi.OpenAPIPaths())
+	if err := httpopenapi.RegisterRoutes(module, openAPIDocument, "", ""); err != nil {
+		return err
+	}
 	if listen == nil {
 		listen = defaultListen
 	}
 	address := fmt.Sprintf("%s:%d", cfg.App.BindIP, cfg.App.Port)
+	runtime.Logger.Info("http server starting", zap.String("address", address))
 	return listen(module, address)
 }
 

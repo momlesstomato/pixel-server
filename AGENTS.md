@@ -42,6 +42,9 @@ This document defines mandatory project constraints and success criteria.
   - Fiber WebSocket for realtime communication.
   - Cobra for CLI.
 - API and CLI capabilities must remain 1:1 in behavior and feature surface.
+- OpenAPI/Swagger is mandatory for HTTP APIs.
+- Every HTTP endpoint must have a corresponding OpenAPI path specification.
+- Swagger UI and raw OpenAPI document routes must be exposed and kept in sync with implemented endpoints.
 
 ## 4) Protocol Source of Truth
 
