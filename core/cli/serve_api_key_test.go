@@ -18,8 +18,8 @@ func TestExecuteServeProtectsRoutesWithAPIKey(t *testing.T) {
 		if testErr != nil {
 			return testErr
 		}
-		if response.StatusCode != nethttp.StatusUnauthorized {
-			t.Fatalf("expected status 401, got %d", response.StatusCode)
+		if response.StatusCode != nethttp.StatusUpgradeRequired {
+			t.Fatalf("expected status 426, got %d", response.StatusCode)
 		}
 		return nil
 	})

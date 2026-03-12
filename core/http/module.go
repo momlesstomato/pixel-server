@@ -42,6 +42,8 @@ type Options struct {
 type Module struct {
 	// app stores the configured Fiber application instance.
 	app *fiber.App
+	// webSocketPaths stores websocket routes that bypass API key checks.
+	webSocketPaths map[string]struct{}
 }
 
 // New creates a Fiber module with zapfiber middleware pre-configured.
@@ -62,7 +64,7 @@ func New(options Options) *Module {
 			return !logger.Core().Enabled(zap.DebugLevel)
 		},
 	}))
-	return &Module{app: app}
+	return &Module{app: app, webSocketPaths: map[string]struct{}{}}
 }
 
 // App returns the underlying Fiber application.
@@ -91,7 +93,7 @@ func (module *Module) ProtectWithAPIKey(apiKey string, header string) error {
 		keyHeader = DefaultAPIKeyHeader
 	}
 	module.app.Use(func(ctx *fiber.Ctx) error {
-		if isPublicDocsRoute(ctx.Path()) {
+		if module.isPublicPath(ctx.Path()) {
 			return ctx.Next()
 		}
 		provided := ctx.Get(keyHeader)
@@ -114,6 +116,15 @@ func isPublicDocsRoute(path string) bool {
 	return strings.HasPrefix(path, DefaultSwaggerUIPath+"/")
 }
 
+// isPublicPath reports whether a request path bypasses API key enforcement.
+func (module *Module) isPublicPath(path string) bool {
+	if isPublicDocsRoute(path) {
+		return true
+	}
+	_, exists := module.webSocketPaths[path]
+	return exists
+}
+
 // RegisterWebSocket registers websocket upgrade and endpoint handlers.
 func (module *Module) RegisterWebSocket(path string, handler WebSocketHandler) error {
 	if handler == nil {
@@ -125,6 +136,7 @@ func (module *Module) RegisterWebSocket(path string, handler WebSocketHandler) e
 		}
 		return fiber.NewError(nethttp.StatusUpgradeRequired, "websocket upgrade required")
 	})
+	module.webSocketPaths[path] = struct{}{}
 	module.app.Get(path, websocket.New(func(connection *websocket.Conn) {
 		handler(connection)
 	}))

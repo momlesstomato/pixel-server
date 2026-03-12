@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -82,5 +83,24 @@ func TestProtectWithAPIKeyAllowsOpenAPIDocs(t *testing.T) {
 	}
 	if uiResponse.StatusCode != nethttp.StatusOK {
 		t.Fatalf("expected status 200 for ui, got %d", uiResponse.StatusCode)
+	}
+}
+
+// TestProtectWithAPIKeyAllowsWebSocketRoute verifies websocket route bypass behavior.
+func TestProtectWithAPIKeyAllowsWebSocketRoute(t *testing.T) {
+	module := New(Options{})
+	if err := module.ProtectWithAPIKey("secret", ""); err != nil {
+		t.Fatalf("expected api key middleware setup success, got %v", err)
+	}
+	if err := module.RegisterWebSocket("/ws", func(_ *websocket.Conn) {}); err != nil {
+		t.Fatalf("expected websocket registration success, got %v", err)
+	}
+	request := httptest.NewRequest(nethttp.MethodGet, "/ws", nil)
+	response, err := module.App().Test(request)
+	if err != nil {
+		t.Fatalf("expected request success, got %v", err)
+	}
+	if response.StatusCode != nethttp.StatusUpgradeRequired {
+		t.Fatalf("expected status 426 for websocket path, got %d", response.StatusCode)
 	}
 }
