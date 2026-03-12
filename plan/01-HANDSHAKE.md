@@ -342,18 +342,18 @@ breaking changes.
 | 12| Parse `client_variables` (1053) C2S          | 3          | DONE    |
 | 13| Parse `security.machine_id` (2490) C2S       | 3          | DONE    |
 | 14| Compose `security.machine_id` (1488) S2C     | 3          | DONE    |
-| 15| Machine ID validation logic (64 hex chars)   | 13, 14     | PENDING |
+| 15| Machine ID validation logic (64 hex chars)   | 13, 14     | DONE    |
 
 ### Milestone 4: Authentication Flow
 
 | # | Task                                         | Depends On | Status  |
 |---|----------------------------------------------|------------|---------|
 | 16| Parse `security.sso_ticket` (2419) C2S       | 3          | DONE    |
-| 17| `AuthenticateUseCase` (validate + register)  | 5, 6, 16   | PENDING |
-| 18| Duplicate login detection + kick             | 5, 17      | PENDING |
+| 17| `AuthenticateUseCase` (validate + register)  | 5, 6, 16   | DONE    |
+| 18| Duplicate login detection + kick             | 5, 17      | DONE    |
 | 19| Compose `authentication.ok` (2491) S2C       | 3          | DONE    |
 | 20| Compose `identity_accounts` (3523) S2C       | 3          | DONE    |
-| 21| Auth timeout (30s no-ticket -> close)        | 17         | PENDING |
+| 21| Auth timeout (30s no-ticket -> close)        | 17         | DONE    |
 
 ### Milestone 5: Session Lifecycle
 

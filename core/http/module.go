@@ -5,6 +5,8 @@ import (
 	"errors"
 	nethttp "net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/contrib/websocket"
@@ -14,6 +16,7 @@ import (
 
 var errNilWebSocketHandler = errors.New("websocket handler is required")
 var errAPIKeyRequired = errors.New("api key is required")
+var errWebSocketPathRequired = errors.New("websocket path is required")
 
 // WebSocketHandler defines the websocket endpoint handler signature.
 type WebSocketHandler func(*websocket.Conn)
@@ -30,6 +33,12 @@ const DefaultOpenAPISpecPath = "/openapi.json"
 // DefaultSwaggerUIPath defines the Swagger UI route.
 const DefaultSwaggerUIPath = "/swagger"
 
+// DefaultWebSocketCloseTimeout defines close control write timeout.
+const DefaultWebSocketCloseTimeout = 2 * time.Second
+
+// DefaultShutdownTimeout defines graceful application shutdown timeout.
+const DefaultShutdownTimeout = 5 * time.Second
+
 // Options defines configurable dependencies for the HTTP module.
 type Options struct {
 	// Logger defines the zap logger used by fiberzap middleware.
@@ -44,6 +53,14 @@ type Module struct {
 	app *fiber.App
 	// webSocketPaths stores websocket routes that bypass API key checks.
 	webSocketPaths map[string]struct{}
+	// webSocketConnections stores active websocket connections.
+	webSocketConnections map[*websocket.Conn]struct{}
+	// webSocketMutex guards websocket routes and connection tracking.
+	webSocketMutex sync.RWMutex
+	// disposeOnce guarantees disposal executes exactly once.
+	disposeOnce sync.Once
+	// disposeError stores the first disposal error.
+	disposeError error
 }
 
 // New creates a Fiber module with zapfiber middleware pre-configured.
@@ -64,7 +81,11 @@ func New(options Options) *Module {
 			return !logger.Core().Enabled(zap.DebugLevel)
 		},
 	}))
-	return &Module{app: app, webSocketPaths: map[string]struct{}{}}
+	return &Module{
+		app:                  app,
+		webSocketPaths:       map[string]struct{}{},
+		webSocketConnections: map[*websocket.Conn]struct{}{},
+	}
 }
 
 // App returns the underlying Fiber application.
@@ -114,36 +135,4 @@ func isPublicDocsRoute(path string) bool {
 		return true
 	}
 	return strings.HasPrefix(path, DefaultSwaggerUIPath+"/")
-}
-
-// isPublicPath reports whether a request path bypasses API key enforcement.
-func (module *Module) isPublicPath(path string) bool {
-	if isPublicDocsRoute(path) {
-		return true
-	}
-	_, exists := module.webSocketPaths[path]
-	return exists
-}
-
-// RegisterWebSocket registers websocket upgrade and endpoint handlers.
-func (module *Module) RegisterWebSocket(path string, handler WebSocketHandler) error {
-	if handler == nil {
-		return errNilWebSocketHandler
-	}
-	module.app.Use(path, func(ctx *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(ctx) {
-			return ctx.Next()
-		}
-		return fiber.NewError(nethttp.StatusUpgradeRequired, "websocket upgrade required")
-	})
-	module.webSocketPaths[path] = struct{}{}
-	module.app.Get(path, websocket.New(func(connection *websocket.Conn) {
-		handler(connection)
-	}))
-	return nil
-}
-
-// Dispose shuts down the Fiber application and releases network resources.
-func (module *Module) Dispose() error {
-	return module.app.Shutdown()
 }

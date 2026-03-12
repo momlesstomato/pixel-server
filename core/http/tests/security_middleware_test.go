@@ -1,4 +1,4 @@
-package http
+package tests
 
 import (
 	nethttp "net/http"
@@ -7,11 +7,12 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
+	corehttp "github.com/momlesstomato/pixel-server/core/http"
 )
 
 // TestProtectWithAPIKeyEnforcesHeader verifies unauthorized and authorized flows.
 func TestProtectWithAPIKeyEnforcesHeader(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	if err := module.ProtectWithAPIKey("secret", ""); err != nil {
 		t.Fatalf("expected api key middleware setup success, got %v", err)
 	}
@@ -36,7 +37,7 @@ func TestProtectWithAPIKeyEnforcesHeader(t *testing.T) {
 		}
 		request := httptest.NewRequest(nethttp.MethodGet, path, nil)
 		if item.header != "" {
-			request.Header.Set(DefaultAPIKeyHeader, item.header)
+			request.Header.Set(corehttp.DefaultAPIKeyHeader, item.header)
 		}
 		response, err := module.App().Test(request)
 		if err != nil {
@@ -50,7 +51,7 @@ func TestProtectWithAPIKeyEnforcesHeader(t *testing.T) {
 
 // TestProtectWithAPIKeyRejectsEmptyKey verifies middleware precondition checks.
 func TestProtectWithAPIKeyRejectsEmptyKey(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	if err := module.ProtectWithAPIKey("", ""); err == nil {
 		t.Fatalf("expected api key middleware failure for empty key")
 	}
@@ -58,17 +59,17 @@ func TestProtectWithAPIKeyRejectsEmptyKey(t *testing.T) {
 
 // TestProtectWithAPIKeyAllowsOpenAPIDocs verifies docs route bypass behavior.
 func TestProtectWithAPIKeyAllowsOpenAPIDocs(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	if err := module.ProtectWithAPIKey("secret", ""); err != nil {
 		t.Fatalf("expected api key middleware setup success, got %v", err)
 	}
-	module.RegisterGET(DefaultOpenAPISpecPath, func(ctx *fiber.Ctx) error {
+	module.RegisterGET(corehttp.DefaultOpenAPISpecPath, func(ctx *fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusOK)
 	})
-	module.RegisterGET(DefaultSwaggerUIPath, func(ctx *fiber.Ctx) error {
+	module.RegisterGET(corehttp.DefaultSwaggerUIPath, func(ctx *fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusOK)
 	})
-	specRequest := httptest.NewRequest(nethttp.MethodGet, DefaultOpenAPISpecPath, nil)
+	specRequest := httptest.NewRequest(nethttp.MethodGet, corehttp.DefaultOpenAPISpecPath, nil)
 	specResponse, specErr := module.App().Test(specRequest)
 	if specErr != nil {
 		t.Fatalf("expected spec request success, got %v", specErr)
@@ -76,7 +77,7 @@ func TestProtectWithAPIKeyAllowsOpenAPIDocs(t *testing.T) {
 	if specResponse.StatusCode != nethttp.StatusOK {
 		t.Fatalf("expected status 200 for spec, got %d", specResponse.StatusCode)
 	}
-	uiRequest := httptest.NewRequest(nethttp.MethodGet, DefaultSwaggerUIPath, nil)
+	uiRequest := httptest.NewRequest(nethttp.MethodGet, corehttp.DefaultSwaggerUIPath, nil)
 	uiResponse, uiErr := module.App().Test(uiRequest)
 	if uiErr != nil {
 		t.Fatalf("expected ui request success, got %v", uiErr)
@@ -88,7 +89,7 @@ func TestProtectWithAPIKeyAllowsOpenAPIDocs(t *testing.T) {
 
 // TestProtectWithAPIKeyAllowsWebSocketRoute verifies websocket route bypass behavior.
 func TestProtectWithAPIKeyAllowsWebSocketRoute(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	if err := module.ProtectWithAPIKey("secret", ""); err != nil {
 		t.Fatalf("expected api key middleware setup success, got %v", err)
 	}
@@ -96,6 +97,25 @@ func TestProtectWithAPIKeyAllowsWebSocketRoute(t *testing.T) {
 		t.Fatalf("expected websocket registration success, got %v", err)
 	}
 	request := httptest.NewRequest(nethttp.MethodGet, "/ws", nil)
+	response, err := module.App().Test(request)
+	if err != nil {
+		t.Fatalf("expected request success, got %v", err)
+	}
+	if response.StatusCode != nethttp.StatusUpgradeRequired {
+		t.Fatalf("expected status 426 for websocket path, got %d", response.StatusCode)
+	}
+}
+
+// TestProtectWithAPIKeyAllowsWebSocketTrailingSlash verifies normalized websocket bypass behavior.
+func TestProtectWithAPIKeyAllowsWebSocketTrailingSlash(t *testing.T) {
+	module := corehttp.New(corehttp.Options{})
+	if err := module.ProtectWithAPIKey("secret", ""); err != nil {
+		t.Fatalf("expected api key middleware setup success, got %v", err)
+	}
+	if err := module.RegisterWebSocket("/ws", func(_ *websocket.Conn) {}); err != nil {
+		t.Fatalf("expected websocket registration success, got %v", err)
+	}
+	request := httptest.NewRequest(nethttp.MethodGet, "/ws/", nil)
 	response, err := module.App().Test(request)
 	if err != nil {
 		t.Fatalf("expected request success, got %v", err)

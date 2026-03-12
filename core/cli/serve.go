@@ -3,9 +3,12 @@ package cli
 import (
 	"fmt"
 	"io"
+	"strings"
+	"time"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/momlesstomato/pixel-server/core/config"
+	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
 	httpopenapi "github.com/momlesstomato/pixel-server/core/http/openapi"
 	"github.com/momlesstomato/pixel-server/core/initializer"
@@ -13,6 +16,9 @@ import (
 	rediscore "github.com/momlesstomato/pixel-server/core/redis"
 	"github.com/momlesstomato/pixel-server/pkg/authentication"
 	"github.com/momlesstomato/pixel-server/pkg/authentication/httpapi"
+	"github.com/momlesstomato/pixel-server/pkg/handshake/authflow"
+	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
+	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/realtime"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -63,37 +69,34 @@ func NewServeCommand(dependencies ServeDependencies) *cobra.Command {
 // ExecuteServe initializes dependencies and starts the Fiber server.
 func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	runner := initializer.NewRunner(
-		config.Initializer{Options: config.LoaderOptions{
-			EnvFile: options.EnvFile, EnvPrefix: options.EnvPrefix,
-		}},
+		config.Initializer{Options: config.LoaderOptions{EnvFile: options.EnvFile, EnvPrefix: options.EnvPrefix}},
 		rediscore.Initializer{},
 		logging.Initializer{Output: options.Output},
 		corehttp.Initializer{APIKeyHeader: options.APIKeyHeader},
-		corehttp.WebSocketInitializer{Path: options.WebSocketPath, Handler: EchoWebSocketHandler},
 	)
 	runtime, err := runner.Run()
 	if err != nil {
 		return err
 	}
-	cfg := runtime.Config
-	module := runtime.HTTP
-	store, err := authentication.NewRedisStore(runtime.Redis, cfg.Authentication.KeyPrefix)
+	ssoStore, err := authentication.NewRedisStore(runtime.Redis, runtime.Config.Authentication.KeyPrefix)
 	if err != nil {
 		return err
 	}
-	if err := httpapi.RegisterRoutes(module, authentication.NewService(store, cfg.Authentication)); err != nil {
+	ssoService := authentication.NewService(ssoStore, runtime.Config.Authentication)
+	module := runtime.HTTP
+	if err := registerServeWebSocket(module, options.WebSocketPath, runtime, ssoService, runtime.Logger); err != nil {
+		return err
+	}
+	if err := httpapi.RegisterRoutes(module, ssoService); err != nil {
 		return err
 	}
 	openAPIDocument := httpopenapi.BuildDocument(options.WebSocketPath, httpapi.OpenAPIPaths())
 	if err := httpopenapi.RegisterRoutes(module, openAPIDocument, "", ""); err != nil {
 		return err
 	}
-	if listen == nil {
-		listen = defaultListen
-	}
-	address := fmt.Sprintf("%s:%d", cfg.App.BindIP, cfg.App.Port)
+	address := fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port)
 	runtime.Logger.Info("http server starting", zap.String("address", address))
-	return listen(module, address)
+	return runServeLifecycle(runtime, module, address, listen)
 }
 
 // EchoWebSocketHandler mirrors inbound messages to the same connection.
@@ -112,4 +115,25 @@ func EchoWebSocketHandler(connection *websocket.Conn) {
 // defaultListen starts Fiber on the configured bind address.
 func defaultListen(module *corehttp.Module, address string) error {
 	return module.App().Listen(address)
+}
+
+// registerServeWebSocket registers websocket endpoint behavior for serve runtime.
+func registerServeWebSocket(module *corehttp.Module, path string, runtime *initializer.Runtime, validator authflow.TicketValidator, logger *zap.Logger) error {
+	registry, err := coreconnection.NewRedisSessionRegistry(runtime.Redis)
+	if err != nil {
+		return err
+	}
+	bus, err := handshakerealtime.NewRedisCloseSignalBus(runtime.Redis, "handshake:close")
+	if err != nil {
+		return err
+	}
+	handler, err := handshakerealtime.NewHandler(validator, registry, packetsecurity.NewMachineIDPolicy(nil), bus, logger, 30*time.Second)
+	if err != nil {
+		return err
+	}
+	webSocketPath := strings.TrimSpace(path)
+	if webSocketPath == "" {
+		webSocketPath = "/ws"
+	}
+	return module.RegisterWebSocket(webSocketPath, handler.Handle)
 }

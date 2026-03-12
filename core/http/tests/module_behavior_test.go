@@ -1,4 +1,4 @@
-package http
+package tests
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	coreapp "github.com/momlesstomato/pixel-server/core/app"
+	corehttp "github.com/momlesstomato/pixel-server/core/http"
 	corelogging "github.com/momlesstomato/pixel-server/core/logging"
 	"go.uber.org/zap"
 )
@@ -21,7 +22,7 @@ func TestNewRegistersZapMiddleware(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected logger creation to succeed, got %v", err)
 	}
-	module := New(Options{Logger: logger})
+	module := corehttp.New(corehttp.Options{Logger: logger})
 	module.RegisterGET("/health", func(ctx *fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusOK)
 	})
@@ -46,7 +47,7 @@ func TestNewSkipsRequestLogsAboveDebug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected logger creation to succeed, got %v", err)
 	}
-	module := New(Options{Logger: logger})
+	module := corehttp.New(corehttp.Options{Logger: logger})
 	module.RegisterGET("/health", func(ctx *fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusOK)
 	})
@@ -65,7 +66,7 @@ func TestNewSkipsRequestLogsAboveDebug(t *testing.T) {
 
 // TestNewDisablesStartupMessage verifies fiber startup message configuration.
 func TestNewDisablesStartupMessage(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	if !module.App().Config().DisableStartupMessage {
 		t.Fatalf("expected startup message to be disabled")
 	}
@@ -73,7 +74,7 @@ func TestNewDisablesStartupMessage(t *testing.T) {
 
 // TestRegisterPOSTRegistersHandler verifies POST route registration behavior.
 func TestRegisterPOSTRegistersHandler(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	module.RegisterPOST("/post", func(ctx *fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusCreated)
 	})
@@ -89,7 +90,7 @@ func TestRegisterPOSTRegistersHandler(t *testing.T) {
 
 // TestRegisterWebSocketReturnsUpgradeRequired verifies non-upgrade requests are rejected.
 func TestRegisterWebSocketReturnsUpgradeRequired(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	err := module.RegisterWebSocket("/ws", func(_ *websocket.Conn) {})
 	if err != nil {
 		t.Fatalf("expected websocket registration to succeed, got %v", err)
@@ -106,23 +107,42 @@ func TestRegisterWebSocketReturnsUpgradeRequired(t *testing.T) {
 
 // TestRegisterWebSocketRejectsNilHandler verifies nil handlers are not accepted.
 func TestRegisterWebSocketRejectsNilHandler(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	if err := module.RegisterWebSocket("/ws", nil); err == nil {
 		t.Fatalf("expected nil websocket handler to fail")
 	}
 }
 
+// TestRegisterWebSocketRejectsEmptyPath verifies websocket path validation.
+func TestRegisterWebSocketRejectsEmptyPath(t *testing.T) {
+	module := corehttp.New(corehttp.Options{})
+	if err := module.RegisterWebSocket("", func(_ *websocket.Conn) {}); err == nil {
+		t.Fatalf("expected empty websocket path to fail")
+	}
+}
+
 // TestDisposeShutsDownModule verifies module disposal path.
 func TestDisposeShutsDownModule(t *testing.T) {
-	module := New(Options{})
+	module := corehttp.New(corehttp.Options{})
 	if err := module.Dispose(); err != nil {
 		t.Fatalf("expected dispose to succeed, got %v", err)
 	}
 }
 
+// TestDisposeIsIdempotent verifies repeated disposal behavior.
+func TestDisposeIsIdempotent(t *testing.T) {
+	module := corehttp.New(corehttp.Options{})
+	if err := module.Dispose(); err != nil {
+		t.Fatalf("expected first dispose success, got %v", err)
+	}
+	if err := module.Dispose(); err != nil {
+		t.Fatalf("expected repeated dispose success, got %v", err)
+	}
+}
+
 // TestInitializerBuildsHTTPModule verifies package-owned initializer behavior.
 func TestInitializerBuildsHTTPModule(t *testing.T) {
-	module, err := (Initializer{}).InitializeHTTP(coreapp.Config{APIKey: "secret"}, zap.NewNop())
+	module, err := (corehttp.Initializer{}).InitializeHTTP(coreapp.Config{APIKey: "secret"}, zap.NewNop())
 	if err != nil {
 		t.Fatalf("expected http initializer success, got %v", err)
 	}
@@ -133,22 +153,22 @@ func TestInitializerBuildsHTTPModule(t *testing.T) {
 
 // TestInitializerRejectsNilLogger verifies logger precondition checks.
 func TestInitializerRejectsNilLogger(t *testing.T) {
-	if _, err := (Initializer{}).InitializeHTTP(coreapp.Config{APIKey: "secret"}, nil); err == nil {
+	if _, err := (corehttp.Initializer{}).InitializeHTTP(coreapp.Config{APIKey: "secret"}, nil); err == nil {
 		t.Fatalf("expected http initializer error for nil logger")
 	}
 }
 
 // TestInitializerRejectsEmptyAPIKey verifies API key precondition checks.
 func TestInitializerRejectsEmptyAPIKey(t *testing.T) {
-	if _, err := (Initializer{}).InitializeHTTP(coreapp.Config{}, zap.NewNop()); err == nil {
+	if _, err := (corehttp.Initializer{}).InitializeHTTP(coreapp.Config{}, zap.NewNop()); err == nil {
 		t.Fatalf("expected http initializer error for empty api key")
 	}
 }
 
 // TestWebSocketInitializerRegistersRoute verifies websocket stage behavior.
 func TestWebSocketInitializerRegistersRoute(t *testing.T) {
-	module := New(Options{})
-	stage := WebSocketInitializer{Path: "/events", Handler: func(_ *websocket.Conn) {}}
+	module := corehttp.New(corehttp.Options{})
+	stage := corehttp.WebSocketInitializer{Path: "/events", Handler: func(_ *websocket.Conn) {}}
 	if err := stage.InitializeWebSocket(module); err != nil {
 		t.Fatalf("expected websocket initializer success, got %v", err)
 	}
@@ -164,11 +184,11 @@ func TestWebSocketInitializerRegistersRoute(t *testing.T) {
 
 // TestWebSocketInitializerRejectsInvalidInputs verifies stage precondition checks.
 func TestWebSocketInitializerRejectsInvalidInputs(t *testing.T) {
-	if err := (WebSocketInitializer{}).InitializeWebSocket(nil); err == nil {
+	if err := (corehttp.WebSocketInitializer{}).InitializeWebSocket(nil); err == nil {
 		t.Fatalf("expected websocket initializer error for nil module")
 	}
-	module := New(Options{})
-	if err := (WebSocketInitializer{}).InitializeWebSocket(module); err == nil {
+	module := corehttp.New(corehttp.Options{})
+	if err := (corehttp.WebSocketInitializer{}).InitializeWebSocket(module); err == nil {
 		t.Fatalf("expected websocket initializer error for nil handler")
 	}
 }

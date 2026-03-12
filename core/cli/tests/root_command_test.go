@@ -1,10 +1,14 @@
-package cli
+package tests
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/momlesstomato/pixel-server/core/cli"
+)
 
 // TestNewRootCommandRegistersServe verifies root command composition.
 func TestNewRootCommandRegistersServe(t *testing.T) {
-	command := NewRootCommand(Dependencies{})
+	command := cli.NewRootCommand(cli.Dependencies{})
 	serve, _, err := command.Find([]string{"serve"})
 	if err != nil {
 		t.Fatalf("expected serve command lookup success, got %v", err)
@@ -16,7 +20,7 @@ func TestNewRootCommandRegistersServe(t *testing.T) {
 
 // TestNewRootCommandRegistersSSO verifies sso command composition.
 func TestNewRootCommandRegistersSSO(t *testing.T) {
-	command := NewRootCommand(Dependencies{})
+	command := cli.NewRootCommand(cli.Dependencies{})
 	sso, _, err := command.Find([]string{"sso"})
 	if err != nil {
 		t.Fatalf("expected sso command lookup success, got %v", err)
