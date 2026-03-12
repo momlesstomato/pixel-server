@@ -39,6 +39,22 @@ func TestNewRegistersZapMiddleware(t *testing.T) {
 	}
 }
 
+// TestRegisterPOSTRegistersHandler verifies POST route registration behavior.
+func TestRegisterPOSTRegistersHandler(t *testing.T) {
+	module := New(Options{})
+	module.RegisterPOST("/post", func(ctx *fiber.Ctx) error {
+		return ctx.SendStatus(fiber.StatusCreated)
+	})
+	request := httptest.NewRequest(nethttp.MethodPost, "/post", bytes.NewBufferString("{}"))
+	response, err := module.App().Test(request)
+	if err != nil {
+		t.Fatalf("expected request success, got %v", err)
+	}
+	if response.StatusCode != fiber.StatusCreated {
+		t.Fatalf("expected status 201, got %d", response.StatusCode)
+	}
+}
+
 // TestRegisterWebSocketReturnsUpgradeRequired verifies non-upgrade requests are rejected.
 func TestRegisterWebSocketReturnsUpgradeRequired(t *testing.T) {
 	module := New(Options{})

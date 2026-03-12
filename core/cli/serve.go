@@ -10,6 +10,8 @@ import (
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	"github.com/momlesstomato/pixel-server/core/logging"
 	rediscore "github.com/momlesstomato/pixel-server/core/redis"
+	"github.com/momlesstomato/pixel-server/pkg/authentication"
+	"github.com/momlesstomato/pixel-server/pkg/authentication/httpapi"
 	"github.com/spf13/cobra"
 )
 
@@ -73,6 +75,13 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	}
 	cfg := runtime.Config
 	module := runtime.HTTP
+	store, err := authentication.NewRedisStore(runtime.Redis, cfg.Authentication.KeyPrefix)
+	if err != nil {
+		return err
+	}
+	if err := httpapi.RegisterRoutes(module, authentication.NewService(store, cfg.Authentication)); err != nil {
+		return err
+	}
 	if listen == nil {
 		listen = defaultListen
 	}

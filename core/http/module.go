@@ -56,6 +56,11 @@ func (module *Module) RegisterGET(path string, handler fiber.Handler) {
 	module.app.Get(path, handler)
 }
 
+// RegisterPOST registers an HTTP POST endpoint on the Fiber application.
+func (module *Module) RegisterPOST(path string, handler fiber.Handler) {
+	module.app.Post(path, handler)
+}
+
 // ProtectWithAPIKey protects all registered routes using API key middleware.
 func (module *Module) ProtectWithAPIKey(apiKey string, header string) error {
 	trimmed := strings.TrimSpace(apiKey)

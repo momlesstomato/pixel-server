@@ -198,25 +198,19 @@ clients could both `GET` successfully before either `DEL` executes.
 ### Configuration
 
 ```go
-type SSOConfig struct {
-    DefaultTTL time.Duration `mapstructure:"default_ttl" default:"5m"`
-    MaxTTL     time.Duration `mapstructure:"max_ttl" default:"30m"`
+type AuthenticationConfig struct {
+    DefaultTTLSeconds int    `mapstructure:"default_ttl_seconds" default:"300"`
+    MaxTTLSeconds     int    `mapstructure:"max_ttl_seconds" default:"1800"`
+    KeyPrefix         string `mapstructure:"key_prefix" default:"sso"`
 }
 ```
 
-Added as a nested field in the existing `Config` struct under `SSO`.
+Added as a nested field in the existing `Config` struct under `authentication`.
 
 ### Redis Dependency
 
-The project already defines `RedisConfig` in `core/config/types.go` but has no
-Redis client library. Required addition:
-
-```
-go get github.com/redis/go-redis/v9
-```
-
-Redis adapter will live in `internal/realms/handshake/adapters/redis_sso.go`
-and implement the `SSOStore` port interface.
+Redis client dependency is already present and the adapter is implemented in
+`pkg/authentication` (`RedisStore`) with `SET` and atomic `GETDEL`.
 
 ---
 
@@ -334,11 +328,11 @@ breaking changes.
 
 | # | Task                                         | Depends On | Status  |
 |---|----------------------------------------------|------------|---------|
-| 6 | Implement `SSOStore` Redis adapter (SET+GETDEL) | 2       | PENDING |
-| 7 | Add `POST /api/v1/sso` endpoint              | 6          | PENDING |
-| 8 | Add `pixelsv sso` CLI command                | 6          | PENDING |
-| 9 | SSO validation unit tests                    | 6          | PENDING |
-| 10| SSO integration tests with Redis             | 6          | PENDING |
+| 6 | Implement `SSOStore` Redis adapter (SET+GETDEL) | 2       | DONE    |
+| 7 | Add `POST /api/v1/sso` endpoint              | 6          | DONE    |
+| 8 | Add `pixelsv sso` CLI command                | 6          | DONE    |
+| 9 | SSO validation unit tests                    | 6          | DONE    |
+| 10| SSO integration tests with Redis             | 6          | DONE    |
 
 ### Milestone 3: Handshake Packets (Pre-Auth)
 
