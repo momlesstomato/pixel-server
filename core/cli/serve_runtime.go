@@ -68,12 +68,21 @@ func cleanupServeRuntime(runtime *initializer.Runtime) error {
 	if runtime.Redis != nil {
 		redisErr = runtime.Redis.Close()
 	}
+	postgresErr := error(nil)
+	if runtime.PostgreSQL != nil {
+		sqlDatabase, dbErr := runtime.PostgreSQL.DB()
+		if dbErr != nil {
+			postgresErr = dbErr
+		} else {
+			postgresErr = sqlDatabase.Close()
+		}
+	}
 	syncErr := runtime.Logger.Sync()
 	if isIgnorableSyncError(syncErr) {
 		syncErr = nil
 	}
-	if redisErr != nil {
-		return redisErr
+	if redisErr != nil || postgresErr != nil {
+		return errors.Join(redisErr, postgresErr)
 	}
 	return syncErr
 }

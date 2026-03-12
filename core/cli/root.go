@@ -20,6 +20,7 @@ func NewRootCommand(dependencies Dependencies) *cobra.Command {
 		Short: "Pixel server runtime CLI",
 	}
 	command.AddCommand(NewServeCommand(dependencies.Serve))
+	command.AddCommand(NewDBCommand())
 	command.AddCommand(authcommand.NewSSOCommand(dependencies.Authentication))
 	return command
 }

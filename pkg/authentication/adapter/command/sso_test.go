@@ -44,7 +44,7 @@ func TestNewSSOCommandRequiresUserID(t *testing.T) {
 func writeEnvFile(t *testing.T, redisAddress string) string {
 	t.Helper()
 	filePath := filepath.Join(t.TempDir(), ".env")
-	content := []byte("APP_API_KEY=secret\nREDIS_ADDRESS=" + redisAddress + "\nPOSTGRES_DSN=dsn\nUSERS_JWT_SECRET=secret\n")
+	content := []byte("APP_API_KEY=secret\nREDIS_ADDRESS=" + redisAddress + "\nPOSTGRES_DSN=postgres://postgres:postgres@127.0.0.1:5432/pixel_server?sslmode=disable\nUSERS_JWT_SECRET=secret\n")
 	if err := os.WriteFile(filePath, content, 0o600); err != nil {
 		t.Fatalf("expected env file write success, got %v", err)
 	}

@@ -13,6 +13,7 @@ import (
 	httpopenapi "github.com/momlesstomato/pixel-server/core/http/openapi"
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	"github.com/momlesstomato/pixel-server/core/logging"
+	postgrescore "github.com/momlesstomato/pixel-server/core/postgres"
 	rediscore "github.com/momlesstomato/pixel-server/core/redis"
 	authenticationhttpapi "github.com/momlesstomato/pixel-server/pkg/authentication/adapter/httpapi"
 	authenticationapplication "github.com/momlesstomato/pixel-server/pkg/authentication/application"
@@ -73,6 +74,7 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 		config.Initializer{Options: config.LoaderOptions{EnvFile: options.EnvFile, EnvPrefix: options.EnvPrefix}},
 		rediscore.Initializer{},
 		logging.Initializer{Output: options.Output},
+		postgrescore.Initializer{},
 		corehttp.Initializer{APIKeyHeader: options.APIKeyHeader},
 	)
 	runtime, err := runner.Run()

@@ -59,6 +59,10 @@ This document defines mandatory project constraints and success criteria.
 - PostgreSQL and Redis are required.
 - PostgreSQL schema must be normalized.
 - PostgreSQL access must use an ORM.
+- PostgreSQL migration management is mandatory with explicit up/down support.
+- PostgreSQL seeding management is mandatory with explicit up/down support.
+- Seeding must include only essential testing/bootstrap data and must not be treated as full production population.
+- Migration and seeding tooling must be robust, deterministic, and reversible.
 - Redis is the mandatory caching/runtime state layer where appropriate.
 
 ## 6) Configuration Module Rules
@@ -96,6 +100,10 @@ This document defines mandatory project constraints and success criteria.
 - Packages must not exceed 6 files.
 - If a test exceeds 150 lines of code, that package must use an internal `tests/` folder.
 - Test files inside `tests/` must use descriptive names and never generic splits like `part1` or `part2`.
+- End-to-end tests must be organized by major numbered flow folders under `e2e/` (for example, `e2e/01_startup/`, `e2e/02_security/`, `e2e/03_encryption/`, `e2e/04_handshake/`).
+- End-to-end test files must live directly inside their major numbered flow folder, with no extra nested step folder layer.
+- End-to-end test filenames must be prefixed with the same flow number as their parent folder (for example, `e2e/04_handshake/04_handshake_test.go`).
+- Every new feature implementation must include corresponding end-to-end tests under this numbered major-flow structure.
 
 ## 10) Markdown Naming
 

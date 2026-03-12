@@ -82,7 +82,7 @@ func TestNewServeCommandDoesNotRequireAPIKeyFlag(t *testing.T) {
 func writeServeEnvFile(t *testing.T) string {
 	t.Helper()
 	filePath := filepath.Join(t.TempDir(), ".env")
-	content := []byte("APP_BIND_IP=127.0.0.1\nAPP_PORT=3987\nAPP_API_KEY=test-key\nREDIS_ADDRESS=localhost:6379\nPOSTGRES_DSN=dsn\nUSERS_JWT_SECRET=secret\nLOGGING_LEVEL=debug\n")
+	content := []byte("APP_BIND_IP=127.0.0.1\nAPP_PORT=3987\nAPP_API_KEY=test-key\nREDIS_ADDRESS=localhost:6379\nPOSTGRES_DSN=postgres://postgres:postgres@127.0.0.1:5432/pixel_server?sslmode=disable\nUSERS_JWT_SECRET=secret\nLOGGING_LEVEL=debug\n")
 	if err := os.WriteFile(filePath, content, 0o600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}

@@ -29,3 +29,15 @@ func TestNewRootCommandRegistersSSO(t *testing.T) {
 		t.Fatalf("expected sso command to be registered")
 	}
 }
+
+// TestNewRootCommandRegistersDB verifies db command composition.
+func TestNewRootCommandRegistersDB(t *testing.T) {
+	command := cli.NewRootCommand(cli.Dependencies{})
+	database, _, err := command.Find([]string{"db"})
+	if err != nil {
+		t.Fatalf("expected db command lookup success, got %v", err)
+	}
+	if database == nil || database.Name() != "db" {
+		t.Fatalf("expected db command to be registered")
+	}
+}

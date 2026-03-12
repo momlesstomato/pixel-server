@@ -6,6 +6,7 @@ import (
 	"github.com/momlesstomato/pixel-server/core/config"
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
 	"github.com/momlesstomato/pixel-server/core/logging"
+	"github.com/momlesstomato/pixel-server/core/postgres"
 	rediscore "github.com/momlesstomato/pixel-server/core/redis"
 )
 
@@ -15,6 +16,8 @@ type Runner struct {
 	config config.Stage
 	// logger stores logger startup behavior.
 	logger logging.Stage
+	// postgres stores PostgreSQL startup behavior.
+	postgres postgres.Stage
 	// redis stores redis startup behavior.
 	redis rediscore.Stage
 	// http stores HTTP startup behavior.
@@ -24,14 +27,14 @@ type Runner struct {
 }
 
 // NewRunner creates a startup runner with explicit typed stages.
-func NewRunner(config config.Stage, redis rediscore.Stage, logger logging.Stage, http corehttp.Stage, websockets ...corehttp.WebSocketStage) *Runner {
-	return &Runner{config: config, redis: redis, logger: logger, http: http, websockets: websockets}
+func NewRunner(config config.Stage, redis rediscore.Stage, logger logging.Stage, postgres postgres.Stage, http corehttp.Stage, websockets ...corehttp.WebSocketStage) *Runner {
+	return &Runner{config: config, redis: redis, logger: logger, postgres: postgres, http: http, websockets: websockets}
 }
 
 // Run executes startup stages and returns initialized runtime dependencies.
 func (runner *Runner) Run() (*Runtime, error) {
-	if runner.config == nil || runner.redis == nil || runner.logger == nil || runner.http == nil {
-		return nil, fmt.Errorf("config, redis, logger and http stages are required")
+	if runner.config == nil || runner.redis == nil || runner.logger == nil || runner.postgres == nil || runner.http == nil {
+		return nil, fmt.Errorf("config, redis, logger, postgres and http stages are required")
 	}
 	loadedConfig, err := runner.config.InitializeConfig()
 	if err != nil {
@@ -45,6 +48,10 @@ func (runner *Runner) Run() (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initializer %s failed: %w", runner.logger.Name(), err)
 	}
+	loadedPostgreSQL, err := runner.postgres.InitializePostgreSQL(loadedConfig.PostgreSQL)
+	if err != nil {
+		return nil, fmt.Errorf("initializer %s failed: %w", runner.postgres.Name(), err)
+	}
 	loadedHTTP, err := runner.http.InitializeHTTP(loadedConfig.App, loadedLogger)
 	if err != nil {
 		return nil, fmt.Errorf("initializer %s failed: %w", runner.http.Name(), err)
@@ -54,5 +61,5 @@ func (runner *Runner) Run() (*Runtime, error) {
 			return nil, fmt.Errorf("initializer %s failed: %w", stage.Name(), err)
 		}
 	}
-	return &Runtime{Config: loadedConfig, Redis: loadedRedis, Logger: loadedLogger, HTTP: loadedHTTP}, nil
+	return &Runtime{Config: loadedConfig, Redis: loadedRedis, PostgreSQL: loadedPostgreSQL, Logger: loadedLogger, HTTP: loadedHTTP}, nil
 }
