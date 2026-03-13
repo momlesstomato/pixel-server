@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	coreplugin "github.com/momlesstomato/pixel-server/core/plugin"
 	sdk "github.com/momlesstomato/pixel-sdk"
+	coreplugin "github.com/momlesstomato/pixel-server/core/plugin"
 	"go.uber.org/zap"
 )
 

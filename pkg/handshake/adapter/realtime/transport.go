@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gofiber/contrib/websocket"
-	"github.com/momlesstomato/pixel-server/core/codec"
 	sdk "github.com/momlesstomato/pixel-sdk"
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"go.uber.org/zap"
 )
 

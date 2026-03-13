@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/gofiber/contrib/websocket"
+	sdk "github.com/momlesstomato/pixel-sdk"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/sessionflow"
 	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
-	sdk "github.com/momlesstomato/pixel-sdk"
 )
 
 const sessionLeaseRefreshInterval = 60 * time.Second

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/gofiber/contrib/websocket"
-	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	sdk "github.com/momlesstomato/pixel-sdk"
+	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 )
 
 // DisconnectUseCase defines connection-disconnect workflow behavior.

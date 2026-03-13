@@ -3,10 +3,10 @@ package tests
 import (
 	"testing"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	coreplugin "github.com/momlesstomato/pixel-server/core/plugin"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/sessionflow"
-	sdk "github.com/momlesstomato/pixel-sdk"
 )
 
 // disconnectRegistryStub defines in-memory session storage behavior.

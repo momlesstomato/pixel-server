@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gofiber/contrib/websocket"
+	sdk "github.com/momlesstomato/pixel-sdk"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
@@ -11,7 +12,6 @@ import (
 	packettelemetry "github.com/momlesstomato/pixel-server/pkg/handshake/packet/telemetry"
 	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
 	packetsnavigation "github.com/momlesstomato/pixel-server/pkg/session/packet/navigation"
-	sdk "github.com/momlesstomato/pixel-sdk"
 	"go.uber.org/zap"
 )
 

@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	coreplugin "github.com/momlesstomato/pixel-server/core/plugin"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
-	sdk "github.com/momlesstomato/pixel-sdk"
 )
 
 // validatorStub defines deterministic ticket validation behavior.
