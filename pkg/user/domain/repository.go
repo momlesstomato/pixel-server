@@ -47,4 +47,24 @@ type Repository interface {
 	RemainingRespects(context.Context, int, RespectTargetType, time.Time) (int, error)
 	// RecordLogin persists one successful login event and reports whether it is first login in UTC day.
 	RecordLogin(context.Context, int, string, time.Time) (bool, error)
+	// LoadWardrobe resolves saved wardrobe slots for one user.
+	LoadWardrobe(context.Context, int) ([]WardrobeSlot, error)
+	// SaveWardrobeSlot upserts one wardrobe slot payload for one user.
+	SaveWardrobeSlot(context.Context, int, WardrobeSlot) error
+	// ListIgnoredUsernames resolves ignored usernames for one user.
+	ListIgnoredUsernames(context.Context, int) ([]string, error)
+	// IgnoreUserByUsername stores one ignore relation by target username.
+	IgnoreUserByUsername(context.Context, int, string) (int, error)
+	// IgnoreUserByID stores one ignore relation by target user identifier.
+	IgnoreUserByID(context.Context, int, int) error
+	// UnignoreUserByUsername removes one ignore relation by target username.
+	UnignoreUserByUsername(context.Context, int, string) (int, error)
+	// LoadProfile resolves one partial public profile payload.
+	LoadProfile(context.Context, int, bool) (Profile, error)
+	// ListRespects resolves respect audit rows for one target user.
+	ListRespects(context.Context, int, int, int) ([]RespectRecord, error)
+	// IsUsernameAvailable checks whether one username is available.
+	IsUsernameAvailable(context.Context, string, int) (bool, error)
+	// ChangeUsername updates one user's username and rename flag.
+	ChangeUsername(context.Context, int, string, bool) (User, error)
 }

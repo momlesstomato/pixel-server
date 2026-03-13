@@ -13,6 +13,7 @@ import (
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	managementhttpapi "github.com/momlesstomato/pixel-server/pkg/management/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
+	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
 )
 
 // registerServeWebSocket registers websocket endpoint behavior.
@@ -23,6 +24,20 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 	}
 	handler.ConfigureBroadcaster(services.broadcaster)
 	handler.ConfigurePostAuth(services.hotelStatus, services.users, services.users, runtime.Config.App.Name)
+	handler.ConfigureUserRuntime(func(transport *handshakerealtime.Transport) (handshakerealtime.UserRuntime, error) {
+		options := userrealtime.Options{
+			Debounce: 2 * time.Second,
+			PacketIDs: userrealtime.PacketIDs{
+				SettingsRoomInvites: uint16(runtime.Config.Users.SettingsRoomInvitesPacketID),
+				SettingsOldChat:     uint16(runtime.Config.Users.SettingsOldChatPacketID),
+				Unignore:            uint16(runtime.Config.Users.UnignorePacketID),
+				IgnoreByID:          uint16(runtime.Config.Users.IgnoreByIDPacketID),
+				ApproveName:         uint16(runtime.Config.Users.ApproveNamePacketID),
+			},
+			Logger: runtime.Logger,
+		}
+		return userrealtime.NewRuntime(services.users, services.registry, transport, options)
+	})
 	services.handler = handler
 	webSocketPath := strings.TrimSpace(path)
 	if webSocketPath == "" {

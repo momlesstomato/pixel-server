@@ -35,7 +35,7 @@ func TestUseCaseRunSendsAvailabilityFirstLoginAndPing(t *testing.T) {
 	if err := useCase.Run(context.Background(), "conn-1", 7); err != nil {
 		t.Fatalf("expected run success, got %v", err)
 	}
-	expected := []uint16{2033, 2725, 411, 2586, 3738, 513, 2875, 793, 3928}
+	expected := []uint16{2033, 2725, 411, 2586, 3738, 513, 2875, 126, 793, 3928}
 	if len(transport.sent) != len(expected) || !equalIDs(transport.sent, expected) {
 		t.Fatalf("unexpected packet sequence %v", transport.sent)
 	}
@@ -48,7 +48,7 @@ func TestUseCaseRunSkipsFirstLoginPacketWhenNotFirst(t *testing.T) {
 	if err := useCase.Run(context.Background(), "conn-1", 7); err != nil {
 		t.Fatalf("expected run success, got %v", err)
 	}
-	expected := []uint16{2033, 2725, 411, 2586, 3738, 513, 2875, 3928}
+	expected := []uint16{2033, 2725, 411, 2586, 3738, 513, 2875, 126, 3928}
 	if len(transport.sent) != len(expected) || !equalIDs(transport.sent, expected) {
 		t.Fatalf("unexpected packet sequence %v", transport.sent)
 	}
@@ -121,6 +121,11 @@ func (profileStub) LoadSettings(context.Context, int) (userdomain.Settings, erro
 // RemainingRespects returns deterministic remaining respects payload.
 func (profileStub) RemainingRespects(context.Context, int, userdomain.RespectTargetType, time.Time) (int, error) {
 	return 3, nil
+}
+
+// ListIgnoredUsernames returns deterministic ignored usernames payload.
+func (profileStub) ListIgnoredUsernames(context.Context, int) ([]string, error) {
+	return []string{}, nil
 }
 
 // equalIDs compares packet identifier slices.

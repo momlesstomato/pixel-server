@@ -36,6 +36,14 @@ func (handler *Handler) Handle(connection *websocket.Conn) {
 		handler.abortConnection(connection)
 		return
 	}
+	var userRuntime UserRuntime
+	if handler.userRuntimeFactory != nil {
+		userRuntime, err = handler.userRuntimeFactory(transport)
+		if err != nil {
+			handler.abortConnection(connection)
+			return
+		}
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	signals, disposable, err := handler.bus.Subscribe(ctx, connID)
 	if err != nil {
@@ -55,13 +63,13 @@ func (handler *Handler) Handle(connection *websocket.Conn) {
 		go handler.consumeBroadcast(ctx, allMessages, connID, transport, cancel)
 	}
 	authSignal, pongSignal, heartbeatStop := make(chan struct{}), make(chan struct{}, 1), func() {}
-	defer handler.disposeConnection(cancel, disposables, useCases.disconnect, heartbeatStop, connID, connection)
+	defer handler.disposeConnection(cancel, disposables, useCases.disconnect, heartbeatStop, connID, connection, userRuntime)
 	handler.startRuntimeWatchers(ctx, useCases, connID, authSignal, signals, transport, cancel)
-	handler.readLoop(ctx, connection, transport, useCases, connID, authSignal, pongSignal, &heartbeatStop, &disposables, cancel)
+	handler.readLoop(ctx, connection, transport, useCases, connID, authSignal, pongSignal, &heartbeatStop, &disposables, cancel, userRuntime)
 }
 
 // readLoop reads websocket packets and applies handshake session workflows.
-func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn, transport *Transport, useCases *runtimeUseCases, connID string, authSignal chan struct{}, pongSignal chan struct{}, heartbeatStop *func(), disposables *[]coreconnection.Disposable, cancel context.CancelFunc) {
+func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn, transport *Transport, useCases *runtimeUseCases, connID string, authSignal chan struct{}, pongSignal chan struct{}, heartbeatStop *func(), disposables *[]coreconnection.Disposable, cancel context.CancelFunc, userRuntime UserRuntime) {
 	authenticated, machineID, userSubscribed := false, "", false
 	errorMeter := newProtocolErrorMeter()
 	for {
@@ -151,6 +159,15 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 					return
 				}
 			default:
+				if authenticated && userRuntime != nil {
+					handled, handleErr := userRuntime.Handle(ctx, connID, frame.PacketID, frame.Body)
+					if handleErr != nil && handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorMalformedPacket, &errorMeter) {
+						return
+					}
+					if handled {
+						continue
+					}
+				}
 				if handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorUnknownPacket, &errorMeter) {
 					return
 				}

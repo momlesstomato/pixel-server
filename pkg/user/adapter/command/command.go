@@ -21,6 +21,7 @@ func NewUserCommand(dependencies Dependencies) *cobra.Command {
 	command.AddCommand(newGetCommand(dependencies, &options))
 	command.AddCommand(newUpdateCommand(dependencies, &options))
 	command.AddCommand(newRespectCommand(dependencies, &options))
+	command.AddCommand(newRenameCommand(dependencies, &options))
 	return command
 }
 

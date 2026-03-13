@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSteps verifies migration step registry contents.
 func TestRegistryReturnsOrderedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 4 {
-		t.Fatalf("expected four migration steps, got %d", len(steps))
+	if len(steps) != 6 {
+		t.Fatalf("expected six migration steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260312_01_users" {
 		t.Fatalf("unexpected migration step metadata")
@@ -18,6 +18,12 @@ func TestRegistryReturnsOrderedSteps(t *testing.T) {
 		t.Fatalf("unexpected migration step metadata")
 	}
 	if steps[3] == nil || steps[3].ID != "20260313_04_user_respects" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[4] == nil || steps[4].ID != "20260313_05_user_wardrobe" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[5] == nil || steps[5].ID != "20260313_06_user_ignores" {
 		t.Fatalf("unexpected migration step metadata")
 	}
 }

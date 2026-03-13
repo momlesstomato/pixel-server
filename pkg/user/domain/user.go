@@ -10,6 +10,15 @@ var ErrUserNotFound = errors.New("user not found")
 // ErrRespectLimitReached defines daily respect limit behavior.
 var ErrRespectLimitReached = errors.New("daily respect limit reached")
 
+// ErrNameAlreadyTaken defines duplicate username change behavior.
+var ErrNameAlreadyTaken = errors.New("username is already taken")
+
+// ErrInvalidName defines invalid username format behavior.
+var ErrInvalidName = errors.New("invalid username")
+
+// ErrNameChangeNotAllowed defines rename-guard behavior for users.
+var ErrNameChangeNotAllowed = errors.New("name change is not allowed")
+
 // User defines one user aggregate identity payload.
 type User struct {
 	// ID stores stable user identifier.
@@ -36,4 +45,20 @@ type User struct {
 	SafetyLocked bool
 	// GroupID stores permission group identifier.
 	GroupID int
+}
+
+// Profile defines one public user profile payload.
+type Profile struct {
+	// UserID stores stable user identifier.
+	UserID int
+	// Username stores current account username.
+	Username string
+	// Figure stores avatar figure string.
+	Figure string
+	// Motto stores profile motto value.
+	Motto string
+	// IsOnline stores current online marker.
+	IsOnline bool
+	// OpenProfileWindow stores client open profile flag.
+	OpenProfileWindow bool
 }

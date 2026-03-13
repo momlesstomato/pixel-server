@@ -131,6 +131,11 @@ tables. See `05-PERMISSION-SYSTEM.md`.
 | (varies) | `user.effect_enable` | effectId | **DEFER** |
 | (varies) | `user.get_email_status`, `user.change_email`, `user.welcome_gift_change_email`, `user.get_profile_by_name` | varies | **DEFER** |
 
+For variable packet IDs, runtime mapping is configurable through environment variables:
+`USERS_SETTINGS_ROOM_INVITES_PACKET_ID`, `USERS_SETTINGS_OLD_CHAT_PACKET_ID`,
+`USERS_UNIGNORE_PACKET_ID`, `USERS_IGNORE_BY_ID_PACKET_ID`, and
+`USERS_APPROVE_NAME_PACKET_ID`.
+
 ---
 
 ## Database Model Design
@@ -544,51 +549,51 @@ and empty arrays until those realms are implemented.
 | 16 | Create `user.settings` S2C packet (ID 513) | 14 | DONE |
 | 17 | Create `user.home_room` S2C packet (ID 2875) | - | DONE |
 | 18 | Create `user.figure` S2C packet (ID 2429) | - | DONE |
-| 19 | Create C2S packets: update_motto, update_figure, settings_volume, settings_room_invites, settings_old_chat, set_home_room | - | PARTIAL (room_invites/old_chat IDs still pending protocol-final mapping) |
+| 19 | Create C2S packets: update_motto, update_figure, settings_volume, settings_room_invites, settings_old_chat, set_home_room | - | DONE (variable IDs wired via env packet mapping) |
 | 20 | Create `user_respects` table + model + migration | - | DONE |
 | 21 | Create `user.respect_received` S2C packet (ID 2815) | - | DONE |
 | 22 | Create C2S packet: user.respect (ID 2694) | - | DONE |
-| 23 | Implement motto/figure update use case with plugin events | 19 | PARTIAL (use case done, plugin events pending) |
-| 24 | Implement settings persistence use case (with write debounce) | 15 | PARTIAL (persistence done, debounce pending) |
+| 23 | Implement motto/figure update use case with plugin events | 19 | DONE |
+| 24 | Implement settings persistence use case (with write debounce) | 15 | DONE |
 | 25 | Implement respect use case: daily limit check, atomic increment | 20,22 | DONE |
 | 26 | Compute respectsRemaining/petRemaining from user_respects in user.info | 20 | DONE |
 | 27 | Wire settings + home_room into post-auth burst | 16,17 | DONE |
 | 28 | API: PATCH /api/users/{id}, GET/PATCH settings, POST respect | 23,24,25 | DONE |
 | 29 | CLI: user update, user respect | 28 | DONE |
-| 30 | Plugin events: UserMottoChanged, UserFigureChanged, UserRespected | 23,25 | PENDING |
+| 30 | Plugin events: UserMottoChanged, UserFigureChanged, UserRespected | 23,25 | DONE |
 | 31 | Unit + integration tests for M2 | all M2 | DONE |
 
 ### Milestone 3: Wardrobe, Ignore List & Profile
 
 | # | Task | Depends On | Status |
 |---|------|------------|--------|
-| 32 | Create `user_wardrobe_slots` table + model + migration | - | PENDING |
-| 33 | Create `user_ignores` table + model + migration | - | PENDING |
-| 34 | Create wardrobe repository | 32 | PENDING |
-| 35 | Create ignore repository | 33 | PENDING |
-| 36 | Create `user.wardrobe_page` S2C + C2S get/save packets | 34 | PENDING |
-| 37 | Create `user.ignored_users` S2C + C2S ignore/unignore packets | 35 | PENDING |
-| 38 | Wire ignored_users into post-auth burst | 37 | PENDING |
-| 39 | Create `user.profile` S2C packet (ID 3898, partial) | - | PENDING |
-| 40 | Create `user.get_profile` C2S packet handler (ID 3265) | 39 | PENDING |
-| 41 | API: GET /api/users/{id}/wardrobe, GET /api/users/{id}/respects | 34,20 | PENDING |
-| 42 | Plugin events: UserIgnored, UserUnignored | 37 | PENDING |
-| 43 | Unit + integration tests for M3 | all M3 | PENDING |
+| 32 | Create `user_wardrobe_slots` table + model + migration | - | DONE |
+| 33 | Create `user_ignores` table + model + migration | - | DONE |
+| 34 | Create wardrobe repository | 32 | DONE |
+| 35 | Create ignore repository | 33 | DONE |
+| 36 | Create `user.wardrobe_page` S2C + C2S get/save packets | 34 | DONE |
+| 37 | Create `user.ignored_users` S2C + C2S ignore/unignore packets | 35 | DONE |
+| 38 | Wire ignored_users into post-auth burst | 37 | DONE |
+| 39 | Create `user.profile` S2C packet (ID 3898, partial) | - | DONE |
+| 40 | Create `user.get_profile` C2S packet handler (ID 3265) | 39 | DONE |
+| 41 | API: GET /api/users/{id}/wardrobe, GET /api/users/{id}/respects | 34,20 | DONE |
+| 42 | Plugin events: UserIgnored, UserUnignored | 37 | DONE |
+| 43 | Unit + integration tests for M3 | all M3 | DONE |
 
 ### Milestone 4: Name Changes
 
 | # | Task | Depends On | Status |
 |---|------|------------|--------|
-| 44 | Create `user.check_name` C2S (ID 3950) + `user.check_name_result` S2C (ID 563) | - | PENDING |
-| 45 | Create `user.change_name` C2S (ID 2977) + `user.change_name_result` S2C (ID 118) | - | PENDING |
-| 46 | Create `user.name_change` S2C broadcast packet (ID 2182) | - | PENDING |
-| 47 | Implement name validation use case (length, chars, uniqueness) | 44 | PENDING |
-| 48 | Implement name change use case with `can_change_name` guard | 45,47 | PENDING |
-| 49 | Create `user.approve_name` C2S + result for admin approval flow | - | PENDING |
-| 50 | API: POST /api/users/{id}/name-change | 48 | PENDING |
-| 51 | CLI: user rename | 50 | PENDING |
-| 52 | Plugin event: UserNameChanged | 48 | PENDING |
-| 53 | Unit + integration tests for M4 | all M4 | PENDING |
+| 44 | Create `user.check_name` C2S (ID 3950) + `user.check_name_result` S2C (ID 563) | - | DONE |
+| 45 | Create `user.change_name` C2S (ID 2977) + `user.change_name_result` S2C (ID 118) | - | DONE |
+| 46 | Create `user.name_change` S2C broadcast packet (ID 2182) | - | DONE (connection-scoped until room realm is available) |
+| 47 | Implement name validation use case (length, chars, uniqueness) | 44 | DONE |
+| 48 | Implement name change use case with `can_change_name` guard | 45,47 | DONE |
+| 49 | Create `user.approve_name` C2S + result for admin approval flow | - | DONE (runtime-configurable packet ID) |
+| 50 | API: POST /api/users/{id}/name-change | 48 | DONE |
+| 51 | CLI: user rename | 50 | DONE |
+| 52 | Plugin event: UserNameChanged | 48 | DONE |
+| 53 | Unit + integration tests for M4 | all M4 | DONE |
 
 ---
 

@@ -24,6 +24,8 @@ func RegisterRoutes(module *corehttp.Module, service Service) error {
 	registerIdentityRoutes(module, service)
 	registerSettingsRoutes(module, service)
 	registerRespectRoutes(module, service)
+	registerWardrobeRoutes(module, service)
+	registerNameRoutes(module, service)
 	return nil
 }
 
@@ -97,6 +99,12 @@ func mapUserError(err error) error {
 	}
 	if err == domain.ErrRespectLimitReached {
 		return fiber.NewError(http.StatusConflict, err.Error())
+	}
+	if err == domain.ErrNameAlreadyTaken || err == domain.ErrNameChangeNotAllowed {
+		return fiber.NewError(http.StatusConflict, err.Error())
+	}
+	if err == domain.ErrInvalidName {
+		return fiber.NewError(http.StatusBadRequest, err.Error())
 	}
 	message := strings.ToLower(err.Error())
 	if strings.Contains(message, "must") || strings.Contains(message, "invalid") || strings.Contains(message, "required") {

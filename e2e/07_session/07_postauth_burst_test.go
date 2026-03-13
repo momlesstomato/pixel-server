@@ -57,9 +57,9 @@ func Test07PostAuthBurstAndLoginStamp(t *testing.T) {
 		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
 		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
 		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
-		testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
 	}
-	if !equalIDs(first, []uint16{2491, 3523, 2033, 2725, 411, 2586, 3738, 513, 2875, 793, 3928}) {
+	if !equalIDs(first, []uint16{2491, 3523, 2033, 2725, 411, 2586, 3738, 513, 2875, 126, 793, 3928}) {
 		t.Fatalf("unexpected first login packet sequence %v", first)
 	}
 	cleanup()
@@ -74,8 +74,9 @@ func Test07PostAuthBurstAndLoginStamp(t *testing.T) {
 		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
 		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
 		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID,
 	}
-	if !equalIDs(second, []uint16{2491, 3523, 2033, 2725, 411, 2586, 3738, 513, 2875, 3928}) {
+	if !equalIDs(second, []uint16{2491, 3523, 2033, 2725, 411, 2586, 3738, 513, 2875, 126, 3928}) {
 		t.Fatalf("unexpected second login packet sequence %v", second)
 	}
 	var events []usermodel.LoginEvent
@@ -106,7 +107,7 @@ func openDatabase(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("expected sqlite open success, got %v", err)
 	}
-	if err := database.AutoMigrate(&usermodel.Record{}, &usermodel.LoginEvent{}, &usermodel.Settings{}, &usermodel.Respect{}); err != nil {
+	if err := database.AutoMigrate(&usermodel.Record{}, &usermodel.LoginEvent{}, &usermodel.Settings{}, &usermodel.Respect{}, &usermodel.WardrobeSlot{}, &usermodel.Ignore{}); err != nil {
 		t.Fatalf("expected sqlite migration success, got %v", err)
 	}
 	return database

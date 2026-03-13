@@ -86,6 +86,7 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	}
 	defer pluginManager.Shutdown()
 	svc.handler.ConfigurePluginEvents(pluginManager.Dispatcher().Fire)
+	svc.users.SetEventFirer(pluginManager.Dispatcher().Fire)
 	address := fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port)
 	runtime.Logger.Info("http server starting", zap.String("address", address))
 	return runServeLifecycle(runtime, runtime.HTTP, address, listen)

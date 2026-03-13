@@ -47,6 +47,8 @@ type ProfileReader interface {
 	LoadSettings(context.Context, int) (userdomain.Settings, error)
 	// RemainingRespects returns remaining respects for one user and target type.
 	RemainingRespects(context.Context, int, userdomain.RespectTargetType, time.Time) (int, error)
+	// ListIgnoredUsernames resolves ignored usernames for one user.
+	ListIgnoredUsernames(context.Context, int) ([]string, error)
 }
 
 // UseCase defines post-authentication packet burst behavior.

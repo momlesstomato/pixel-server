@@ -2,10 +2,12 @@ package store
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/momlesstomato/pixel-server/pkg/user/domain"
 	usermodel "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/model"
+	"gorm.io/gorm"
 )
 
 // Create inserts one user row and returns domain representation.
@@ -61,6 +63,49 @@ func (repository *Repository) UpdateProfile(ctx context.Context, userID int, pat
 		if result.RowsAffected == 0 {
 			return domain.User{}, domain.ErrUserNotFound
 		}
+	}
+	return repository.FindByID(ctx, userID)
+}
+
+// IsUsernameAvailable checks whether one username is available.
+func (repository *Repository) IsUsernameAvailable(ctx context.Context, username string, excludeUserID int) (bool, error) {
+	var count int64
+	query := repository.database.WithContext(ctx).Model(&usermodel.Record{}).Where("LOWER(username) = LOWER(?)", strings.TrimSpace(username))
+	if excludeUserID > 0 {
+		query = query.Where("id <> ?", excludeUserID)
+	}
+	if err := query.Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count == 0, nil
+}
+
+// ChangeUsername updates one user's username and rename flag.
+func (repository *Repository) ChangeUsername(ctx context.Context, userID int, username string, force bool) (domain.User, error) {
+	trimmed := strings.TrimSpace(username)
+	record, err := repository.loadRecord(ctx, userID)
+	if err != nil {
+		return domain.User{}, err
+	}
+	if !force && !record.CanChangeName {
+		return domain.User{}, domain.ErrNameChangeNotAllowed
+	}
+	available, err := repository.IsUsernameAvailable(ctx, trimmed, userID)
+	if err != nil {
+		return domain.User{}, err
+	}
+	if !available {
+		return domain.User{}, domain.ErrNameAlreadyTaken
+	}
+	result := repository.database.WithContext(ctx).Model(&usermodel.Record{}).Where("id = ?", userID).Updates(map[string]any{"username": trimmed, "can_change_name": false})
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return domain.User{}, domain.ErrUserNotFound
+		}
+		return domain.User{}, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.User{}, domain.ErrUserNotFound
 	}
 	return repository.FindByID(ctx, userID)
 }

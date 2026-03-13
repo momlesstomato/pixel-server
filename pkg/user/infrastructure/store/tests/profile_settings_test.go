@@ -67,7 +67,7 @@ func openRepository(t *testing.T) *userstore.Repository {
 	if err != nil {
 		t.Fatalf("expected sqlite open success, got %v", err)
 	}
-	if err := database.AutoMigrate(&usermodel.Record{}, &usermodel.Settings{}, &usermodel.Respect{}, &usermodel.LoginEvent{}); err != nil {
+	if err := database.AutoMigrate(&usermodel.Record{}, &usermodel.Settings{}, &usermodel.Respect{}, &usermodel.LoginEvent{}, &usermodel.WardrobeSlot{}, &usermodel.Ignore{}); err != nil {
 		t.Fatalf("expected sqlite migration success, got %v", err)
 	}
 	repository, err := userstore.NewRepository(database)

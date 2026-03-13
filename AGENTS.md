@@ -16,6 +16,14 @@ This document defines mandatory project constraints and success criteria.
 - Structs, interfaces, and function definitions must live in their corresponding package/module domain.
 - Cross-cutting contracts must be avoided in centralized files when ownership is clear (for example, config contracts in `core/config`, logging contracts in `core/logging`, transport contracts in `core/http`).
 - Package design must stay distributed by responsibility to avoid bloated "catch-all" files and to keep future realm/packet growth isolated by module.
+- The same distributed-by-responsibility rule applies to `sdk/` and event definitions:
+  - avoid catch-all event files,
+  - place events in domain-scoped folders (for example `sdk/events/user/...`),
+  - keep one event type per file where ownership is clear.
+- Packet definitions must be partitioned by responsibility:
+  - no catch-all packet files,
+  - packet groups must be split into focused module files (and subfolders when needed),
+  - packet growth must remain isolated by realm/module.
 - Package and folder names must be short and intention-revealing; avoid overly long or stacked names when a concise equivalent exists (for example, prefer `infrastructure/model` and `infrastructure/store` over verbose variants).
 - Configuration models must also follow distributed ownership by section and must not be centralized in a monolithic `core/config/types.go`.
 - Configuration section types must live in their owning module package (for example, `core/redis/config.go`, `core/logging/config.go`, `core/postgres/config.go`, `core/users/config.go`, `core/app/config.go`).

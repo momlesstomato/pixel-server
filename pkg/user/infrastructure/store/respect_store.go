@@ -68,3 +68,32 @@ func (repository *Repository) RecordRespect(ctx context.Context, actorUserID int
 	}
 	return updated, nil
 }
+
+// ListRespects resolves respect audit rows for one target user.
+func (repository *Repository) ListRespects(ctx context.Context, targetUserID int, limit int, offset int) ([]domain.RespectRecord, error) {
+	if _, err := repository.loadRecord(ctx, targetUserID); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	var rows []usermodel.Respect
+	query := repository.database.WithContext(ctx).Where("target_id = ? AND target_type = ?", targetUserID, int16(domain.RespectTargetUser))
+	if err := query.Order("respected_at DESC, id DESC").Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	records := make([]domain.RespectRecord, 0, len(rows))
+	for _, row := range rows {
+		records = append(records, domain.RespectRecord{
+			ID: int(row.ID), ActorUserID: int(row.ActorUserID), TargetID: int(row.TargetID),
+			TargetType: domain.RespectTargetType(row.TargetType), RespectedAt: row.RespectedAt,
+		})
+	}
+	return records, nil
+}

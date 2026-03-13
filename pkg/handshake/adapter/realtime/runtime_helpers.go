@@ -26,8 +26,11 @@ func (handler *Handler) abortConnection(connection *websocket.Conn) {
 }
 
 // disposeConnection applies one shared connection cleanup lifecycle.
-func (handler *Handler) disposeConnection(cancel context.CancelFunc, disposables []coreconnection.Disposable, disconnect *sessionflow.DisconnectUseCase, heartbeatStop func(), connID string, connection *websocket.Conn) {
+func (handler *Handler) disposeConnection(cancel context.CancelFunc, disposables []coreconnection.Disposable, disconnect *sessionflow.DisconnectUseCase, heartbeatStop func(), connID string, connection *websocket.Conn, userRuntime UserRuntime) {
 	heartbeatStop()
+	if userRuntime != nil {
+		userRuntime.Dispose(connID)
+	}
 	for _, disposable := range disposables {
 		if disposable != nil {
 			_ = disposable.Dispose()

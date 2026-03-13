@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/momlesstomato/pixel-server/pkg/user/domain"
 )
 
@@ -13,6 +14,8 @@ import (
 type Service struct {
 	// repository stores user persistence contract implementation.
 	repository domain.Repository
+	// fire stores optional plugin event dispatch behavior.
+	fire func(sdk.Event)
 }
 
 // NewService creates one user service.
@@ -21,6 +24,11 @@ func NewService(repository domain.Repository) (*Service, error) {
 		return nil, fmt.Errorf("user repository is required")
 	}
 	return &Service{repository: repository}, nil
+}
+
+// SetEventFirer configures optional plugin event dispatch behavior.
+func (service *Service) SetEventFirer(fire func(sdk.Event)) {
+	service.fire = fire
 }
 
 // Create creates one user using username validation.

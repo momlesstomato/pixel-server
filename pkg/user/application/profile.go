@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	sdkuser "github.com/momlesstomato/pixel-sdk/events/user"
 	"github.com/momlesstomato/pixel-server/pkg/user/domain"
 )
 
@@ -70,6 +71,11 @@ func (service *Service) SaveSettings(ctx context.Context, userID int, patch doma
 
 // RecordUserRespect validates and stores one user-to-user respect event.
 func (service *Service) RecordUserRespect(ctx context.Context, actorUserID int, targetUserID int, at time.Time) (RespectResult, error) {
+	return service.RecordUserRespectWithConn(ctx, "", actorUserID, targetUserID, at)
+}
+
+// RecordUserRespectWithConn validates and stores one user-to-user respect event.
+func (service *Service) RecordUserRespectWithConn(ctx context.Context, connID string, actorUserID int, targetUserID int, at time.Time) (RespectResult, error) {
 	if actorUserID <= 0 || targetUserID <= 0 {
 		return RespectResult{}, fmt.Errorf("actor and target user id must be positive")
 	}
@@ -78,6 +84,13 @@ func (service *Service) RecordUserRespect(ctx context.Context, actorUserID int, 
 	}
 	if at.IsZero() {
 		return RespectResult{}, fmt.Errorf("respect timestamp is required")
+	}
+	if service.fire != nil {
+		event := &sdkuser.Respected{ActorConnID: connID, ActorUserID: actorUserID, TargetUserID: targetUserID}
+		service.fire(event)
+		if event.Cancelled() {
+			return RespectResult{}, fmt.Errorf("respect cancelled by plugin")
+		}
 	}
 	received, err := service.repository.RecordRespect(ctx, actorUserID, targetUserID, domain.RespectTargetUser, at.UTC())
 	if err != nil {

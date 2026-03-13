@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -18,6 +19,14 @@ import (
 	sessionpostauth "github.com/momlesstomato/pixel-server/pkg/session/application/postauth"
 	"go.uber.org/zap"
 )
+
+// UserRuntime defines authenticated user packet handling behavior.
+type UserRuntime interface {
+	// Handle processes one packet payload and returns handled marker.
+	Handle(context.Context, string, uint16, []byte) (bool, error)
+	// Dispose flushes and disposes per-connection resources.
+	Dispose(string)
+}
 
 // Handler defines websocket handshake runtime behavior.
 type Handler struct {
@@ -47,6 +56,8 @@ type Handler struct {
 	desktopFactory func(*Transport) (*sessionnavigation.DesktopViewUseCase, error)
 	// fire dispatches optional plugin lifecycle events.
 	fire func(sdk.Event)
+	// userRuntimeFactory creates authenticated user packet handlers.
+	userRuntimeFactory func(*Transport) (UserRuntime, error)
 }
 
 // runtimeUseCases defines handshake runtime use-case wiring behavior.
@@ -99,6 +110,7 @@ func NewHandlerWithHeartbeat(validator authflow.TicketValidator, sessions coreco
 		validator: validator, sessions: sessions, policy: appliedPolicy, bus: bus, logger: output,
 		authTimeout: authTimeout, heartbeatInterval: heartbeatInterval, heartbeatTimeout: heartbeatTimeout,
 		connID: func() (string, error) { return GenerateConnectionID(rand.Reader) }, postAuthFactory: factory, desktopFactory: desktopFactory,
+		userRuntimeFactory: nil,
 	}, nil
 }
 
@@ -124,6 +136,11 @@ func (handler *Handler) ConfigureDesktopView(checker sessionnavigation.RoomCheck
 // ConfigurePluginEvents wires plugin event dispatch behavior.
 func (handler *Handler) ConfigurePluginEvents(fire func(sdk.Event)) {
 	handler.fire = fire
+}
+
+// ConfigureUserRuntime wires authenticated user packet runtime behavior.
+func (handler *Handler) ConfigureUserRuntime(factory func(*Transport) (UserRuntime, error)) {
+	handler.userRuntimeFactory = factory
 }
 
 // GenerateConnectionID creates one connection identifier string.

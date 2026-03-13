@@ -97,3 +97,53 @@ func (stub repositoryStub) RemainingRespects(context.Context, int, domain.Respec
 func (stub repositoryStub) RecordLogin(context.Context, int, string, time.Time) (bool, error) {
 	return false, nil
 }
+
+// LoadWardrobe returns deterministic wardrobe list.
+func (stub repositoryStub) LoadWardrobe(context.Context, int) ([]domain.WardrobeSlot, error) {
+	return []domain.WardrobeSlot{}, nil
+}
+
+// SaveWardrobeSlot returns deterministic save result.
+func (stub repositoryStub) SaveWardrobeSlot(context.Context, int, domain.WardrobeSlot) error {
+	return nil
+}
+
+// ListIgnoredUsernames returns deterministic ignore list.
+func (stub repositoryStub) ListIgnoredUsernames(context.Context, int) ([]string, error) {
+	return []string{}, nil
+}
+
+// IgnoreUserByUsername returns deterministic ignored user identifier.
+func (stub repositoryStub) IgnoreUserByUsername(context.Context, int, string) (int, error) {
+	return 2, nil
+}
+
+// IgnoreUserByID returns deterministic ignore result.
+func (stub repositoryStub) IgnoreUserByID(context.Context, int, int) error {
+	return nil
+}
+
+// UnignoreUserByUsername returns deterministic unignore identifier.
+func (stub repositoryStub) UnignoreUserByUsername(context.Context, int, string) (int, error) {
+	return 2, nil
+}
+
+// LoadProfile returns deterministic profile payload.
+func (stub repositoryStub) LoadProfile(context.Context, int, bool) (domain.Profile, error) {
+	return domain.Profile{UserID: 1}, nil
+}
+
+// ListRespects returns deterministic respect list payload.
+func (stub repositoryStub) ListRespects(context.Context, int, int, int) ([]domain.RespectRecord, error) {
+	return []domain.RespectRecord{}, nil
+}
+
+// IsUsernameAvailable returns deterministic username availability.
+func (stub repositoryStub) IsUsernameAvailable(context.Context, string, int) (bool, error) {
+	return true, nil
+}
+
+// ChangeUsername returns deterministic changed user payload.
+func (stub repositoryStub) ChangeUsername(_ context.Context, _ int, username string, _ bool) (domain.User, error) {
+	return domain.User{ID: 1, Username: username}, nil
+}

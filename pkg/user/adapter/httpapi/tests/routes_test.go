@@ -32,6 +32,23 @@ func TestRegisterRoutesAndHandlers(t *testing.T) {
 	if err != nil || settingsResponse.StatusCode != http.StatusOK {
 		t.Fatalf("expected get settings success, got status=%d err=%v", settingsResponse.StatusCode, err)
 	}
+	wardrobeRequest := httptest.NewRequest(http.MethodGet, "/api/v1/users/7/wardrobe", nil)
+	wardrobeResponse, err := module.App().Test(wardrobeRequest)
+	if err != nil || wardrobeResponse.StatusCode != http.StatusOK {
+		t.Fatalf("expected get wardrobe success, got status=%d err=%v", wardrobeResponse.StatusCode, err)
+	}
+	respectsRequest := httptest.NewRequest(http.MethodGet, "/api/v1/users/7/respects?limit=20&offset=0", nil)
+	respectsResponse, err := module.App().Test(respectsRequest)
+	if err != nil || respectsResponse.StatusCode != http.StatusOK {
+		t.Fatalf("expected get respects success, got status=%d err=%v", respectsResponse.StatusCode, err)
+	}
+	namePayload, _ := json.Marshal(map[string]string{"name": "beta"})
+	nameChangeRequest := httptest.NewRequest(http.MethodPost, "/api/v1/users/7/name-change", bytes.NewReader(namePayload))
+	nameChangeRequest.Header.Set("Content-Type", "application/json")
+	nameChangeResponse, err := module.App().Test(nameChangeRequest)
+	if err != nil || nameChangeResponse.StatusCode != http.StatusOK {
+		t.Fatalf("expected post name-change success, got status=%d err=%v", nameChangeResponse.StatusCode, err)
+	}
 }
 
 // TestRespectRouteMapsConflict verifies respect conflict mapping behavior.
@@ -84,4 +101,19 @@ func (stub serviceStub) RecordUserRespect(context.Context, int, int, time.Time) 
 		return userapplication.RespectResult{}, stub.respectErr
 	}
 	return userapplication.RespectResult{RespectsReceived: 2, Remaining: 1}, nil
+}
+
+// LoadWardrobe returns deterministic wardrobe slots payload.
+func (stub serviceStub) LoadWardrobe(context.Context, int) ([]domain.WardrobeSlot, error) {
+	return []domain.WardrobeSlot{{SlotID: 1, Figure: "hr-1", Gender: "M"}}, nil
+}
+
+// ListRespects returns deterministic respect history payload.
+func (stub serviceStub) ListRespects(context.Context, int, int, int) ([]domain.RespectRecord, error) {
+	return []domain.RespectRecord{{ID: 1, ActorUserID: 2, TargetID: 7, TargetType: domain.RespectTargetUser}}, nil
+}
+
+// ForceChangeName returns deterministic name change result payload.
+func (stub serviceStub) ForceChangeName(context.Context, int, string) (domain.NameResult, error) {
+	return domain.NameResult{ResultCode: domain.NameResultAvailable, Name: "beta"}, nil
 }

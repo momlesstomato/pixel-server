@@ -9,5 +9,7 @@ func Registry() []*gormigrate.Migration {
 		Step02UserLoginEvents(),
 		Step03UserSettings(),
 		Step04UserRespects(),
+		Step05UserWardrobe(),
+		Step06UserIgnores(),
 	}
 }

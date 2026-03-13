@@ -5,6 +5,7 @@ import (
 	"time"
 
 	userdomain "github.com/momlesstomato/pixel-server/pkg/user/domain"
+	userignorepacket "github.com/momlesstomato/pixel-server/pkg/user/packet/ignore"
 	userpacket "github.com/momlesstomato/pixel-server/pkg/user/packet/profile"
 )
 
@@ -20,6 +21,8 @@ type userBurstSnapshot struct {
 	respectsPetRemaining int
 	// lastAccessDate stores formatted last access date payload.
 	lastAccessDate string
+	// ignoredUsernames stores ignored usernames payload.
+	ignoredUsernames []string
 }
 
 // sendUserBurst sends user profile, permissions, perks, noobness, settings, and home room packets.
@@ -34,7 +37,11 @@ func (useCase *UseCase) sendUserBurst(ctx context.Context, connID string, userID
 	if err := useCase.sendUserAccessPackets(connID, snapshot); err != nil {
 		return err
 	}
-	return useCase.sendUserSettingsPackets(connID, snapshot)
+	if err := useCase.sendUserSettingsPackets(connID, snapshot); err != nil {
+		return err
+	}
+	ignored := userignorepacket.UserIgnoredUsersPacket{Usernames: snapshot.ignoredUsernames}
+	return sendPacket(useCase.transport, connID, ignored.PacketID(), ignored)
 }
 
 // loadUserBurstSnapshot loads one post-auth user snapshot payload.
@@ -55,7 +62,14 @@ func (useCase *UseCase) loadUserBurstSnapshot(ctx context.Context, userID int) (
 	if err != nil {
 		return userBurstSnapshot{}, err
 	}
-	return userBurstSnapshot{user: user, settings: settings, respectsRemaining: remaining, respectsPetRemaining: petRemaining, lastAccessDate: useCase.now().UTC().Format(time.RFC3339)}, nil
+	ignoredUsernames, err := useCase.profiles.ListIgnoredUsernames(ctx, userID)
+	if err != nil {
+		return userBurstSnapshot{}, err
+	}
+	return userBurstSnapshot{
+		user: user, settings: settings, respectsRemaining: remaining, respectsPetRemaining: petRemaining,
+		lastAccessDate: useCase.now().UTC().Format(time.RFC3339), ignoredUsernames: ignoredUsernames,
+	}, nil
 }
 
 // sendUserIdentityPackets sends user.info packet.

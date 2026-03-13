@@ -20,4 +20,10 @@ type Service interface {
 	SaveSettings(context.Context, int, domain.SettingsPatch) (domain.Settings, error)
 	// RecordUserRespect stores one user-to-user respect event.
 	RecordUserRespect(context.Context, int, int, time.Time) (userapplication.RespectResult, error)
+	// LoadWardrobe resolves saved wardrobe slots for one user.
+	LoadWardrobe(context.Context, int) ([]domain.WardrobeSlot, error)
+	// ListRespects resolves respect audit rows for one target user.
+	ListRespects(context.Context, int, int, int) ([]domain.RespectRecord, error)
+	// ForceChangeName applies one administrative user rename operation.
+	ForceChangeName(context.Context, int, string) (domain.NameResult, error)
 }
