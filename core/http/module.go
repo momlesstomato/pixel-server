@@ -112,6 +112,11 @@ func (module *Module) RegisterPOST(path string, handler fiber.Handler) {
 	module.app.Post(path, handler)
 }
 
+// RegisterDELETE registers an HTTP DELETE endpoint on the Fiber application.
+func (module *Module) RegisterDELETE(path string, handler fiber.Handler) {
+	module.app.Delete(path, handler)
+}
+
 // ProtectWithAPIKey protects all registered routes using API key middleware.
 func (module *Module) ProtectWithAPIKey(apiKey string, header string) error {
 	trimmed := strings.TrimSpace(apiKey)

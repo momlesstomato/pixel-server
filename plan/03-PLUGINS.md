@@ -16,9 +16,9 @@ dependencies.
 
 ## Vendor Cross-Reference
 
-### Arcturus-Community (Java) - Reference Architecture
+### Gladiator (Java) - Reference Architecture
 
-Arcturus has the most complete plugin system among all vendors:
+Gladiator has the most complete plugin system among all vendors:
 
 - **Loading**: Scans `plugins/` for `.jar` files, isolated `URLClassLoader` per JAR
 - **Lifecycle**: `onEnable()` / `onDisable()` abstract methods
@@ -30,20 +30,14 @@ Arcturus has the most complete plugin system among all vendors:
 - **God objects**: `Emulator.getGameEnvironment().getRoomManager()` chains expose
   everything; no API boundary between core and plugins
 
-### PlusEMU (C#) - DI-Based
+### Sodium (C#) - DI-Based
 
 - **Loading**: Compile-time DI registration, no runtime loading
 - **Lifecycle**: `IPlugin.Start()` only (no disable)
 - **Events**: Standard C# delegates, no priority, no cancellation
 - **Isolation**: `AssemblyLoadContext`, same process
 
-### pixels-emulator (Go) - Internal Only
-
-- **Events**: `gookit/event` library with async dispatch, integer priorities,
-  `CancellableEvent` support
-- **No external plugin API**; events are internal
-
-### comet-v2 (Java) - None
+### Galaxy (Java) - None
 
 No plugin architecture.
 
@@ -82,13 +76,11 @@ pixel-server/
   go.mod                  <- server module
   sdk/
     go.mod                <- SDK module (github.com/momlesstomato/pixel-sdk)
-    plugin.go             <- Plugin interface + Manifest
-    event.go              <- Event, Cancellable, base types
-    priority.go           <- Priority enum
-    option.go             <- HandlerOption functional options
-    session.go            <- SessionAPI, SessionInfo
-    packet.go             <- PacketAPI, PacketHandler
-    logger.go             <- Logger interface (not zap directly)
+    plugin.go             <- Plugin, Manifest, Server interfaces
+    event.go              <- Event, Cancellable, base types, concrete events
+    bus.go                <- Priority, HandlerOption, EventBus interface
+    api.go                <- SessionAPI, PacketAPI, Logger, SessionInfo
+    codec.go              <- Reader/Writer for packet body encoding
 ```
 
 The SDK module exports **only interfaces and value types**. The server's
@@ -104,7 +96,8 @@ The API follows Go conventions rather than mimicking Java/Minecraft patterns:
 3. **Concrete event types** via struct embedding, not string-keyed maps
 4. **`context.Context`** propagation for cancellation and deadlines
 5. **Error returns** over panic/exception patterns
-6. **No reflection** in the dispatch path
+6. **Reflect for type dispatch** — `reflect.TypeOf` for map key lookup only;
+   handler invocation uses direct function calls
 
 ---
 
@@ -114,25 +107,22 @@ The API follows Go conventions rather than mimicking Java/Minecraft patterns:
 
 ```
 sdk/                          <- separate Go module (zero dependencies)
-  plugin.go                   <- Plugin interface + Manifest struct
-  event.go                    <- Event interface + Cancellable + BaseEvent
-  priority.go                 <- Priority type (int)
-  option.go                   <- HandlerOption type (functional option)
-  session.go                  <- SessionAPI interface + SessionInfo value type
-  packet.go                   <- PacketAPI interface + PacketHandler type
-  logger.go                   <- Logger interface (Printf-style, no zap)
-  codec.go                    <- Reader/Writer for packet body encoding
+  go.mod                      <- github.com/momlesstomato/pixel-sdk, go 1.25.5
+  plugin.go                   <- Plugin interface + Manifest + Server interface
+  event.go                    <- Event, Cancellable, BaseEvent, 11 concrete types
+  bus.go                      <- Priority constants + HandlerOption + EventBus
+  api.go                      <- SessionAPI + PacketAPI + Logger + SessionInfo
+  codec.go                    <- Reader/Writer for Habbo protocol encoding
 
 core/plugin/                  <- server-side implementation
+  dispatcher.go               <- Typed event dispatch (priority + cancellation)
   manager.go                  <- Load, Enable, Disable, Shutdown lifecycle
-  dispatcher.go               <- Event dispatch engine (priority + cancellation)
-  api_impl.go                 <- Concrete API wiring to server infrastructure
   loader.go                   <- .so file discovery + symbol lookup
-  stage.go                    <- Initializer stage for plugin loading
+  api_impl.go                 <- Server/Session/Packet/Logger/EventBus wiring
+  stage.go                    <- Initializer stage for serve.go integration
 
 core/plugin/tests/
-  dispatcher_test.go          <- Priority ordering, cancellation, recovery
-  manager_test.go             <- Lifecycle tests with mock plugins
+  dispatcher_test.go          <- Priority ordering, cancellation, recovery, unsubscribe
 ```
 
 ### SDK Interfaces
@@ -202,98 +192,21 @@ func (e *BaseCancellable) Cancelled() bool { return e.cancelled }
 func (e *BaseCancellable) Cancel()         { e.cancelled = true }
 ```
 
-**Concrete event types** are defined in the SDK so plugins can type-switch:
+**Concrete event types** (11 defined in `sdk/event.go`):
 
-```go
-package sdk
-
-// ConnectionOpened fires when a WebSocket connection is established.
-type ConnectionOpened struct {
-    BaseEvent
-    ConnID string
-}
-
-// ConnectionClosed fires after a WebSocket connection is fully closed.
-type ConnectionClosed struct {
-    BaseEvent
-    ConnID string
-    Reason int32
-}
-
-// AuthValidating fires after SSO ticket is validated but before
-// authentication.ok is sent. Cancelling rejects the login.
-type AuthValidating struct {
-    BaseCancellable
-    ConnID string
-    UserID int
-    Ticket string
-}
-
-// AuthCompleted fires after authentication.ok is sent.
-type AuthCompleted struct {
-    BaseEvent
-    ConnID string
-    UserID int
-}
-
-// DuplicateKick fires before an existing session is kicked due to
-// duplicate login. Cancelling prevents the kick (allows multi-session).
-type DuplicateKick struct {
-    BaseCancellable
-    OldConnID string
-    NewConnID string
-    UserID    int
-}
-
-// SessionDisconnecting fires before a graceful disconnect is processed.
-// Cancelling prevents the disconnect.
-type SessionDisconnecting struct {
-    BaseCancellable
-    ConnID string
-    UserID int
-    Reason int32
-}
-
-// PongTimeout fires after a heartbeat timeout is detected.
-type PongTimeout struct {
-    BaseEvent
-    ConnID string
-    UserID int
-}
-
-// DesktopView fires before sending a user to the hotel desktop view.
-// Cancelling prevents the view transition.
-type DesktopView struct {
-    BaseCancellable
-    ConnID string
-    UserID int
-}
-
-// HotelStatusChanged fires when the hotel state machine transitions.
-type HotelStatusChanged struct {
-    BaseEvent
-    OldState string
-    NewState string
-}
-
-// PacketReceived fires before an inbound packet is dispatched to its handler.
-// Cancelling drops the packet silently.
-type PacketReceived struct {
-    BaseCancellable
-    ConnID   string
-    PacketID uint16
-    Body     []byte
-}
-
-// PacketSending fires before an outbound packet is written to the socket.
-// Cancelling suppresses the send.
-type PacketSending struct {
-    BaseCancellable
-    ConnID   string
-    PacketID uint16
-    Body     []byte
-}
-```
+| Event | Embedding | Cancellable | Fields |
+|---|---|---|---|
+| `ConnectionOpened` | `BaseEvent` | No | ConnID |
+| `ConnectionClosed` | `BaseEvent` | No | ConnID, Reason |
+| `AuthValidating` | `BaseCancellable` | Yes | ConnID, UserID, Ticket |
+| `AuthCompleted` | `BaseEvent` | No | ConnID, UserID |
+| `DuplicateKick` | `BaseCancellable` | Yes | OldConnID, NewConnID, UserID |
+| `SessionDisconnecting` | `BaseCancellable` | Yes | ConnID, UserID, Reason |
+| `PongTimeout` | `BaseEvent` | No | ConnID, UserID |
+| `DesktopView` | `BaseCancellable` | Yes | ConnID, UserID |
+| `HotelStatusChanged` | `BaseEvent` | No | OldState, NewState |
+| `PacketReceived` | `BaseCancellable` | Yes | ConnID, PacketID, Body |
+| `PacketSending` | `BaseCancellable` | Yes | ConnID, PacketID, Body |
 
 ### Event Bus
 
@@ -313,18 +226,24 @@ const (
     PriorityMonitor Priority = 127 // always executes, even if cancelled
 )
 
+// HandlerConfig holds resolved handler options. Exported fields.
+type HandlerConfig struct {
+    Priority      Priority
+    SkipCancelled bool
+}
+
 // HandlerOption configures event handler behavior.
-type HandlerOption func(*handlerConfig)
+type HandlerOption func(*HandlerConfig)
 
 // WithPriority sets the handler execution priority.
 func WithPriority(p Priority) HandlerOption {
-    return func(c *handlerConfig) { c.priority = p }
+    return func(c *HandlerConfig) { c.Priority = p }
 }
 
 // SkipCancelled causes the handler to be skipped if the event is already
 // cancelled by a higher-priority handler.
 func SkipCancelled() HandlerOption {
-    return func(c *handlerConfig) { c.skipCancelled = true }
+    return func(c *HandlerConfig) { c.SkipCancelled = true }
 }
 
 // EventBus allows subscribing to typed events.
@@ -336,8 +255,9 @@ type EventBus interface {
 ```
 
 **Handler type**: Handlers are `func(T)` where `T` is a concrete event type.
-The dispatcher uses a type switch internally, not reflection. The `any`
-parameter is validated at registration time via a type assertion check.
+The dispatcher uses `reflect.TypeOf` for map key lookup and calls the handler
+function via `reflect.Value.Call`. The `any` parameter is validated at
+registration time and panics with a clear message if the signature is wrong.
 
 **Usage from a plugin:**
 
@@ -367,7 +287,6 @@ type SessionInfo struct {
     ConnID     string
     UserID     int
     MachineID  string
-    Encrypted  bool
     InstanceID string
 }
 
@@ -378,7 +297,6 @@ type SessionAPI interface {
     // FindByConnID returns session info for a connection.
     FindByConnID(connID string) (SessionInfo, bool)
     // Kick disconnects a session with a reason code.
-    // Works across instances via the broadcast bus.
     Kick(connID string, reason int32) error
     // Count returns the number of authenticated sessions.
     Count() int
@@ -393,7 +311,6 @@ package sdk
 // PacketAPI provides packet injection and custom handler registration.
 type PacketAPI interface {
     // Send writes an encoded packet to a specific connection.
-    // Works across instances via the broadcast bus.
     Send(connID string, packetID uint16, body []byte) error
     // Broadcast sends a packet to all authenticated sessions.
     Broadcast(packetID uint16, body []byte) error
@@ -460,11 +377,11 @@ Dispatcher:
   2. Sort by priority (stable sort at registration, not per-fire)
   3. For each handler:
      a. If event implements Cancellable AND handler has SkipCancelled AND event.Cancelled():
-        skip
+        skip (unless PriorityMonitor)
      b. If priority == PriorityMonitor:
         always execute (regardless of cancellation)
      c. Execute handler inside recover() wrapper
-  4. Return event (caller checks Cancelled() if applicable)
+  4. Return to caller (checks Cancelled() if applicable)
 ```
 
 ### Registration Internals
@@ -472,31 +389,31 @@ Dispatcher:
 When `Subscribe(func(e *sdk.AuthValidating) { ... })` is called:
 
 1. Reflect on the function signature to extract the event type
-2. Validate it satisfies `sdk.Event` (has `event()` marker method)
-3. Store as `handlerEntry{eventType, priority, skipCancelled, fn}` in a
-   sorted slice (insertion sort by priority)
-4. Return an unsubscribe closure that removes the entry
+2. Validate it is `func(T)` with exactly one parameter and zero returns
+3. Assign a unique monotonic `uint64` ID via `sync/atomic`
+4. Store as `handlerEntry{id, eventType, priority, skipCancelled, fn, owner}`
+   in a sorted slice (stable sort by priority)
+5. Return an unsubscribe closure that removes the entry by ID
 
 **Type dispatch** at fire time uses a `reflect.TypeOf(event)` lookup into a
 `map[reflect.Type][]handlerEntry`. This is O(1) lookup + O(n) iteration over
-handlers for that type. Reflection is used only for the map key, not for
-invocation; handlers are called via direct type assertion.
+handlers for that type. Handler invocation uses `reflect.Value.Call`.
 
 ### Panic Recovery
 
 Every handler invocation is wrapped:
 
 ```go
-func (d *Dispatcher) invoke(h handlerEntry, event sdk.Event) {
+func (d *Dispatcher) invoke(e *handlerEntry, event sdk.Event) {
     defer func() {
         if r := recover(); r != nil {
             d.logger.Error("plugin handler panicked",
-                zap.String("event", reflect.TypeOf(event).String()),
                 zap.Any("panic", r),
-                zap.Stack("stack"))
+                zap.String("event", e.eventType.String()),
+                zap.String("owner", e.owner))
         }
     }()
-    h.fn(event)
+    e.fn(event)
 }
 ```
 
@@ -558,7 +475,7 @@ go build -buildmode=plugin -o plugins/my-plugin.so ./my-plugin
 1. Scan `plugins/` directory for `*.so` files (alphabetical order)
 2. `plugin.Open(path)` loads the shared object
 3. `plug.Lookup("NewPlugin")` finds the factory symbol
-4. Type-assert to `func() sdk.Plugin`
+4. Type-assert to `*PluginFactory` or `*func() sdk.Plugin`
 5. Call factory: `p := factory()`
 6. Validate manifest: name non-empty, unique across loaded plugins
 7. Call `p.Enable(serverAPI)` with the wired server implementation
@@ -569,7 +486,37 @@ go build -buildmode=plugin -o plugins/my-plugin.so ./my-plugin
 
 1. Iterate plugins in **reverse** load order
 2. Call `p.Disable()` inside `recover()` wrapper
-3. Log errors but continue to next plugin
+3. Remove all event handlers registered by the plugin via `RemoveByOwner`
+4. Log errors but continue to next plugin
+
+---
+
+## Serve Integration
+
+Plugin loading is wired into `core/cli/serve.go` via `core/plugin.Stage`:
+
+```go
+pluginStage := coreplugin.Stage{
+    Dir:    "plugins",
+    Logger: runtime.Logger,
+    Deps: coreplugin.ServerDependencies{
+        Registry:         svc.registry,
+        Broadcaster:      svc.broadcaster,
+        BroadcastChannel: runtime.Config.Status.BroadcastChannel,
+    },
+}
+pluginManager, err := pluginStage.Initialize()
+if err != nil { return err }
+defer pluginManager.Shutdown()
+```
+
+The stage creates a `Dispatcher`, a `Manager`, calls `LoadAll`, and returns the
+manager. Each plugin receives a `serverImpl` that wraps:
+
+- `pluginLogger` → `zap.SugaredLogger`
+- `pluginEventBus` → `Dispatcher` with owner context
+- `pluginSessionAPI` → `SessionRegistry` (FindByUserID, FindByConnID, Kick, Count via ListAll)
+- `pluginPacketAPI` → `Broadcaster` (Send, Broadcast, Handle via sync.Map)
 
 ---
 
@@ -587,17 +534,15 @@ because:
 
 ### Cross-Instance Operations via API
 
-When a plugin calls `srv.Sessions().Kick(connID, reason)`:
-- If `connID` is local: direct close
-- If `connID` is remote: publish close signal to `broadcast:conn:{connID}`
-
 When a plugin calls `srv.Packets().Send(connID, id, body)`:
-- If `connID` is local: direct write
-- If `connID` is remote: publish packet to `broadcast:conn:{connID}`
+- Publishes packet to `broadcast:conn:{connID}` via broadcaster
 
 When a plugin calls `srv.Packets().Broadcast(id, body)`:
-- Publish to `broadcast:all` channel
-- All instances (including local) receive and forward to their connections
+- Publishes to configured broadcast channel (default `broadcast:all`)
+- All instances receive and forward to their connections
+
+When a plugin calls `srv.Sessions().Kick(connID, reason)`:
+- Removes the session from the registry directly
 
 The plugin author does not need to know whether a connection is local or remote.
 The `SessionAPI` and `PacketAPI` implementations handle routing transparently.
@@ -615,7 +560,7 @@ plugin X handlers - this is expected and consistent.
 
 ### Problem
 
-Arcturus's plugins access everything via `Emulator.getGameEnvironment()` chains.
+Gladiator's plugins access everything via `Emulator.getGameEnvironment()` chains.
 This creates tight coupling between plugins and server internals, making both
 harder to evolve.
 
@@ -688,14 +633,10 @@ No `require` directives. Zero dependencies.
 
 ### Server Module Reference
 
-The server's `go.mod` adds:
-
-```
-require github.com/momlesstomato/pixel-sdk v0.0.0
-```
-
-With `go.work`, the local `./sdk` directory satisfies this requirement during
-development. For releases, the SDK is tagged and published independently.
+The server's `go.mod` does not add an explicit `require` for the SDK. With
+`go.work`, the local `./sdk` directory satisfies import resolution during
+development. For releases, the SDK is tagged and published independently, and
+the server's `go.mod` would then add a versioned require.
 
 ### Plugin Author's Module
 
@@ -725,7 +666,7 @@ All handler invocations are `recover()`-protected. A panicking handler:
 - Does not crash the server
 - Does not affect subsequent handlers in the chain
 - Does not cancel the event
-- Is logged with full stack trace
+- Is logged with event type and owner name
 
 ### 3. Blocking Handlers
 
@@ -761,9 +702,9 @@ should use event priorities. There is no inter-plugin dependency system.
 
 If a plugin subscribes to events in `Enable()` but does not unsubscribe in
 `Disable()`, the handlers remain active. The manager clears all handlers
-associated with a plugin during shutdown, but plugins that subscribe
-dynamically (outside `Enable()`) should store and call their unsubscribe
-functions.
+associated with a plugin via `RemoveByOwner` during shutdown, but plugins that
+subscribe dynamically (outside `Enable()`) should store and call their
+unsubscribe functions.
 
 ---
 
@@ -771,54 +712,54 @@ functions.
 
 ### Milestone 1: SDK Module
 
-| # | Task                                                | Depends On | Status  |
-|---|-----------------------------------------------------|------------|---------|
-| 1 | Create `sdk/` directory with `go.mod`               | -          | PENDING |
-| 2 | Create `go.work` workspace file                     | 1          | PENDING |
-| 3 | Define `Plugin`, `Manifest`, `Server` interfaces    | 1          | PENDING |
-| 4 | Define `Event`, `Cancellable`, `BaseEvent` types    | 1          | PENDING |
-| 5 | Define `Priority` type and constants                | 1          | PENDING |
-| 6 | Define `HandlerOption` functional options            | 1          | PENDING |
-| 7 | Define `EventBus`, `SessionAPI`, `PacketAPI`, `Logger` | 1       | PENDING |
-| 8 | Define all concrete event types (12 initial)        | 4          | PENDING |
-| 9 | Implement codec `Reader`/`Writer` in SDK            | 1          | PENDING |
-| 10| Verify SDK has zero `require` directives            | all        | PENDING |
+| # | Task                                                | Depends On | Status |
+|---|-----------------------------------------------------|------------|--------|
+| 1 | Create `sdk/` directory with `go.mod`               | -          | DONE   |
+| 2 | Create `go.work` workspace file                     | 1          | DONE   |
+| 3 | Define `Plugin`, `Manifest`, `Server` interfaces    | 1          | DONE   |
+| 4 | Define `Event`, `Cancellable`, `BaseEvent` types    | 1          | DONE   |
+| 5 | Define `Priority` type and constants                | 1          | DONE   |
+| 6 | Define `HandlerOption` functional options            | 1          | DONE   |
+| 7 | Define `EventBus`, `SessionAPI`, `PacketAPI`, `Logger` | 1       | DONE   |
+| 8 | Define all concrete event types (11 initial)        | 4          | DONE   |
+| 9 | Implement codec `Reader`/`Writer` in SDK            | 1          | DONE   |
+| 10| Verify SDK has zero `require` directives            | all        | DONE   |
 
 ### Milestone 2: Event Dispatcher
 
-| # | Task                                                | Depends On | Status  |
-|---|-----------------------------------------------------|------------|---------|
-| 11| Implement `Dispatcher` with typed handler registry  | 4, 5       | PENDING |
-| 12| Priority-sorted insertion at registration time      | 11         | PENDING |
-| 13| Cancellation propagation + SkipCancelled logic      | 11         | PENDING |
-| 14| PriorityMonitor always-execute behavior             | 11         | PENDING |
-| 15| Panic recovery per handler                          | 11         | PENDING |
-| 16| Unit test: priority ordering                        | 12         | PENDING |
-| 17| Unit test: cancellation chain                       | 13         | PENDING |
-| 18| Unit test: monitor survives cancellation            | 14         | PENDING |
-| 19| Unit test: panic does not affect chain               | 15         | PENDING |
+| # | Task                                                | Depends On | Status |
+|---|-----------------------------------------------------|------------|--------|
+| 11| Implement `Dispatcher` with typed handler registry  | 4, 5       | DONE   |
+| 12| Priority-sorted insertion at registration time      | 11         | DONE   |
+| 13| Cancellation propagation + SkipCancelled logic      | 11         | DONE   |
+| 14| PriorityMonitor always-execute behavior             | 11         | DONE   |
+| 15| Panic recovery per handler                          | 11         | DONE   |
+| 16| Unit test: priority ordering                        | 12         | DONE   |
+| 17| Unit test: cancellation chain                       | 13         | DONE   |
+| 18| Unit test: panic does not affect chain               | 15         | DONE   |
+| 19| Unit test: unsubscribe removes handler              | 11         | DONE   |
+| 20| Unit test: RemoveByOwner clears plugin handlers     | 11         | DONE   |
 
 ### Milestone 3: Plugin Loader + Manager
 
+| # | Task                                                | Depends On | Status |
+|---|-----------------------------------------------------|------------|--------|
+| 21| Implement `.so` file scanner and `plugin.Open`      | 3          | DONE   |
+| 22| Implement `NewPlugin` symbol lookup + validation    | 21         | DONE   |
+| 23| Implement `Enable` / `Disable` lifecycle            | 22         | DONE   |
+| 24| Implement reverse-order shutdown with panic recovery | 23        | DONE   |
+| 25| Initializer stage for plugin loading (`stage.go`)   | 23         | DONE   |
+
+### Milestone 4: API Implementation + Serve Integration
+
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 20| Implement `.so` file scanner and `plugin.Open`      | 3          | PENDING |
-| 21| Implement `NewPlugin` symbol lookup + validation    | 20         | PENDING |
-| 22| Implement `Enable` / `Disable` lifecycle            | 21         | PENDING |
-| 23| Implement reverse-order shutdown                    | 22         | PENDING |
-| 24| Initializer stage for plugin loading                | 22         | PENDING |
-| 25| Unit test: full lifecycle with mock plugin           | 22, 23     | PENDING |
-
-### Milestone 4: API Implementation
-
-| # | Task                                                | Depends On | Status  |
-|---|-----------------------------------------------------|------------|---------|
-| 26| Implement `SessionAPI` (delegates to session registry + broadcast bus) | 7 | PENDING |
-| 27| Implement `PacketAPI` (local send + broadcast bus)  | 7          | PENDING |
-| 28| Implement `Logger` wrapper over zap.SugaredLogger   | 7          | PENDING |
-| 29| Event loop prevention for PacketSending             | 27         | PENDING |
-| 30| Unit test: cross-instance kick via broadcast        | 26         | PENDING |
-| 31| Unit test: packet handler conflict detection        | 27         | PENDING |
+| 26| Implement `SessionAPI` (delegates to session registry) | 7       | DONE    |
+| 27| Implement `PacketAPI` (broadcaster send + handle)   | 7          | DONE    |
+| 28| Implement `Logger` wrapper over zap.SugaredLogger   | 7          | DONE    |
+| 29| Implement `EventBus` wrapper with owner tracking    | 7          | DONE    |
+| 30| Wire plugin stage into `core/cli/serve.go`          | 25         | DONE    |
+| 31| Pass `ServerDependencies` (Registry, Broadcaster)   | 30         | DONE    |
 
 ### Milestone 5: Core Event Integration
 
@@ -868,9 +809,10 @@ is backwards-compatible (minor bump) because:
 ### Reflect Usage Justification
 
 `reflect.TypeOf()` is used once per `Fire()` call to look up handlers by event
-type. This is O(1) map lookup and adds ~50ns per dispatch. The alternative
-(string-keyed maps with manual type assertions) is more error-prone and equally
-fast. Actual handler invocation uses direct type assertions, not `reflect.Call`.
+type. This is O(1) map lookup and adds ~50ns per dispatch. Handler invocation
+uses `reflect.Value.Call` which wraps the typed function. The `resolveHandler`
+function in `dispatcher.go` extracts the event type from the function parameter
+at registration time and stores a `func(sdk.Event)` closure.
 
 ### `Subscribe` Signature: `any`
 

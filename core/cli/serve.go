@@ -14,14 +14,15 @@ import (
 	httpopenapi "github.com/momlesstomato/pixel-server/core/http/openapi"
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	"github.com/momlesstomato/pixel-server/core/logging"
+	coreplugin "github.com/momlesstomato/pixel-server/core/plugin"
 	postgrescore "github.com/momlesstomato/pixel-server/core/postgres"
 	rediscore "github.com/momlesstomato/pixel-server/core/redis"
 	authenticationhttpapi "github.com/momlesstomato/pixel-server/pkg/authentication/adapter/httpapi"
 	authenticationapplication "github.com/momlesstomato/pixel-server/pkg/authentication/application"
 	authenticationredisstore "github.com/momlesstomato/pixel-server/pkg/authentication/infrastructure/redisstore"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
-	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
+	managementhttpapi "github.com/momlesstomato/pixel-server/pkg/management/adapter/httpapi"
 	sessionhotelstatus "github.com/momlesstomato/pixel-server/pkg/status/application/hotelstatus"
 	statusredisstore "github.com/momlesstomato/pixel-server/pkg/status/infrastructure/redisstore"
 	userapplication "github.com/momlesstomato/pixel-server/pkg/user/application"
@@ -86,66 +87,132 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	if err != nil {
 		return err
 	}
-	ssoStore, err := authenticationredisstore.NewRedisStore(runtime.Redis, runtime.Config.Authentication.KeyPrefix)
+	svc, err := buildServeServices(runtime)
 	if err != nil {
 		return err
 	}
-	ssoService := authenticationapplication.NewService(ssoStore, runtime.Config.Authentication)
-	if err := registerServeWebSocket(runtime.HTTP, options.WebSocketPath, runtime, ssoService, runtime.Logger); err != nil {
+	if err := registerServeWebSocket(runtime.HTTP, options.WebSocketPath, runtime, svc); err != nil {
 		return err
 	}
-	if err := authenticationhttpapi.RegisterRoutes(runtime.HTTP, ssoService); err != nil {
+	if err := registerServeHTTPRoutes(runtime.HTTP, svc, options.WebSocketPath); err != nil {
 		return err
 	}
-	if err := httpopenapi.RegisterRoutes(runtime.HTTP, httpopenapi.BuildDocument(options.WebSocketPath, authenticationhttpapi.OpenAPIPaths()), "", ""); err != nil {
+	pluginStage := coreplugin.Stage{Dir: "plugins", Logger: runtime.Logger, Deps: coreplugin.ServerDependencies{
+		Registry: svc.registry, Broadcaster: svc.broadcaster, BroadcastChannel: runtime.Config.Status.BroadcastChannel,
+	}}
+	pluginManager, err := pluginStage.Initialize()
+	if err != nil {
 		return err
 	}
-	runtime.Logger.Info("http server starting", zap.String("address", fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port)))
-	return runServeLifecycle(runtime, runtime.HTTP, fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port), listen)
+	defer pluginManager.Shutdown()
+	addr := fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port)
+	runtime.Logger.Info("http server starting", zap.String("address", addr))
+	return runServeLifecycle(runtime, runtime.HTTP, addr, listen)
 }
 
-// registerServeWebSocket registers websocket endpoint behavior for serve runtime.
-func registerServeWebSocket(module *corehttp.Module, path string, runtime *initializer.Runtime, validator authflow.TicketValidator, logger *zap.Logger) error {
-	registry, err := coreconnection.NewRedisSessionRegistryWithOptions(runtime.Redis, coreconnection.RedisSessionRegistryOptions{InstanceID: runtime.Config.App.Name})
+// serveServices holds shared dependencies built during serve startup.
+type serveServices struct {
+	sso         *authenticationapplication.Service
+	registry    *coreconnection.RedisSessionRegistry
+	bus         *handshakerealtime.DistributedCloseSignalBus
+	broadcaster broadcast.Broadcaster
+	hotelStatus *sessionhotelstatus.Service
+	users       *userapplication.Service
+}
+
+// buildServeServices constructs shared application dependencies.
+func buildServeServices(rt *initializer.Runtime) (*serveServices, error) {
+	ssoStore, err := authenticationredisstore.NewRedisStore(rt.Redis, rt.Config.Authentication.KeyPrefix)
+	if err != nil {
+		return nil, err
+	}
+	registry, err := coreconnection.NewRedisSessionRegistryWithOptions(rt.Redis, coreconnection.RedisSessionRegistryOptions{InstanceID: rt.Config.App.Name})
+	if err != nil {
+		return nil, err
+	}
+	bus, err := handshakerealtime.NewRedisCloseSignalBus(rt.Redis, "handshake:close")
+	if err != nil {
+		return nil, err
+	}
+	broadcaster, err := broadcast.NewRedisBroadcaster(rt.Redis, "")
+	if err != nil {
+		return nil, err
+	}
+	statusStore, err := statusredisstore.NewStore(rt.Redis, rt.Config.Status.RedisKey)
+	if err != nil {
+		return nil, err
+	}
+	hotel, err := sessionhotelstatus.NewService(statusStore, broadcaster, rt.Config.Status)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = hotel.Current(context.Background()); err != nil {
+		return nil, err
+	}
+	hotel.StartCountdownTicker(context.Background())
+	userRepo, err := userstore.NewRepository(rt.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
+	users, err := userapplication.NewService(userRepo)
+	if err != nil {
+		return nil, err
+	}
+	return &serveServices{
+		sso:      authenticationapplication.NewService(ssoStore, rt.Config.Authentication),
+		registry: registry, bus: bus, broadcaster: broadcaster,
+		hotelStatus: hotel, users: users,
+	}, nil
+}
+
+// registerServeWebSocket registers websocket endpoint behavior.
+func registerServeWebSocket(module *corehttp.Module, path string, rt *initializer.Runtime, svc *serveServices) error {
+	handler, err := handshakerealtime.NewHandler(svc.sso, svc.registry, packetsecurity.NewMachineIDPolicy(nil), svc.bus, rt.Logger, 30*time.Second)
 	if err != nil {
 		return err
 	}
-	bus, err := handshakerealtime.NewRedisCloseSignalBus(runtime.Redis, "handshake:close")
-	if err != nil {
+	handler.ConfigureBroadcaster(svc.broadcaster)
+	handler.ConfigurePostAuth(svc.hotelStatus, svc.users, rt.Config.App.Name)
+	wsPath := strings.TrimSpace(path)
+	if wsPath == "" {
+		wsPath = "/ws"
+	}
+	return module.RegisterWebSocket(wsPath, handler.Handle)
+}
+
+// registerServeHTTPRoutes registers all REST API routes and OpenAPI documentation.
+func registerServeHTTPRoutes(module *corehttp.Module, svc *serveServices, wsPath string) error {
+	if err := authenticationhttpapi.RegisterRoutes(module, svc.sso); err != nil {
 		return err
 	}
-	handler, err := handshakerealtime.NewHandler(validator, registry, packetsecurity.NewMachineIDPolicy(nil), bus, logger, 30*time.Second)
-	if err != nil {
+	closer := &busCloserAdapter{bus: svc.bus}
+	if err := managementhttpapi.RegisterSessionRoutes(module, svc.registry, closer); err != nil {
 		return err
 	}
-	broadcaster, err := broadcast.NewRedisBroadcaster(runtime.Redis, "")
-	if err != nil {
+	if err := managementhttpapi.RegisterHotelRoutes(module, svc.hotelStatus); err != nil {
 		return err
 	}
-	handler.ConfigureBroadcaster(broadcaster)
-	statusStore, err := statusredisstore.NewStore(runtime.Redis, runtime.Config.Status.RedisKey)
-	if err != nil {
-		return err
+	paths := mergeOpenAPIPaths(authenticationhttpapi.OpenAPIPaths(), managementhttpapi.OpenAPIPaths())
+	return httpopenapi.RegisterRoutes(module, httpopenapi.BuildDocument(wsPath, paths), "", "")
+}
+
+// busCloserAdapter adapts DistributedCloseSignalBus to SessionCloser interface.
+type busCloserAdapter struct {
+	bus *handshakerealtime.DistributedCloseSignalBus
+}
+
+// Close publishes a close signal for one connection identifier.
+func (a *busCloserAdapter) Close(ctx context.Context, connID string, code int, reason string) error {
+	return a.bus.Publish(ctx, connID, handshakerealtime.CloseSignal{Code: code, Reason: reason})
+}
+
+// mergeOpenAPIPaths combines multiple OpenAPI path maps.
+func mergeOpenAPIPaths(maps ...map[string]any) map[string]any {
+	merged := map[string]any{}
+	for _, m := range maps {
+		for k, v := range m {
+			merged[k] = v
+		}
 	}
-	hotelStatus, err := sessionhotelstatus.NewService(statusStore, broadcaster, runtime.Config.Status)
-	if err != nil {
-		return err
-	}
-	if _, err = hotelStatus.Current(context.Background()); err != nil {
-		return err
-	}
-	hotelStatus.StartCountdownTicker(context.Background())
-	userRepository, err := userstore.NewRepository(runtime.PostgreSQL)
-	if err != nil {
-		return err
-	}
-	users, err := userapplication.NewService(userRepository)
-	if err != nil {
-		return err
-	}
-	handler.ConfigurePostAuth(hotelStatus, users, runtime.Config.App.Name)
-	if webSocketPath := strings.TrimSpace(path); webSocketPath != "" {
-		return module.RegisterWebSocket(webSocketPath, handler.Handle)
-	}
-	return module.RegisterWebSocket("/ws", handler.Handle)
+	return merged
 }

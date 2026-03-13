@@ -69,6 +69,27 @@ func (registry *RedisSessionRegistry) Remove(connID string) {
 	_, _ = pipeline.Exec(ctx)
 }
 
+// ListAll returns all sessions stored in the registry using SCAN.
+func (registry *RedisSessionRegistry) ListAll() ([]Session, error) {
+	ctx, pattern := context.Background(), registry.prefix+":conn:*"
+	var sessions []Session
+	iter := registry.client.Scan(ctx, 0, pattern, 100).Iterator()
+	for iter.Next(ctx) {
+		payload, err := registry.client.Get(ctx, iter.Val()).Bytes()
+		if err != nil {
+			continue
+		}
+		var s Session
+		if json.Unmarshal(payload, &s) == nil {
+			sessions = append(sessions, s)
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+	return sessions, nil
+}
+
 // fetchByConnID loads one session record by connection identifier.
 func (registry *RedisSessionRegistry) fetchByConnID(ctx context.Context, connID string) (Session, bool, error) {
 	payload, err := registry.client.Get(ctx, registry.connKey(connID)).Bytes()

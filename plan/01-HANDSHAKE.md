@@ -28,8 +28,8 @@ This realm is the **gateway boundary** - no game packet may be processed until
 
 ## Vendor Cross-Reference
 
-Analysis of four reference implementations (pixels-emulator Go, PlusEMU C#,
-Arcturus-Community Java, comet-v2 Java) and the pixel-protocol YAML spec.
+Analysis of three reference implementations (Sodium C#,
+Gladiator Java, Galaxy Java) and the pixel-protocol YAML spec.
 
 ### Handshake Sequence (All Vendors Agree)
 
@@ -260,8 +260,8 @@ registry:
 3. Remove old session from registry
 4. Proceed with new authentication normally
 
-**Vendor consensus:** PlusEMU explicitly kicks via `DisconnectCurrentOnlineHabboTask`.
-Arcturus implicitly disposes old `GameClient`. We follow PlusEMU's explicit approach.
+**Vendor consensus:** Sodium explicitly kicks via `DisconnectCurrentOnlineHabboTask`.
+Gladiator implicitly disposes old `GameClient`. We follow Sodium's explicit approach.
 
 **No dedicated "kick" packet exists.** All vendors simply close the WebSocket
 connection. The Nitro client handles `onclose` gracefully.
@@ -281,12 +281,12 @@ simply close/dispose the connection on auth failure.
 ### 3. Empty or Malformed Ticket
 
 - Whitespace-only ticket: strip and treat as empty -> close connection
-- Ticket exceeding 128 chars: reject immediately (comet-v2 validates 8-128)
+- Ticket exceeding 128 chars: reject immediately (Galaxy validates 8-128)
 - Ticket with non-printable characters: reject
 
 ### 4. Machine ID Validation
 
-Following Arcturus pattern:
+Following Gladiator pattern:
 - Must be exactly 64 hex characters
 - If starts with `~` or wrong length: server generates a new random 64-char hex
   and returns it via `security.machine_id` (S2C 1488)
@@ -480,18 +480,18 @@ any packet can be parsed or composed. All vendors agree on this wire format.
 
 ## Vendor Implementation Comparison
 
-| Aspect                    | pixels-emulator (Go) | PlusEMU (C#)      | Arcturus (Java)    | comet-v2 (Java)    |
-|---------------------------|----------------------|--------------------|--------------------|--------------------|
-| SSO storage               | PostgreSQL           | Database           | Database           | Database + Cache   |
-| Duplicate login           | Reject (>1 result)   | Explicit kick      | Implicit dispose   | Overwrite mapping  |
-| Machine ID validation     | Not implemented      | Not shown          | 64 hex + regen     | Not shown          |
-| Encryption default        | N/A                  | Config option      | Off by default     | Config option      |
-| DH bit size               | N/A                  | 32 bits            | 128 bits           | 128 bits           |
-| Ping interval             | Not shown            | ~30s               | ~30s               | ~30s               |
-| Pong timeout              | Not enforced         | Likely enforced    | Likely enforced    | 60s                |
-| Disconnect packet         | conn.Dispose()       | session.Disconnect | disposeClient()    | session.disconnect |
-| Ban checks at auth        | None                 | Not shown          | MAC + IP ban       | Machine ban        |
-| Post-auth packet burst    | AuthOk only          | ~10 packets        | ~15 packets        | ~10 packets        |
+| Aspect                    | Sodium (C#)       | Gladiator (Java)   | Galaxy (Java)      |
+|---------------------------|--------------------|--------------------|--------------------|
+| SSO storage               | Database           | Database           | Database + Cache   |
+| Duplicate login           | Explicit kick      | Implicit dispose   | Overwrite mapping  |
+| Machine ID validation     | Not shown          | 64 hex + regen     | Not shown          |
+| Encryption default        | Config option      | Off by default     | Config option      |
+| DH bit size               | 32 bits            | 128 bits           | 128 bits           |
+| Ping interval             | ~30s               | ~30s               | ~30s               |
+| Pong timeout              | Likely enforced    | Likely enforced    | 60s                |
+| Disconnect packet         | session.Disconnect | disposeClient()    | session.disconnect |
+| Ban checks at auth        | Not shown          | MAC + IP ban       | Machine ban        |
+| Post-auth packet burst    | ~10 packets        | ~15 packets        | ~10 packets        |
 
 ### Our Design Choices vs Vendors
 
@@ -499,7 +499,7 @@ any packet can be parsed or composed. All vendors agree on this wire format.
 |-------------------------------------|---------------------------|--------------------------------------------------------------|
 | SSO storage                         | **Redis** (not DB)        | Ephemeral tokens don't need persistence; Redis TTL is native |
 | SSO validation                      | **GETDEL** (atomic)       | Stronger single-use guarantee than DB query + delete          |
-| Duplicate login                     | **Explicit kick** (PlusEMU) | Clear intent, auditable, predictable behavior              |
+| Duplicate login                     | **Explicit kick** (Sodium) | Clear intent, auditable, predictable behavior              |
 | Encryption                          | **Implemented (optional)**| Compatible with vendor handshake while keeping TLS support    |
-| Machine ID                          | **Validate + regenerate** (Arcturus) | Best security practice from vendors              |
+| Machine ID                          | **Validate + regenerate** (Gladiator) | Best security practice from vendors              |
 | Auth failed response                | **Close connection**      | All vendors agree - no error packet exists                   |

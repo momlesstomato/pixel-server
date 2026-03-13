@@ -50,8 +50,8 @@ realm package.
 
 ## Vendor Cross-Reference
 
-Analysis of pixels-emulator (Go), PlusEMU (C#), Arcturus-Community (Java),
-comet-v2 (Java), and the pixel-protocol YAML spec.
+Analysis of Sodium (C#), Gladiator (Java),
+Galaxy (Java), and the pixel-protocol YAML spec.
 
 ### Post-Authentication Burst (All Vendors Agree)
 
@@ -130,9 +130,9 @@ Server                                    Client
 |---------------------------------------|-----------------------------------------------------------------------------------|
 | `session.peer_users_classification`   | Social classification system; requires friends/ignore list (social realm)          |
 | `session.client_toolbar_toggle`       | UI state preference only; no server-side behavior in any vendor                   |
-| `session.render_room`                 | PlusEMU explicitly `throw new NotImplementedException()`; not needed until rooms   |
+| `session.render_room`                 | Sodium explicitly `throw new NotImplementedException()`; not needed until rooms   |
 | `session.tracking_performance_log`    | Client telemetry; no vendor implements server-side handling                        |
-| `session.event_tracker`               | Client telemetry; PlusEMU returns `Task.CompletedTask` (no-op)                    |
+| `session.event_tracker`               | Client telemetry; Sodium returns `Task.CompletedTask` (no-op)                    |
 | `session.tracking_lag_warning_report` | Client telemetry; no vendor implements server-side handling                        |
 | `session.restore_client`              | Reconnection/resume system; requires session persistence beyond disconnect         |
 | `availability.time`                   | Scheduled open/close times; requires hotel scheduling system                       |
@@ -294,17 +294,17 @@ realm. This section documents the **full reason code registry** for reference:
 | Code | Name                    | Trigger                                      | Vendor Source      |
 |------|-------------------------|----------------------------------------------|--------------------|
 | 0    | LOGOUT                  | Normal user-initiated logout                 | All vendors        |
-| 1    | JUST_BANNED             | User was just banned during session          | Arcturus, PlusEMU  |
+| 1    | JUST_BANNED             | User was just banned during session          | Gladiator, Sodium  |
 | 2    | CONCURRENT_LOGIN        | Duplicate login detected, old session kicked | All vendors        |
 | 3    | CONNECTION_LOST_TO_PEER | Connection lost to peer server               | Protocol spec      |
-| 10   | STILL_BANNED            | User attempted login while banned            | Arcturus, PlusEMU  |
-| 12   | HOTEL_CLOSED            | Hotel closed while user was connected        | Arcturus           |
+| 10   | STILL_BANNED            | User attempted login while banned            | Gladiator, Sodium  |
+| 12   | HOTEL_CLOSED            | Hotel closed while user was connected        | Gladiator          |
 | 13   | DUAL_LOGIN_BY_IP        | Multiple connections from same IP            | Protocol spec      |
 | 17   | NO_LOGIN_PERMISSION     | User lacks login permission                  | Protocol spec      |
 | 18   | DUPLICATE_CONNECTION    | Duplicate connection detected                | Protocol spec      |
 | 22   | INVALID_LOGIN_TICKET    | SSO ticket invalid, expired, or missing      | All vendors        |
 | 112  | IDLE_TIMEOUT            | No activity timeout                          | Protocol spec      |
-| 113  | PONG_TIMEOUT            | Heartbeat pong not received in time          | Comet-v2           |
+| 113  | PONG_TIMEOUT            | Heartbeat pong not received in time          | Galaxy             |
 | 114  | IDLE_NOT_AUTHENTICATED  | Auth timeout (custom, our addition)          | pixelsv            |
 
 Already defined constants in `pkg/handshake/packet/authentication/disconnect_reason.go`:
@@ -432,7 +432,7 @@ Client                                Server
 **Important**: This is NOT a disconnect. The user remains authenticated and
 connected. They are simply moved from a room to the hotel lobby view.
 
-**Vendor behavior**: Arcturus removes the Habbo from the room's `RoomUnit`
+**Vendor behavior**: Gladiator removes the Habbo from the room's `RoomUnit`
 list, broadcasts `UserRemove` to other occupants, and sends the client
 back to navigator/desktop state.
 
@@ -475,7 +475,7 @@ type GenericErrorPacket struct {
 }
 ```
 
-**Known error codes** (from Arcturus):
+**Known error codes** (from Gladiator):
 
 | Code    | Meaning                          |
 |---------|----------------------------------|
@@ -664,17 +664,17 @@ If the hotel closes and kicks 1000+ users simultaneously:
 
 ## Vendor Implementation Comparison
 
-| Aspect                     | pixels-emulator (Go) | PlusEMU (C#)        | Arcturus (Java)      | comet-v2 (Java)      |
-|----------------------------|----------------------|---------------------|----------------------|----------------------|
-| Post-auth burst            | AuthOk only          | ~10 packets         | ~15 packets          | ~10 packets          |
-| availability.status values | N/A                  | Hardcoded (T,F,T)   | Configurable 3 bools | Configurable 3 bools |
-| Hotel close system         | Not implemented      | Not shown           | HotelWillCloseComposer + timer | HotelMaintenanceComposer |
-| connection.error           | Not implemented      | Not shown           | ConnectionErrorComposer | Not shown          |
-| Generic error              | Not implemented      | GenericErrorComposer | GenericErrorMessagesComposer | Not shown       |
-| Moderation caution         | Not implemented      | ModerationCautionEvent (incoming) | Via moderation system | Not shown    |
-| Desktop view               | Not implemented      | Basic handler       | Room exit + broadcast | Basic handler       |
-| Disconnect reasons         | Not shown            | Multiple codes      | Multiple codes       | Multiple codes       |
-| Multi-instance             | None                 | None                | None                 | None                 |
+| Aspect                     | Sodium (C#)         | Gladiator (Java)     | Galaxy (Java)        |
+|----------------------------|---------------------|----------------------|----------------------|
+| Post-auth burst            | ~10 packets         | ~15 packets          | ~10 packets          |
+| availability.status values | Hardcoded (T,F,T)   | Configurable 3 bools | Configurable 3 bools |
+| Hotel close system         | Not shown           | HotelWillCloseComposer + timer | HotelMaintenanceComposer |
+| connection.error           | Not shown           | ConnectionErrorComposer | Not shown          |
+| Generic error              | GenericErrorComposer | GenericErrorMessagesComposer | Not shown       |
+| Moderation caution         | ModerationCautionEvent (incoming) | Via moderation system | Not shown    |
+| Desktop view               | Basic handler       | Room exit + broadcast | Basic handler       |
+| Disconnect reasons         | Multiple codes      | Multiple codes       | Multiple codes       |
+| Multi-instance             | None                | None                 | None                 |
 
 ### Our Design Choices vs Vendors
 

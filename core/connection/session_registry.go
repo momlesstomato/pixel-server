@@ -53,6 +53,8 @@ type SessionRegistry interface {
 	Touch(string) error
 	// Remove deletes session indexes by connection ID.
 	Remove(string)
+	// ListAll returns all sessions currently stored in the registry.
+	ListAll() ([]Session, error)
 }
 
 // RedisSessionRegistryOptions defines Redis session registry configuration.
