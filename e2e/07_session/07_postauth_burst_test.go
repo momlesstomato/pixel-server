@@ -39,16 +39,27 @@ func Test07PostAuthBurstAndLoginStamp(t *testing.T) {
 	statusService, _ := statushotel.NewService(statusStore, broadcaster, corestatus.Config{OpenHour: 0, OpenMinute: 0, CloseHour: 23, CloseMinute: 59, BroadcastChannel: "broadcast:all", CountdownTickSeconds: 60, DefaultMaintenanceDurationMinutes: 15})
 	userRepository, _ := userstore.NewRepository(database)
 	users, _ := userapplication.NewService(userRepository)
+	created, err := users.Create(context.Background(), "postauth-user")
+	if err != nil {
+		t.Fatalf("expected user create success, got %v", err)
+	}
 	bus, _ := handshakerealtime.NewRedisCloseSignalBus(redisClient, "handshake:test")
 	registry, _ := coreconnection.NewRedisSessionRegistryWithOptions(redisClient, coreconnection.RedisSessionRegistryOptions{InstanceID: "pixel-server"})
-	handler, _ := handshakerealtime.NewHandler(ticketValidator{values: map[string]int{"ticket-1": 7, "ticket-2": 7}}, registry, packetsecurity.NewMachineIDPolicy(strings.NewReader(strings.Repeat("a", 32))), bus, nil, 2*time.Second)
-	handler.ConfigurePostAuth(statusService, users, "pixel-server")
+	handler, _ := handshakerealtime.NewHandler(ticketValidator{values: map[string]int{"ticket-1": created.ID, "ticket-2": created.ID}}, registry, packetsecurity.NewMachineIDPolicy(strings.NewReader(strings.Repeat("a", 32))), bus, nil, 2*time.Second)
+	handler.ConfigurePostAuth(statusService, users, users, "pixel-server")
 	connection, cleanup := testkit.StartWebSocket(t, handler.Handle)
 	testkit.SendPacket(t, connection, packetsecurity.ClientMachineIDPacket{MachineID: strings.Repeat("a", 64), Fingerprint: "x", Capabilities: "y"})
 	_ = testkit.ReadFrame(t, connection)
 	testkit.SendPacket(t, connection, packetsecurity.SSOTicketPacket{Ticket: "ticket-1"})
-	first := []uint16{testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID}
-	if !equalIDs(first, []uint16{2491, 3523, 2033, 793, 3928}) {
+	first := []uint16{
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID,
+	}
+	if !equalIDs(first, []uint16{2491, 3523, 2033, 2725, 411, 2586, 3738, 513, 2875, 793, 3928}) {
 		t.Fatalf("unexpected first login packet sequence %v", first)
 	}
 	cleanup()
@@ -57,8 +68,14 @@ func Test07PostAuthBurstAndLoginStamp(t *testing.T) {
 	testkit.SendPacket(t, connection, packetsecurity.ClientMachineIDPacket{MachineID: strings.Repeat("a", 64), Fingerprint: "x", Capabilities: "y"})
 	_ = testkit.ReadFrame(t, connection)
 	testkit.SendPacket(t, connection, packetsecurity.SSOTicketPacket{Ticket: "ticket-2"})
-	second := []uint16{testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID}
-	if !equalIDs(second, []uint16{2491, 3523, 2033, 3928}) {
+	second := []uint16{
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+		testkit.ReadFrame(t, connection).PacketID, testkit.ReadFrame(t, connection).PacketID,
+	}
+	if !equalIDs(second, []uint16{2491, 3523, 2033, 2725, 411, 2586, 3738, 513, 2875, 3928}) {
 		t.Fatalf("unexpected second login packet sequence %v", second)
 	}
 	var events []usermodel.LoginEvent
@@ -89,7 +106,7 @@ func openDatabase(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("expected sqlite open success, got %v", err)
 	}
-	if err := database.AutoMigrate(&usermodel.Record{}, &usermodel.LoginEvent{}); err != nil {
+	if err := database.AutoMigrate(&usermodel.Record{}, &usermodel.LoginEvent{}, &usermodel.Settings{}, &usermodel.Respect{}); err != nil {
 		t.Fatalf("expected sqlite migration success, got %v", err)
 	}
 	return database

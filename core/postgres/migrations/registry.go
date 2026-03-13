@@ -7,5 +7,7 @@ func Registry() []*gormigrate.Migration {
 	return []*gormigrate.Migration{
 		Step01Users(),
 		Step02UserLoginEvents(),
+		Step03UserSettings(),
+		Step04UserRespects(),
 	}
 }

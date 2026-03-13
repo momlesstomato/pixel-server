@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/momlesstomato/pixel-server/pkg/user/domain"
@@ -26,52 +25,32 @@ func NewRepository(database *gorm.DB) (*Repository, error) {
 	return &Repository{database: database}, nil
 }
 
-// Create inserts one user row and returns domain representation.
-func (repository *Repository) Create(ctx context.Context, username string) (domain.User, error) {
-	record := usermodel.Record{Username: username}
-	if err := repository.database.WithContext(ctx).Create(&record).Error; err != nil {
-		return domain.User{}, err
-	}
-	return domain.User{ID: int(record.ID), Username: record.Username}, nil
-}
-
-// FindByID loads one user row by identifier.
-func (repository *Repository) FindByID(ctx context.Context, id int) (domain.User, error) {
+// loadRecord resolves one user record by identifier.
+func (repository *Repository) loadRecord(ctx context.Context, id int) (usermodel.Record, error) {
 	var record usermodel.Record
 	err := repository.database.WithContext(ctx).First(&record, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return domain.User{}, domain.ErrUserNotFound
+		return usermodel.Record{}, domain.ErrUserNotFound
 	}
 	if err != nil {
-		return domain.User{}, err
+		return usermodel.Record{}, err
 	}
-	return domain.User{ID: int(record.ID), Username: record.Username}, nil
+	return record, nil
 }
 
-// DeleteByID soft-deletes one user row by identifier.
-func (repository *Repository) DeleteByID(ctx context.Context, id int) error {
-	result := repository.database.WithContext(ctx).Delete(&usermodel.Record{}, id)
-	if result.Error != nil {
-		return result.Error
+// mapUser converts one model record into domain user payload.
+func mapUser(record usermodel.Record) domain.User {
+	return domain.User{
+		ID: int(record.ID), Username: record.Username, Figure: record.Figure,
+		Gender: record.Gender, Motto: record.Motto, RealName: record.RealName,
+		RespectsReceived: record.RespectsReceived, HomeRoomID: record.HomeRoomID,
+		CanChangeName: record.CanChangeName, NoobnessLevel: record.NoobnessLevel,
+		SafetyLocked: record.SafetyLocked, GroupID: int(record.GroupID),
 	}
-	if result.RowsAffected == 0 {
-		return domain.ErrUserNotFound
-	}
-	return nil
 }
 
-// RecordLogin stores one successful login event and returns first-login-of-day status.
-func (repository *Repository) RecordLogin(ctx context.Context, userID int, holder string, loggedAt time.Time) (bool, error) {
-	dayStart := time.Date(loggedAt.UTC().Year(), loggedAt.UTC().Month(), loggedAt.UTC().Day(), 0, 0, 0, 0, time.UTC)
-	dayEnd := dayStart.Add(24 * time.Hour)
-	var count int64
-	query := repository.database.WithContext(ctx).Model(&usermodel.LoginEvent{}).Where("user_id = ? AND logged_at >= ? AND logged_at < ?", userID, dayStart, dayEnd)
-	if err := query.Count(&count).Error; err != nil {
-		return false, err
-	}
-	event := usermodel.LoginEvent{UserID: userID, Holder: strings.TrimSpace(holder), LoggedAt: loggedAt.UTC()}
-	if err := repository.database.WithContext(ctx).Create(&event).Error; err != nil {
-		return false, err
-	}
-	return count == 0, nil
+// utcDayStart returns UTC day start for one timestamp.
+func utcDayStart(value time.Time) time.Time {
+	utc := value.UTC()
+	return time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, time.UTC)
 }

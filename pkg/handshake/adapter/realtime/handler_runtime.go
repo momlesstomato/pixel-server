@@ -11,6 +11,7 @@ import (
 	packettelemetry "github.com/momlesstomato/pixel-server/pkg/handshake/packet/telemetry"
 	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
 	packetsnavigation "github.com/momlesstomato/pixel-server/pkg/session/packet/navigation"
+	sdk "github.com/momlesstomato/pixel-sdk"
 	"go.uber.org/zap"
 )
 
@@ -25,6 +26,10 @@ func (handler *Handler) Handle(connection *websocket.Conn) {
 	if err != nil {
 		handler.abortConnection(connection)
 		return
+	}
+	if handler.fire != nil {
+		transport.SetEventFirer(handler.fire)
+		handler.fire(&sdk.ConnectionOpened{ConnID: connID})
 	}
 	useCases, err := handler.newRuntimeUseCases(transport)
 	if err != nil {
@@ -76,6 +81,13 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 		}
 		for _, frame := range frames {
 			handler.logger.Debug("websocket packet received", zap.String("conn_id", connID), zap.Uint16("packet_id", frame.PacketID), zap.Int("size", len(frame.Body)))
+			if handler.fire != nil {
+				received := &sdk.PacketReceived{ConnID: connID, PacketID: frame.PacketID, Body: append([]byte(nil), frame.Body...)}
+				handler.fire(received)
+				if received.Cancelled() {
+					continue
+				}
+			}
 			switch frame.PacketID {
 			case packetauth.ClientMachineIDPacketID:
 				handler.handleMachineID(connID, frame.Body, transport, &machineID)

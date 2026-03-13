@@ -79,14 +79,14 @@ func (handler *Handler) deliverBroadcastPayload(connID string, transport *Transp
 	}
 	for _, frame := range frames {
 		if frame.PacketID != packetauth.DisconnectReasonPacketID {
-			_ = transport.Send(connID, frame.PacketID, frame.Body)
+			_ = transport.writeFrame(frame.PacketID, frame.Body)
 			continue
 		}
 		reason := packetauth.DisconnectReasonPacket{}
 		if reason.Decode(frame.Body) != nil {
 			continue
 		}
-		_ = transport.Send(connID, frame.PacketID, frame.Body)
+		_ = transport.writeFrame(frame.PacketID, frame.Body)
 		code, closeReason := disconnectClose(reason.Reason)
 		_ = transport.Close(connID, code, closeReason)
 		return false

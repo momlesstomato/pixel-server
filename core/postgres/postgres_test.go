@@ -33,6 +33,12 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if !database.Migrator().HasTable(&usermodel.LoginEvent{}) {
 		t.Fatalf("expected migrated user login events table to exist")
 	}
+	if !database.Migrator().HasTable(&usermodel.Settings{}) {
+		t.Fatalf("expected migrated user settings table to exist")
+	}
+	if !database.Migrator().HasTable(&usermodel.Respect{}) {
+		t.Fatalf("expected migrated user respects table to exist")
+	}
 	user := usermodel.Record{Username: "tester"}
 	if err := database.Create(&user).Error; err != nil {
 		t.Fatalf("expected user insert success, got %v", err)
@@ -66,11 +72,29 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if err := manager.MigrateDown(); err != nil {
 		t.Fatalf("expected migration down success, got %v", err)
 	}
-	if !database.Migrator().HasTable(&usermodel.Record{}) {
-		t.Fatalf("expected users table to exist after non-destructive rollback step")
+	if database.Migrator().HasTable(&usermodel.Respect{}) {
+		t.Fatalf("expected user respects table to be dropped")
+	}
+	if !database.Migrator().HasTable(&usermodel.Settings{}) {
+		t.Fatalf("expected users settings table to remain")
+	}
+	if err := manager.MigrateDown(); err != nil {
+		t.Fatalf("expected migration down success, got %v", err)
+	}
+	if database.Migrator().HasTable(&usermodel.Settings{}) {
+		t.Fatalf("expected user settings table to be dropped")
+	}
+	if !database.Migrator().HasTable(&usermodel.LoginEvent{}) {
+		t.Fatalf("expected user login events table to remain")
+	}
+	if err := manager.MigrateDown(); err != nil {
+		t.Fatalf("expected migration down success, got %v", err)
 	}
 	if database.Migrator().HasTable(&usermodel.LoginEvent{}) {
 		t.Fatalf("expected user login events table to be dropped")
+	}
+	if !database.Migrator().HasTable(&usermodel.Record{}) {
+		t.Fatalf("expected users table to remain")
 	}
 	if err := manager.MigrateDown(); err != nil {
 		t.Fatalf("expected migration down success, got %v", err)

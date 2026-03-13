@@ -11,6 +11,7 @@ import (
 	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
+	sdk "github.com/momlesstomato/pixel-sdk"
 )
 
 const sessionLeaseRefreshInterval = 60 * time.Second
@@ -33,6 +34,9 @@ func (handler *Handler) disposeConnection(cancel context.CancelFunc, disposables
 		}
 	}
 	disconnect.Cleanup(connID)
+	if handler.fire != nil {
+		handler.fire(&sdk.ConnectionClosed{ConnID: connID})
+	}
 	cancel()
 	_ = connection.Close()
 }

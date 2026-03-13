@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/momlesstomato/pixel-server/core/codec"
+	sdk "github.com/momlesstomato/pixel-sdk"
 	"go.uber.org/zap"
 )
 
@@ -35,6 +36,8 @@ type Transport struct {
 	cipherMutex sync.RWMutex
 	// cipher stores optional packet stream cipher.
 	cipher PacketCipher
+	// fire dispatches optional plugin lifecycle events.
+	fire func(sdk.Event)
 }
 
 // NewTransport creates websocket transport behavior.
@@ -55,11 +58,28 @@ func NewTransport(connID string, connection *websocket.Conn, bus CloseSignalBus,
 	return &Transport{connID: connID, connection: connection, bus: bus, logger: output}, nil
 }
 
+// SetEventFirer sets optional plugin event dispatch behavior.
+func (transport *Transport) SetEventFirer(fire func(sdk.Event)) {
+	transport.fire = fire
+}
+
 // Send writes one encoded packet to one connection.
 func (transport *Transport) Send(connID string, packetID uint16, body []byte) error {
 	if connID != transport.connID {
 		return fmt.Errorf("target connection %s is not local", connID)
 	}
+	if transport.fire != nil {
+		event := &sdk.PacketSending{ConnID: connID, PacketID: packetID, Body: append([]byte(nil), body...)}
+		transport.fire(event)
+		if event.Cancelled() {
+			return nil
+		}
+	}
+	return transport.writeFrame(packetID, body)
+}
+
+// writeFrame encodes and writes one packet frame bypassing plugin event dispatch.
+func (transport *Transport) writeFrame(packetID uint16, body []byte) error {
 	frame, err := transport.encodePayload(packetID, body)
 	if err != nil {
 		return err
@@ -68,7 +88,7 @@ func (transport *Transport) Send(connID string, packetID uint16, body []byte) er
 	err = transport.connection.WriteMessage(websocket.BinaryMessage, frame)
 	transport.mutex.Unlock()
 	if err == nil {
-		transport.logger.Debug("websocket packet sent", zap.String("conn_id", connID), zap.Uint16("packet_id", packetID), zap.Int("size", len(body)))
+		transport.logger.Debug("websocket packet sent", zap.String("conn_id", transport.connID), zap.Uint16("packet_id", packetID), zap.Int("size", len(body)))
 	}
 	return err
 }

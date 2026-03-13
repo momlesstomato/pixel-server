@@ -1,13 +1,14 @@
 package domain
 
 import (
-	"context"
 	"errors"
-	"time"
 )
 
 // ErrUserNotFound defines missing user lookup behavior.
 var ErrUserNotFound = errors.New("user not found")
+
+// ErrRespectLimitReached defines daily respect limit behavior.
+var ErrRespectLimitReached = errors.New("daily respect limit reached")
 
 // User defines one user aggregate identity payload.
 type User struct {
@@ -15,16 +16,24 @@ type User struct {
 	ID int
 	// Username stores user visible name.
 	Username string
-}
-
-// Repository defines user persistence behavior.
-type Repository interface {
-	// Create persists one user row using the provided username.
-	Create(context.Context, string) (User, error)
-	// FindByID resolves one user by identifier.
-	FindByID(context.Context, int) (User, error)
-	// DeleteByID soft-deletes one user by identifier.
-	DeleteByID(context.Context, int) error
-	// RecordLogin persists one successful login event and reports whether it is first login in UTC day.
-	RecordLogin(context.Context, int, string, time.Time) (bool, error)
+	// Figure stores avatar figure string.
+	Figure string
+	// Gender stores avatar gender marker.
+	Gender string
+	// Motto stores profile motto.
+	Motto string
+	// RealName stores profile real-name value.
+	RealName string
+	// RespectsReceived stores total received respects.
+	RespectsReceived int
+	// HomeRoomID stores configured home room identifier.
+	HomeRoomID int
+	// CanChangeName stores rename capability marker.
+	CanChangeName bool
+	// NoobnessLevel stores account age tier marker.
+	NoobnessLevel int
+	// SafetyLocked stores account safety lock marker.
+	SafetyLocked bool
+	// GroupID stores permission group identifier.
+	GroupID int
 }

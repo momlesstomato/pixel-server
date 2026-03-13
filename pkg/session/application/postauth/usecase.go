@@ -13,6 +13,7 @@ import (
 	packetsavailability "github.com/momlesstomato/pixel-server/pkg/session/packet/availability"
 	packetsnavigation "github.com/momlesstomato/pixel-server/pkg/session/packet/navigation"
 	statusdomain "github.com/momlesstomato/pixel-server/pkg/status/domain"
+	userdomain "github.com/momlesstomato/pixel-server/pkg/user/domain"
 )
 
 // ErrHotelClosed defines hotel-closed authentication continuation behavior.
@@ -38,6 +39,16 @@ type LoginRecorder interface {
 	RecordLogin(context.Context, int, string, time.Time) (bool, error)
 }
 
+// ProfileReader defines user profile read behavior for post-auth burst.
+type ProfileReader interface {
+	// FindByID resolves one user identity payload.
+	FindByID(context.Context, int) (userdomain.User, error)
+	// LoadSettings resolves one user settings payload.
+	LoadSettings(context.Context, int) (userdomain.Settings, error)
+	// RemainingRespects returns remaining respects for one user and target type.
+	RemainingRespects(context.Context, int, userdomain.RespectTargetType, time.Time) (int, error)
+}
+
 // UseCase defines post-authentication packet burst behavior.
 type UseCase struct {
 	// transport sends packets to active connection.
@@ -46,6 +57,8 @@ type UseCase struct {
 	status StatusReader
 	// logins records successful login stamps.
 	logins LoginRecorder
+	// profiles reads user profile payloads for post-auth packets.
+	profiles ProfileReader
 	// holder stores holder identifier for stamped login records.
 	holder string
 	// now provides deterministic timestamp source for tests.
@@ -53,7 +66,7 @@ type UseCase struct {
 }
 
 // NewUseCase creates one post-authentication burst use case.
-func NewUseCase(transport Transport, status StatusReader, logins LoginRecorder, holder string) (*UseCase, error) {
+func NewUseCase(transport Transport, status StatusReader, logins LoginRecorder, profiles ProfileReader, holder string) (*UseCase, error) {
 	if transport == nil {
 		return nil, fmt.Errorf("transport is required")
 	}
@@ -63,11 +76,14 @@ func NewUseCase(transport Transport, status StatusReader, logins LoginRecorder, 
 	if logins == nil {
 		return nil, fmt.Errorf("login recorder is required")
 	}
+	if profiles == nil {
+		return nil, fmt.Errorf("profile reader is required")
+	}
 	resolvedHolder := strings.TrimSpace(holder)
 	if resolvedHolder == "" {
 		resolvedHolder = "pixel-server"
 	}
-	return &UseCase{transport: transport, status: status, logins: logins, holder: resolvedHolder, now: time.Now}, nil
+	return &UseCase{transport: transport, status: status, logins: logins, profiles: profiles, holder: resolvedHolder, now: time.Now}, nil
 }
 
 // Run sends availability status, optional first-login-of-day, and immediate ping packet.
@@ -88,6 +104,9 @@ func (useCase *UseCase) Run(ctx context.Context, connID string, userID int) erro
 	}
 	availability := packetsavailability.StatusPacket{IsOpen: status.IsOpen(), OnShutdown: status.OnShutdown(), IsAuthentic: true}
 	if err := sendPacket(useCase.transport, connID, availability.PacketID(), availability); err != nil {
+		return err
+	}
+	if err := useCase.sendUserBurst(ctx, connID, userID); err != nil {
 		return err
 	}
 	firstLoginOfDay, err := useCase.logins.RecordLogin(ctx, userID, useCase.holder, useCase.now().UTC())

@@ -765,24 +765,24 @@ unsubscribe functions.
 
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 32| Fire `ConnectionOpened` in WebSocket handler         | 11         | PENDING |
-| 33| Fire `ConnectionClosed` in dispose handler           | 11         | PENDING |
-| 34| Fire `AuthValidating` in auth use case              | 11         | PENDING |
-| 35| Fire `AuthCompleted` in auth use case               | 11         | PENDING |
-| 36| Fire `DuplicateKick` in auth use case               | 11         | PENDING |
-| 37| Fire `SessionDisconnecting` in disconnect use case  | 11         | PENDING |
-| 38| Fire `PacketReceived` in packet read loop           | 11         | PENDING |
-| 39| Fire `PacketSending` in transport send path         | 11         | PENDING |
-| 40| Integration test: cancel auth via plugin            | 34         | PENDING |
-| 41| Integration test: cancel disconnect via plugin      | 37         | PENDING |
+| 32| Fire `ConnectionOpened` in WebSocket handler         | 11         | DONE    |
+| 33| Fire `ConnectionClosed` in dispose handler           | 11         | DONE    |
+| 34| Fire `AuthValidating` in auth use case              | 11         | DONE    |
+| 35| Fire `AuthCompleted` in auth use case               | 11         | DONE    |
+| 36| Fire `DuplicateKick` in auth use case               | 11         | DONE    |
+| 37| Fire `SessionDisconnecting` in disconnect use case  | 11         | DONE    |
+| 38| Fire `PacketReceived` in packet read loop           | 11         | DONE    |
+| 39| Fire `PacketSending` in transport send path         | 11         | DONE    |
+| 40| Integration test: cancel auth via plugin            | 34         | DONE    |
+| 41| Integration test: cancel disconnect via plugin      | 37         | DONE    |
 
 ### Milestone 6: E2E & Example
 
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 42| Example plugin: login logger                        | 35         | PENDING |
-| 43| Example plugin: packet filter                       | 38         | PENDING |
-| 44| E2E test: load .so, fire event, verify behavior     | 25, 32     | PENDING |
+| 42| Example plugin: login logger                        | 35         | DONE    |
+| 43| Example plugin: packet filter                       | 38         | DONE    |
+| 44| E2E test: load .so, fire event, verify behavior     | 25, 32     | DONE    |
 
 ---
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
@@ -44,6 +45,8 @@ type Handler struct {
 	postAuthFactory func(*Transport) (*sessionpostauth.UseCase, error)
 	// desktopFactory creates desktop-view navigation behavior.
 	desktopFactory func(*Transport) (*sessionnavigation.DesktopViewUseCase, error)
+	// fire dispatches optional plugin lifecycle events.
+	fire func(sdk.Event)
 }
 
 // runtimeUseCases defines handshake runtime use-case wiring behavior.
@@ -100,9 +103,9 @@ func NewHandlerWithHeartbeat(validator authflow.TicketValidator, sessions coreco
 }
 
 // ConfigurePostAuth wires post-authentication packet burst dependencies.
-func (handler *Handler) ConfigurePostAuth(status sessionpostauth.StatusReader, logins sessionpostauth.LoginRecorder, holder string) {
+func (handler *Handler) ConfigurePostAuth(status sessionpostauth.StatusReader, logins sessionpostauth.LoginRecorder, profiles sessionpostauth.ProfileReader, holder string) {
 	handler.postAuthFactory = func(transport *Transport) (*sessionpostauth.UseCase, error) {
-		return sessionpostauth.NewUseCase(transport, status, logins, holder)
+		return sessionpostauth.NewUseCase(transport, status, logins, profiles, holder)
 	}
 }
 
@@ -116,6 +119,11 @@ func (handler *Handler) ConfigureDesktopView(checker sessionnavigation.RoomCheck
 	handler.desktopFactory = func(transport *Transport) (*sessionnavigation.DesktopViewUseCase, error) {
 		return sessionnavigation.NewDesktopViewUseCase(transport, checker)
 	}
+}
+
+// ConfigurePluginEvents wires plugin event dispatch behavior.
+func (handler *Handler) ConfigurePluginEvents(fire func(sdk.Event)) {
+	handler.fire = fire
 }
 
 // GenerateConnectionID creates one connection identifier string.
@@ -143,6 +151,10 @@ func (handler *Handler) newRuntimeUseCases(transport *Transport) (*runtimeUseCas
 	desktop, desktopErr := handler.desktopFactory(transport)
 	if authErr != nil || timeoutErr != nil || disconnectErr != nil || heartbeatErr != nil || latencyErr != nil || cryptoErr != nil || postAuthErr != nil || desktopErr != nil {
 		return nil, fmt.Errorf("handshake runtime initialization failed")
+	}
+	if handler.fire != nil {
+		authenticate.SetEventFirer(handler.fire)
+		disconnect.SetEventFirer(handler.fire)
 	}
 	return &runtimeUseCases{
 		authenticate: authenticate, timeout: timeout, disconnect: disconnect, heartbeat: heartbeat,

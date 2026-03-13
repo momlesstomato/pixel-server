@@ -7,6 +7,7 @@ import (
 
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/authentication"
+	sdk "github.com/momlesstomato/pixel-sdk"
 )
 
 // AuthenticateUseCase defines authentication workflow behavior.
@@ -19,6 +20,8 @@ type AuthenticateUseCase struct {
 	transport Transport
 	// now provides deterministic time source for session timestamps.
 	now func() time.Time
+	// fire dispatches optional plugin lifecycle events.
+	fire func(sdk.Event)
 }
 
 // NewAuthenticateUseCase creates authentication workflow behavior.
@@ -33,6 +36,11 @@ func NewAuthenticateUseCase(validator TicketValidator, sessions SessionRegistry,
 		return nil, fmt.Errorf("transport is required")
 	}
 	return &AuthenticateUseCase{validator: validator, sessions: sessions, transport: transport, now: time.Now}, nil
+}
+
+// SetEventFirer sets optional plugin event dispatch behavior.
+func (useCase *AuthenticateUseCase) SetEventFirer(fire func(sdk.Event)) {
+	useCase.fire = fire
 }
 
 // Authenticate validates ticket, handles duplicate sessions, and emits auth packets.
@@ -50,12 +58,28 @@ func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request Au
 		useCase.closeWithReason(request.ConnID, packetauth.DisconnectReasonInvalidLoginTicket, UnauthorizedCloseCode, "unauthorized")
 		return AuthenticateResult{}, err
 	}
+	if useCase.fire != nil {
+		validating := &sdk.AuthValidating{ConnID: request.ConnID, UserID: userID, Ticket: ticket}
+		useCase.fire(validating)
+		if validating.Cancelled() {
+			useCase.closeWithReason(request.ConnID, packetauth.DisconnectReasonInvalidLoginTicket, UnauthorizedCloseCode, "cancelled by plugin")
+			return AuthenticateResult{}, fmt.Errorf("authentication cancelled by plugin")
+		}
+	}
 	kickedConnID := ""
 	existing, found := useCase.sessions.FindByUserID(userID)
 	if found && existing.ConnID != "" && existing.ConnID != request.ConnID {
-		kickedConnID = existing.ConnID
-		useCase.closeWithReason(existing.ConnID, packetauth.DisconnectReasonConcurrentLogin, DuplicateLoginCloseCode, "duplicate login")
-		useCase.sessions.Remove(existing.ConnID)
+		kicked := true
+		if useCase.fire != nil {
+			dupKick := &sdk.DuplicateKick{OldConnID: existing.ConnID, NewConnID: request.ConnID, UserID: userID}
+			useCase.fire(dupKick)
+			kicked = !dupKick.Cancelled()
+		}
+		if kicked {
+			kickedConnID = existing.ConnID
+			useCase.closeWithReason(existing.ConnID, packetauth.DisconnectReasonConcurrentLogin, DuplicateLoginCloseCode, "duplicate login")
+			useCase.sessions.Remove(existing.ConnID)
+		}
 	}
 	session := coreconnection.Session{
 		ConnID: request.ConnID, UserID: userID, MachineID: request.MachineID, State: coreconnection.StateAuthenticated, CreatedAt: useCase.now(),
@@ -68,6 +92,9 @@ func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request Au
 	}
 	if err := useCase.sendIdentityAccounts(request.ConnID, userID); err != nil {
 		return AuthenticateResult{}, err
+	}
+	if useCase.fire != nil {
+		useCase.fire(&sdk.AuthCompleted{ConnID: request.ConnID, UserID: userID})
 	}
 	return AuthenticateResult{UserID: userID, KickedConnID: kickedConnID}, nil
 }

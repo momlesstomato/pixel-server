@@ -112,6 +112,11 @@ func (module *Module) RegisterPOST(path string, handler fiber.Handler) {
 	module.app.Post(path, handler)
 }
 
+// RegisterPATCH registers an HTTP PATCH endpoint on the Fiber application.
+func (module *Module) RegisterPATCH(path string, handler fiber.Handler) {
+	module.app.Patch(path, handler)
+}
+
 // RegisterDELETE registers an HTTP DELETE endpoint on the Fiber application.
 func (module *Module) RegisterDELETE(path string, handler fiber.Handler) {
 	module.app.Delete(path, handler)

@@ -41,3 +41,15 @@ func TestNewRootCommandRegistersDB(t *testing.T) {
 		t.Fatalf("expected db command to be registered")
 	}
 }
+
+// TestNewRootCommandRegistersUser verifies user command composition.
+func TestNewRootCommandRegistersUser(t *testing.T) {
+	command := cli.NewRootCommand(cli.Dependencies{})
+	user, _, err := command.Find([]string{"user"})
+	if err != nil {
+		t.Fatalf("expected user command lookup success, got %v", err)
+	}
+	if user == nil || user.Name() != "user" {
+		t.Fatalf("expected user command to be registered")
+	}
+}

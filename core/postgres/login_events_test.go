@@ -24,6 +24,12 @@ func TestManagerMigratesUserLoginEventsTable(t *testing.T) {
 	if err := manager.MigrateDown(); err != nil {
 		t.Fatalf("expected migration down success, got %v", err)
 	}
+	if err := manager.MigrateDown(); err != nil {
+		t.Fatalf("expected migration down success, got %v", err)
+	}
+	if err := manager.MigrateDown(); err != nil {
+		t.Fatalf("expected migration down success, got %v", err)
+	}
 	if database.Migrator().HasTable(&usermodel.LoginEvent{}) {
 		t.Fatalf("expected login_events table to be dropped")
 	}
