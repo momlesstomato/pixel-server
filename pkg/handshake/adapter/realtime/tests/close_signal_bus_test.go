@@ -6,6 +6,7 @@ import (
 	"time"
 
 	miniredis "github.com/alicebob/miniredis/v2"
+	"github.com/momlesstomato/pixel-server/core/broadcast"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	redislib "github.com/redis/go-redis/v9"
 )
@@ -14,6 +15,13 @@ import (
 func TestNewRedisCloseSignalBusRejectsNilClient(t *testing.T) {
 	if _, err := handshakerealtime.NewRedisCloseSignalBus(nil, ""); err == nil {
 		t.Fatalf("expected constructor error for nil client")
+	}
+}
+
+// TestNewCloseSignalBusRejectsNilBroadcaster verifies constructor validation behavior.
+func TestNewCloseSignalBusRejectsNilBroadcaster(t *testing.T) {
+	if _, err := handshakerealtime.NewCloseSignalBus(nil, ""); err == nil {
+		t.Fatalf("expected constructor error for nil broadcaster")
 	}
 }
 
@@ -40,6 +48,33 @@ func TestRedisCloseSignalBusPublishSubscribe(t *testing.T) {
 	select {
 	case signal := <-signals:
 		if signal.Code != 4002 || signal.Reason != "duplicate" {
+			t.Fatalf("unexpected signal payload: %#v", signal)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected close signal delivery")
+	}
+}
+
+// TestCloseSignalBusWithLocalBroadcaster verifies local broadcaster integration behavior.
+func TestCloseSignalBusWithLocalBroadcaster(t *testing.T) {
+	broadcaster := broadcast.NewLocalBroadcaster()
+	bus, err := handshakerealtime.NewCloseSignalBus(broadcaster, "handshake:test")
+	if err != nil {
+		t.Fatalf("expected bus constructor success, got %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	signals, subscription, err := bus.Subscribe(ctx, "conn-2")
+	if err != nil {
+		t.Fatalf("expected subscribe success, got %v", err)
+	}
+	defer subscription.Dispose()
+	if err := bus.Publish(ctx, "conn-2", handshakerealtime.CloseSignal{Code: 4001, Reason: "local"}); err != nil {
+		t.Fatalf("expected publish success, got %v", err)
+	}
+	select {
+	case signal := <-signals:
+		if signal.Code != 4001 || signal.Reason != "local" {
 			t.Fatalf("unexpected signal payload: %#v", signal)
 		}
 	case <-time.After(time.Second):

@@ -21,6 +21,9 @@ func TestRedisSessionRegistryRegisterFindRemove(t *testing.T) {
 	if !ok || byConnID.UserID != 15 {
 		t.Fatalf("expected session by conn id, got %+v", byConnID)
 	}
+	if byConnID.InstanceID == "" {
+		t.Fatalf("expected generated instance id for registered session")
+	}
 	byUserID, ok := registry.FindByUserID(15)
 	if !ok || byUserID.ConnID != "conn-1" {
 		t.Fatalf("expected session by user id, got %+v", byUserID)
@@ -40,6 +43,9 @@ func TestRedisSessionRegistryRejectsMissingConnID(t *testing.T) {
 	defer closeRegistry()
 	if err := registry.Register(coreconnection.Session{}); err == nil {
 		t.Fatalf("expected register failure for empty conn id")
+	}
+	if err := registry.Touch(""); err == nil {
+		t.Fatalf("expected touch failure for empty conn id")
 	}
 }
 
@@ -71,15 +77,69 @@ func TestNewRedisSessionRegistryRejectsNilClient(t *testing.T) {
 	}
 }
 
+// TestRedisSessionRegistrySessionTTLExpiry verifies TTL expiration behavior.
+func TestRedisSessionRegistrySessionTTLExpiry(t *testing.T) {
+	registry, server, closeRegistry := createConfiguredTestRegistry(t, coreconnection.RedisSessionRegistryOptions{
+		TTL:             2 * time.Second,
+		RefreshInterval: time.Second,
+		InstanceID:      "instance-test",
+	})
+	defer closeRegistry()
+	session := coreconnection.Session{ConnID: "conn-ttl", UserID: 33, State: coreconnection.StateAuthenticated, CreatedAt: time.Unix(300, 0)}
+	if err := registry.Register(session); err != nil {
+		t.Fatalf("expected register success, got %v", err)
+	}
+	server.FastForward(3 * time.Second)
+	if _, ok := registry.FindByConnID("conn-ttl"); ok {
+		t.Fatalf("expected conn session to expire")
+	}
+	if _, ok := registry.FindByUserID(33); ok {
+		t.Fatalf("expected user index to expire")
+	}
+}
+
+// TestRedisSessionRegistryTouchRefreshesLease verifies touch lease refresh behavior.
+func TestRedisSessionRegistryTouchRefreshesLease(t *testing.T) {
+	registry, server, closeRegistry := createConfiguredTestRegistry(t, coreconnection.RedisSessionRegistryOptions{
+		TTL:             2 * time.Second,
+		RefreshInterval: time.Second,
+		InstanceID:      "instance-touch",
+	})
+	defer closeRegistry()
+	session := coreconnection.Session{ConnID: "conn-touch", UserID: 44, State: coreconnection.StateAuthenticated, CreatedAt: time.Unix(301, 0)}
+	if err := registry.Register(session); err != nil {
+		t.Fatalf("expected register success, got %v", err)
+	}
+	server.FastForward(1500 * time.Millisecond)
+	if err := registry.Touch("conn-touch"); err != nil {
+		t.Fatalf("expected touch success, got %v", err)
+	}
+	server.FastForward(1500 * time.Millisecond)
+	if _, ok := registry.FindByConnID("conn-touch"); !ok {
+		t.Fatalf("expected conn session to remain after touch refresh")
+	}
+	server.FastForward(2500 * time.Millisecond)
+	if _, ok := registry.FindByConnID("conn-touch"); ok {
+		t.Fatalf("expected conn session to expire after refreshed ttl")
+	}
+}
+
 // createTestRegistry builds a redis-backed session registry with isolated test resources.
 func createTestRegistry(t *testing.T) (*coreconnection.RedisSessionRegistry, func()) {
+	t.Helper()
+	registry, _, cleanup := createConfiguredTestRegistry(t, coreconnection.RedisSessionRegistryOptions{})
+	return registry, cleanup
+}
+
+// createConfiguredTestRegistry builds a redis-backed session registry with explicit options.
+func createConfiguredTestRegistry(t *testing.T, options coreconnection.RedisSessionRegistryOptions) (*coreconnection.RedisSessionRegistry, *miniredis.Miniredis, func()) {
 	t.Helper()
 	server, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("expected miniredis startup, got %v", err)
 	}
 	client := redislib.NewClient(&redislib.Options{Addr: server.Addr()})
-	registry, err := coreconnection.NewRedisSessionRegistry(client)
+	registry, err := coreconnection.NewRedisSessionRegistryWithOptions(client, options)
 	if err != nil {
 		t.Fatalf("expected registry creation success, got %v", err)
 	}
@@ -87,5 +147,5 @@ func createTestRegistry(t *testing.T) (*coreconnection.RedisSessionRegistry, fun
 		_ = client.Close()
 		server.Close()
 	}
-	return registry, cleanup
+	return registry, server, cleanup
 }

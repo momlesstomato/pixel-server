@@ -24,6 +24,14 @@ pattern is generalized into a broader message bus.
 Several packets already live in the handshake realm because they participate in
 the authentication flow. These are **shared** with this realm:
 
+Milestone summary:
+- Milestone 1: DONE
+- Milestone 2: DONE
+- Milestone 3: DONE (except task 21 remains pending)
+- Milestone 4: DONE
+- Milestone 5: DONE
+- Milestone 6: DONE
+
 | Packet | Location | Notes |
 |--------|----------|-------|
 | `client.ping` (3928) | `pkg/handshake/packet/session/` | DONE |
@@ -588,69 +596,69 @@ If the hotel closes and kicks 1000+ users simultaneously:
 
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 1 | Define `Broadcaster` port interface                 | -          | PENDING |
-| 2 | Implement `RedisBroadcaster` (Pub/Sub adapter)      | 1          | PENDING |
-| 3 | Implement `LocalBroadcaster` (in-process, for tests)| 1          | PENDING |
-| 4 | Add `InstanceID` to `Session` struct                | -          | PENDING |
-| 5 | Add TTL to session registry keys (120s, refresh 60s)| -          | PENDING |
-| 6 | Refactor `CloseSignalBus` to use `Broadcaster`      | 2          | PENDING |
-| 7 | Unit test: pub/sub round-trip                       | 2          | PENDING |
-| 8 | Unit test: session TTL expiry                       | 5          | PENDING |
+| 1 | Define `Broadcaster` port interface                 | -          | DONE |
+| 2 | Implement `RedisBroadcaster` (Pub/Sub adapter)      | 1          | DONE |
+| 3 | Implement `LocalBroadcaster` (in-process, for tests)| 1          | DONE |
+| 4 | Add `InstanceID` to `Session` struct                | -          | DONE |
+| 5 | Add TTL to session registry keys (120s, refresh 60s)| -          | DONE |
+| 6 | Refactor `CloseSignalBus` to use `Broadcaster`      | 2          | DONE |
+| 7 | Unit test: pub/sub round-trip                       | 2          | DONE |
+| 8 | Unit test: session TTL expiry                       | 5          | DONE |
 
 ### Milestone 2: Post-Authentication Burst
 
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 9 | Compose `availability.status` (2033) S2C            | -          | PENDING |
-| 10| Compose `session.first_login_of_day` (793) S2C      | -          | PENDING |
-| 11| Hotel status Redis key read on auth                 | -          | PENDING |
-| 12| Post-auth burst orchestrator (sends 2033 + 3928)    | 9, 11      | PENDING |
-| 13| Integration test: burst after auth.ok               | 12         | PENDING |
+| 9 | Compose `availability.status` (2033) S2C            | -          | DONE |
+| 10| Compose `session.first_login_of_day` (793) S2C      | -          | DONE |
+| 11| Hotel status Redis key read on auth                 | -          | DONE |
+| 12| Post-auth burst orchestrator (sends 2033 + 3928)    | 9, 11      | DONE |
+| 13| Integration test: burst after auth.ok               | 12         | DONE |
 
 ### Milestone 3: Hotel Status Lifecycle
 
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 14| Compose `hotel.will_close` (1050) S2C               | -          | PENDING |
-| 15| Compose `hotel.maintenance` (1350) S2C              | -          | PENDING |
-| 16| Compose `hotel.closes_and_opens_at` (2771) S2C      | -          | PENDING |
-| 17| Compose `hotel.closed_and_opens` (3728) S2C         | -          | PENDING |
-| 18| Hotel status state machine with Redis CAS            | 2          | PENDING |
-| 19| Close countdown ticker with crash-recovery           | 18         | PENDING |
-| 20| Broadcast hotel packets via `broadcast:all`          | 2, 14-17   | PENDING |
+| 14| Compose `hotel.will_close` (1050) S2C               | -          | DONE |
+| 15| Compose `hotel.maintenance` (1350) S2C              | -          | DONE |
+| 16| Compose `hotel.closes_and_opens_at` (2771) S2C      | -          | DONE |
+| 17| Compose `hotel.closed_and_opens` (3728) S2C         | -          | DONE |
+| 18| Hotel status state machine with Redis CAS            | 2          | DONE |
+| 19| Close countdown ticker with crash-recovery           | 18         | DONE |
+| 20| Broadcast hotel packets via `broadcast:all`          | 2, 14-17   | DONE |
 | 21| Integration test: scheduled close across instances   | 18, 20     | PENDING |
 
 ### Milestone 4: Error & Notification System
 
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 22| Compose `connection.error` (1004) S2C               | -          | PENDING |
-| 23| Compose `session.generic_error` (1600) S2C          | -          | PENDING |
-| 24| Compose `session.generic_alert` (3801) S2C          | -          | PENDING |
-| 25| Compose `session.moderation_caution` (1890) S2C     | -          | PENDING |
-| 26| Targeted send via `broadcast:user:{userID}`         | 2          | PENDING |
-| 27| Protocol error handler (unknown/malformed packets)  | 22         | PENDING |
-| 28| Error rate limiter per connection                   | 27         | PENDING |
+| 22| Compose `connection.error` (1004) S2C               | -          | DONE |
+| 23| Compose `session.generic_error` (1600) S2C          | -          | DONE |
+| 24| Compose `session.generic_alert` (3801) S2C          | -          | DONE |
+| 25| Compose `session.moderation_caution` (1890) S2C     | -          | DONE |
+| 26| Targeted send via `broadcast:user:{userID}`         | 2          | DONE |
+| 27| Protocol error handler (unknown/malformed packets)  | 22         | DONE |
+| 28| Error rate limiter per connection                   | 27         | DONE |
 
 ### Milestone 5: Navigation & Disconnect Reasons
 
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 29| Parse `session.desktop_view` (105) C2S              | -          | PENDING |
-| 30| Compose `session.desktop_view` (3523) S2C           | -          | PENDING |
-| 31| Desktop view use case (stub until room realm)       | 29, 30     | PENDING |
-| 32| Add remaining disconnect reason constants           | -          | PENDING |
-| 33| Hotel-closed disconnect flow (reason 12)            | 18, 32     | PENDING |
-| 34| Ban disconnect flow (reasons 1, 10)                 | 26, 32     | PENDING |
+| 29| Parse `session.desktop_view` (105) C2S              | -          | DONE |
+| 30| Compose `session.desktop_view` (3523) S2C           | -          | DONE |
+| 31| Desktop view use case (stub until room realm)       | 29, 30     | DONE |
+| 32| Add remaining disconnect reason constants           | -          | DONE |
+| 33| Hotel-closed disconnect flow (reason 12)            | 18, 32     | DONE |
+| 34| Ban disconnect flow (reasons 1, 10)                 | 26, 32     | DONE |
 
 ### Milestone 6: E2E & Integration
 
 | # | Task                                                | Depends On | Status  |
 |---|-----------------------------------------------------|------------|---------|
-| 35| E2E test: full post-auth burst sequence             | 12         | PENDING |
-| 36| E2E test: hotel close broadcast + disconnect        | 20, 33     | PENDING |
-| 37| E2E test: connection error on unknown packet        | 27         | PENDING |
-| 38| E2E test: targeted alert via broadcast bus          | 26         | PENDING |
+| 35| E2E test: full post-auth burst sequence             | 12         | DONE |
+| 36| E2E test: hotel close broadcast + disconnect        | 20, 33     | DONE |
+| 37| E2E test: connection error on unknown packet        | 27         | DONE |
+| 38| E2E test: targeted alert via broadcast bus          | 26         | DONE |
 
 ---
 

@@ -12,6 +12,18 @@ const DisconnectReasonPacketID uint16 = 4000
 // DisconnectReasonConcurrentLogin identifies concurrent login disconnect reason.
 const DisconnectReasonConcurrentLogin int32 = 2
 
+// DisconnectReasonLogout identifies user-initiated logout disconnect reason.
+const DisconnectReasonLogout int32 = 0
+
+// DisconnectReasonJustBanned identifies live-session ban disconnect reason.
+const DisconnectReasonJustBanned int32 = 1
+
+// DisconnectReasonStillBanned identifies login rejected due active ban reason.
+const DisconnectReasonStillBanned int32 = 10
+
+// DisconnectReasonHotelClosed identifies hotel closed disconnect reason.
+const DisconnectReasonHotelClosed int32 = 12
+
 // DisconnectReasonInvalidLoginTicket identifies invalid login ticket disconnect reason.
 const DisconnectReasonInvalidLoginTicket int32 = 22
 

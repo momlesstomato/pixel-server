@@ -1,12 +1,13 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
-	"github.com/gofiber/contrib/websocket"
+	"github.com/momlesstomato/pixel-server/core/broadcast"
 	"github.com/momlesstomato/pixel-server/core/config"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
@@ -21,6 +22,10 @@ import (
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
+	sessionhotelstatus "github.com/momlesstomato/pixel-server/pkg/status/application/hotelstatus"
+	statusredisstore "github.com/momlesstomato/pixel-server/pkg/status/infrastructure/redisstore"
+	userapplication "github.com/momlesstomato/pixel-server/pkg/user/application"
+	userstore "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/store"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -86,43 +91,22 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 		return err
 	}
 	ssoService := authenticationapplication.NewService(ssoStore, runtime.Config.Authentication)
-	module := runtime.HTTP
-	if err := registerServeWebSocket(module, options.WebSocketPath, runtime, ssoService, runtime.Logger); err != nil {
+	if err := registerServeWebSocket(runtime.HTTP, options.WebSocketPath, runtime, ssoService, runtime.Logger); err != nil {
 		return err
 	}
-	if err := authenticationhttpapi.RegisterRoutes(module, ssoService); err != nil {
+	if err := authenticationhttpapi.RegisterRoutes(runtime.HTTP, ssoService); err != nil {
 		return err
 	}
-	openAPIDocument := httpopenapi.BuildDocument(options.WebSocketPath, authenticationhttpapi.OpenAPIPaths())
-	if err := httpopenapi.RegisterRoutes(module, openAPIDocument, "", ""); err != nil {
+	if err := httpopenapi.RegisterRoutes(runtime.HTTP, httpopenapi.BuildDocument(options.WebSocketPath, authenticationhttpapi.OpenAPIPaths()), "", ""); err != nil {
 		return err
 	}
-	address := fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port)
-	runtime.Logger.Info("http server starting", zap.String("address", address))
-	return runServeLifecycle(runtime, module, address, listen)
-}
-
-// EchoWebSocketHandler mirrors inbound messages to the same connection.
-func EchoWebSocketHandler(connection *websocket.Conn) {
-	for {
-		messageType, payload, err := connection.ReadMessage()
-		if err != nil {
-			return
-		}
-		if err := connection.WriteMessage(messageType, payload); err != nil {
-			return
-		}
-	}
-}
-
-// defaultListen starts Fiber on the configured bind address.
-func defaultListen(module *corehttp.Module, address string) error {
-	return module.App().Listen(address)
+	runtime.Logger.Info("http server starting", zap.String("address", fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port)))
+	return runServeLifecycle(runtime, runtime.HTTP, fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port), listen)
 }
 
 // registerServeWebSocket registers websocket endpoint behavior for serve runtime.
 func registerServeWebSocket(module *corehttp.Module, path string, runtime *initializer.Runtime, validator authflow.TicketValidator, logger *zap.Logger) error {
-	registry, err := coreconnection.NewRedisSessionRegistry(runtime.Redis)
+	registry, err := coreconnection.NewRedisSessionRegistryWithOptions(runtime.Redis, coreconnection.RedisSessionRegistryOptions{InstanceID: runtime.Config.App.Name})
 	if err != nil {
 		return err
 	}
@@ -134,9 +118,34 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 	if err != nil {
 		return err
 	}
-	webSocketPath := strings.TrimSpace(path)
-	if webSocketPath == "" {
-		webSocketPath = "/ws"
+	broadcaster, err := broadcast.NewRedisBroadcaster(runtime.Redis, "")
+	if err != nil {
+		return err
 	}
-	return module.RegisterWebSocket(webSocketPath, handler.Handle)
+	handler.ConfigureBroadcaster(broadcaster)
+	statusStore, err := statusredisstore.NewStore(runtime.Redis, runtime.Config.Status.RedisKey)
+	if err != nil {
+		return err
+	}
+	hotelStatus, err := sessionhotelstatus.NewService(statusStore, broadcaster, runtime.Config.Status)
+	if err != nil {
+		return err
+	}
+	if _, err = hotelStatus.Current(context.Background()); err != nil {
+		return err
+	}
+	hotelStatus.StartCountdownTicker(context.Background())
+	userRepository, err := userstore.NewRepository(runtime.PostgreSQL)
+	if err != nil {
+		return err
+	}
+	users, err := userapplication.NewService(userRepository)
+	if err != nil {
+		return err
+	}
+	handler.ConfigurePostAuth(hotelStatus, users, runtime.Config.App.Name)
+	if webSocketPath := strings.TrimSpace(path); webSocketPath != "" {
+		return module.RegisterWebSocket(webSocketPath, handler.Handle)
+	}
+	return module.RegisterWebSocket("/ws", handler.Handle)
 }

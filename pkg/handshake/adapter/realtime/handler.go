@@ -1,19 +1,20 @@
 package realtime
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"time"
 
+	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/cryptoflow"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/sessionflow"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
-	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
+	sessionnavigation "github.com/momlesstomato/pixel-server/pkg/session/application/navigation"
+	sessionpostauth "github.com/momlesstomato/pixel-server/pkg/session/application/postauth"
 	"go.uber.org/zap"
 )
 
@@ -27,6 +28,8 @@ type Handler struct {
 	policy *packetauth.MachineIDPolicy
 	// bus publishes and receives distributed close instructions.
 	bus CloseSignalBus
+	// broadcaster publishes and subscribes session notification channels.
+	broadcaster broadcast.Broadcaster
 	// logger stores runtime structured log behavior.
 	logger *zap.Logger
 	// authTimeout stores authentication timeout duration.
@@ -37,6 +40,10 @@ type Handler struct {
 	heartbeatTimeout time.Duration
 	// connID creates stable connection identifiers.
 	connID func() (string, error)
+	// postAuthFactory creates post-authentication burst behavior.
+	postAuthFactory func(*Transport) (*sessionpostauth.UseCase, error)
+	// desktopFactory creates desktop-view navigation behavior.
+	desktopFactory func(*Transport) (*sessionnavigation.DesktopViewUseCase, error)
 }
 
 // runtimeUseCases defines handshake runtime use-case wiring behavior.
@@ -53,6 +60,10 @@ type runtimeUseCases struct {
 	latency *sessionflow.LatencyUseCase
 	// crypto stores diffie/rsa/rc4 exchange workflow behavior.
 	crypto *cryptoflow.Session
+	// postauth stores post-authentication burst workflow behavior.
+	postauth *sessionpostauth.UseCase
+	// desktop stores desktop-view navigation workflow behavior.
+	desktop *sessionnavigation.DesktopViewUseCase
 }
 
 // NewHandler creates websocket handshake runtime behavior.
@@ -79,7 +90,32 @@ func NewHandlerWithHeartbeat(validator authflow.TicketValidator, sessions coreco
 	if output == nil {
 		output = zap.NewNop()
 	}
-	return &Handler{validator: validator, sessions: sessions, policy: appliedPolicy, bus: bus, logger: output, authTimeout: authTimeout, heartbeatInterval: heartbeatInterval, heartbeatTimeout: heartbeatTimeout, connID: func() (string, error) { return GenerateConnectionID(rand.Reader) }}, nil
+	factory := func(_ *Transport) (*sessionpostauth.UseCase, error) { return nil, nil }
+	desktopFactory := func(_ *Transport) (*sessionnavigation.DesktopViewUseCase, error) { return nil, nil }
+	return &Handler{
+		validator: validator, sessions: sessions, policy: appliedPolicy, bus: bus, logger: output,
+		authTimeout: authTimeout, heartbeatInterval: heartbeatInterval, heartbeatTimeout: heartbeatTimeout,
+		connID: func() (string, error) { return GenerateConnectionID(rand.Reader) }, postAuthFactory: factory, desktopFactory: desktopFactory,
+	}, nil
+}
+
+// ConfigurePostAuth wires post-authentication packet burst dependencies.
+func (handler *Handler) ConfigurePostAuth(status sessionpostauth.StatusReader, logins sessionpostauth.LoginRecorder, holder string) {
+	handler.postAuthFactory = func(transport *Transport) (*sessionpostauth.UseCase, error) {
+		return sessionpostauth.NewUseCase(transport, status, logins, holder)
+	}
+}
+
+// ConfigureBroadcaster wires distributed broadcast channels for session notifications.
+func (handler *Handler) ConfigureBroadcaster(broadcaster broadcast.Broadcaster) {
+	handler.broadcaster = broadcaster
+}
+
+// ConfigureDesktopView wires desktop-view navigation behavior.
+func (handler *Handler) ConfigureDesktopView(checker sessionnavigation.RoomChecker) {
+	handler.desktopFactory = func(transport *Transport) (*sessionnavigation.DesktopViewUseCase, error) {
+		return sessionnavigation.NewDesktopViewUseCase(transport, checker)
+	}
 }
 
 // GenerateConnectionID creates one connection identifier string.
@@ -103,46 +139,13 @@ func (handler *Handler) newRuntimeUseCases(transport *Transport) (*runtimeUseCas
 	heartbeat, heartbeatErr := sessionflow.NewHeartbeatUseCase(transport, handler.heartbeatInterval, handler.heartbeatTimeout)
 	latency, latencyErr := sessionflow.NewLatencyUseCase(transport)
 	crypto, cryptoErr := cryptoflow.NewSession(cryptoflow.Options{ServerClientEncryption: true})
-	if authErr != nil || timeoutErr != nil || disconnectErr != nil || heartbeatErr != nil || latencyErr != nil || cryptoErr != nil {
+	postauth, postAuthErr := handler.postAuthFactory(transport)
+	desktop, desktopErr := handler.desktopFactory(transport)
+	if authErr != nil || timeoutErr != nil || disconnectErr != nil || heartbeatErr != nil || latencyErr != nil || cryptoErr != nil || postAuthErr != nil || desktopErr != nil {
 		return nil, fmt.Errorf("handshake runtime initialization failed")
 	}
-	return &runtimeUseCases{authenticate: authenticate, timeout: timeout, disconnect: disconnect, heartbeat: heartbeat, latency: latency, crypto: crypto}, nil
-}
-
-// handleMachineID normalizes and echoes machine identifier payload.
-func (handler *Handler) handleMachineID(connID string, body []byte, transport *Transport, machineID *string) {
-	packet := packetauth.ClientMachineIDPacket{}
-	if packet.Decode(body) != nil {
-		return
-	}
-	normalized, err := handler.policy.Normalize(packet.MachineID)
-	if err != nil {
-		return
-	}
-	*machineID = normalized
-	response := packetauth.ServerMachineIDPacket{MachineID: normalized}
-	encoded, encodeErr := response.Encode()
-	if encodeErr == nil {
-		_ = transport.Send(connID, response.PacketID(), encoded)
-	}
-}
-
-// handleSSO authenticates one SSO packet payload.
-func (handler *Handler) handleSSO(ctx context.Context, connID string, body []byte, machineID string, useCase *authflow.AuthenticateUseCase) bool {
-	packet := packetauth.SSOTicketPacket{}
-	if packet.Decode(body) != nil {
-		return true
-	}
-	_, err := useCase.Authenticate(ctx, authflow.AuthenticateRequest{ConnID: connID, Ticket: packet.Ticket, MachineID: machineID})
-	return err == nil
-}
-
-// handleDisconnect handles one client disconnect packet and closes connection.
-func (handler *Handler) handleDisconnect(connID string, body []byte, useCase *sessionflow.DisconnectUseCase) bool {
-	packet := packetsession.ClientDisconnectPacket{}
-	if packet.Decode(body) != nil {
-		return false
-	}
-	_ = useCase.Disconnect(connID)
-	return true
+	return &runtimeUseCases{
+		authenticate: authenticate, timeout: timeout, disconnect: disconnect, heartbeat: heartbeat,
+		latency: latency, crypto: crypto, postauth: postauth, desktop: desktop,
+	}, nil
 }

@@ -1,12 +1,13 @@
-package postgresstore
+package store
 
 import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
-	usermodel "github.com/momlesstomato/pixel-server/core/postgres/model/user"
 	"github.com/momlesstomato/pixel-server/pkg/user/domain"
+	usermodel "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/model"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -83,6 +84,25 @@ func TestRepositoryDeleteByIDSoftDeletesRecord(t *testing.T) {
 	}
 }
 
+// TestRepositoryRecordLoginReturnsFirstLoginOfDay verifies login stamp behavior.
+func TestRepositoryRecordLoginReturnsFirstLoginOfDay(t *testing.T) {
+	database := openDatabase(t)
+	repository, _ := NewRepository(database)
+	loggedAt := time.Date(2026, time.March, 12, 8, 30, 0, 0, time.UTC)
+	firstLogin, err := repository.RecordLogin(context.Background(), 7, "pixel-server", loggedAt)
+	if err != nil || !firstLogin {
+		t.Fatalf("expected first login stamp success, got %v and %v", err, firstLogin)
+	}
+	firstLogin, err = repository.RecordLogin(context.Background(), 7, "pixel-server", loggedAt.Add(2*time.Hour))
+	if err != nil || firstLogin {
+		t.Fatalf("expected same-day non-first login, got %v and %v", err, firstLogin)
+	}
+	firstLogin, err = repository.RecordLogin(context.Background(), 7, "pixel-server", loggedAt.Add(24*time.Hour))
+	if err != nil || !firstLogin {
+		t.Fatalf("expected next-day first login, got %v and %v", err, firstLogin)
+	}
+}
+
 // openDatabase creates a sqlite database with migrated user schema.
 func openDatabase(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -92,6 +112,9 @@ func openDatabase(t *testing.T) *gorm.DB {
 	}
 	if err := database.AutoMigrate(&usermodel.Record{}); err != nil {
 		t.Fatalf("expected sqlite migration success, got %v", err)
+	}
+	if err := database.AutoMigrate(&usermodel.LoginEvent{}); err != nil {
+		t.Fatalf("expected sqlite login event migration success, got %v", err)
 	}
 	return database
 }

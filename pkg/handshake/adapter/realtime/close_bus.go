@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	redislib "github.com/redis/go-redis/v9"
 )
@@ -25,40 +27,48 @@ type CloseSignalBus interface {
 	Subscribe(context.Context, string) (<-chan CloseSignal, coreconnection.Disposable, error)
 }
 
-// RedisCloseSignalBus defines Redis pub/sub close-signal behavior.
-type RedisCloseSignalBus struct {
-	// client stores Redis connectivity for pub/sub operations.
-	client *redislib.Client
+// DistributedCloseSignalBus defines broadcaster-backed close-signal behavior.
+type DistributedCloseSignalBus struct {
+	// broadcaster stores cross-instance publish and subscribe behavior.
+	broadcaster broadcast.Broadcaster
 	// prefix stores pub/sub channel namespace prefix.
 	prefix string
 }
 
-// NewRedisCloseSignalBus creates Redis close-signal behavior.
-func NewRedisCloseSignalBus(client *redislib.Client, prefix string) (*RedisCloseSignalBus, error) {
-	if client == nil {
-		return nil, fmt.Errorf("redis client is required")
+// NewCloseSignalBus creates broadcaster-backed close-signal behavior.
+func NewCloseSignalBus(broadcaster broadcast.Broadcaster, prefix string) (*DistributedCloseSignalBus, error) {
+	if broadcaster == nil {
+		return nil, fmt.Errorf("broadcaster is required")
 	}
-	value := prefix
+	value := strings.TrimSpace(prefix)
 	if value == "" {
 		value = "handshake:close"
 	}
-	return &RedisCloseSignalBus{client: client, prefix: value}, nil
+	return &DistributedCloseSignalBus{broadcaster: broadcaster, prefix: value}, nil
+}
+
+// NewRedisCloseSignalBus creates Redis-backed close-signal behavior.
+func NewRedisCloseSignalBus(client *redislib.Client, prefix string) (*DistributedCloseSignalBus, error) {
+	broadcaster, err := broadcast.NewRedisBroadcaster(client, "")
+	if err != nil {
+		return nil, err
+	}
+	return NewCloseSignalBus(broadcaster, prefix)
 }
 
 // Publish emits one close signal for one connection identifier.
-func (bus *RedisCloseSignalBus) Publish(ctx context.Context, connID string, signal CloseSignal) error {
+func (bus *DistributedCloseSignalBus) Publish(ctx context.Context, connID string, signal CloseSignal) error {
 	payload, err := json.Marshal(signal)
 	if err != nil {
 		return err
 	}
-	return bus.client.Publish(ctx, bus.channel(connID), payload).Err()
+	return bus.broadcaster.Publish(ctx, bus.channel(connID), payload)
 }
 
 // Subscribe listens for close signals targeting one connection identifier.
-func (bus *RedisCloseSignalBus) Subscribe(ctx context.Context, connID string) (<-chan CloseSignal, coreconnection.Disposable, error) {
-	pubSub := bus.client.Subscribe(ctx, bus.channel(connID))
-	if _, err := pubSub.Receive(ctx); err != nil {
-		_ = pubSub.Close()
+func (bus *DistributedCloseSignalBus) Subscribe(ctx context.Context, connID string) (<-chan CloseSignal, coreconnection.Disposable, error) {
+	messages, disposable, err := bus.broadcaster.Subscribe(ctx, bus.channel(connID))
+	if err != nil {
 		return nil, nil, err
 	}
 	stream := make(chan CloseSignal, 1)
@@ -68,21 +78,21 @@ func (bus *RedisCloseSignalBus) Subscribe(ctx context.Context, connID string) (<
 			select {
 			case <-ctx.Done():
 				return
-			case message, open := <-pubSub.Channel():
+			case payload, open := <-messages:
 				if !open {
 					return
 				}
 				var signal CloseSignal
-				if err := json.Unmarshal([]byte(message.Payload), &signal); err == nil {
+				if json.Unmarshal(payload, &signal) == nil {
 					stream <- signal
 				}
 			}
 		}
 	}()
-	return stream, coreconnection.DisposeFunc(pubSub.Close), nil
+	return stream, disposable, nil
 }
 
-// channel returns Redis pub/sub channel name for one connection.
-func (bus *RedisCloseSignalBus) channel(connID string) string {
+// channel returns pub/sub channel name for one connection.
+func (bus *DistributedCloseSignalBus) channel(connID string) string {
 	return bus.prefix + ":" + connID
 }

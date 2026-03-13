@@ -102,6 +102,24 @@ func isIgnorableSyncError(err error) bool {
 	return strings.Contains(message, "invalid argument") || strings.Contains(message, "bad file descriptor")
 }
 
+// EchoWebSocketHandler mirrors inbound messages to the same connection.
+func EchoWebSocketHandler(connection *websocket.Conn) {
+	for {
+		messageType, payload, err := connection.ReadMessage()
+		if err != nil {
+			return
+		}
+		if err := connection.WriteMessage(messageType, payload); err != nil {
+			return
+		}
+	}
+}
+
+// defaultListen starts Fiber on the configured bind address.
+func defaultListen(module *corehttp.Module, address string) error {
+	return module.App().Listen(address)
+}
+
 // NewEchoWebSocketHandler returns an echo handler with debug packet telemetry.
 func NewEchoWebSocketHandler(logger *zap.Logger) corehttp.WebSocketHandler {
 	return func(connection *websocket.Conn) {

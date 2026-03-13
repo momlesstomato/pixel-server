@@ -10,6 +10,8 @@ import (
 )
 
 const defaultSessionRegistryPrefix = "session"
+const defaultSessionRegistryTTL = 120 * time.Second
+const defaultSessionRefreshInterval = 60 * time.Second
 
 // SessionState identifies connection authentication lifecycle state.
 type SessionState int
@@ -33,6 +35,8 @@ type Session struct {
 	MachineID string
 	// State stores current session lifecycle state.
 	State SessionState
+	// InstanceID stores the server instance identifier that owns this session.
+	InstanceID string
 	// CreatedAt stores the session creation timestamp.
 	CreatedAt time.Time
 }
@@ -45,8 +49,22 @@ type SessionRegistry interface {
 	FindByUserID(int) (Session, bool)
 	// FindByConnID retrieves an active session by connection ID.
 	FindByConnID(string) (Session, bool)
+	// Touch refreshes session key TTL for an active connection.
+	Touch(string) error
 	// Remove deletes session indexes by connection ID.
 	Remove(string)
+}
+
+// RedisSessionRegistryOptions defines Redis session registry configuration.
+type RedisSessionRegistryOptions struct {
+	// Prefix stores Redis key namespace prefix.
+	Prefix string
+	// TTL stores Redis key expiration duration.
+	TTL time.Duration
+	// RefreshInterval stores recommended key lease refresh interval.
+	RefreshInterval time.Duration
+	// InstanceID stores default session instance identifier.
+	InstanceID string
 }
 
 // RedisSessionRegistry implements SessionRegistry backed by Redis keys.
@@ -55,14 +73,32 @@ type RedisSessionRegistry struct {
 	client *redislib.Client
 	// prefix stores Redis key namespace prefix for session records.
 	prefix string
+	// ttl stores Redis lease duration for session records.
+	ttl time.Duration
+	// refreshInterval stores recommended lease refresh interval.
+	refreshInterval time.Duration
+	// instanceID stores default instance identifier for registered sessions.
+	instanceID string
 }
 
 // NewRedisSessionRegistry creates a Redis-backed session registry.
 func NewRedisSessionRegistry(client *redislib.Client) (*RedisSessionRegistry, error) {
+	return NewRedisSessionRegistryWithOptions(client, RedisSessionRegistryOptions{})
+}
+
+// NewRedisSessionRegistryWithOptions creates a Redis-backed session registry with options.
+func NewRedisSessionRegistryWithOptions(client *redislib.Client, options RedisSessionRegistryOptions) (*RedisSessionRegistry, error) {
 	if client == nil {
 		return nil, fmt.Errorf("redis client is required")
 	}
-	return &RedisSessionRegistry{client: client, prefix: defaultSessionRegistryPrefix}, nil
+	resolved, err := resolveRedisSessionRegistryOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	return &RedisSessionRegistry{
+		client: client, prefix: resolved.Prefix, ttl: resolved.TTL,
+		refreshInterval: resolved.RefreshInterval, instanceID: resolved.InstanceID,
+	}, nil
 }
 
 // Register stores or updates a session.
@@ -70,70 +106,37 @@ func (registry *RedisSessionRegistry) Register(session Session) error {
 	if session.ConnID == "" {
 		return fmt.Errorf("session connection id is required")
 	}
+	effectiveSession := session
+	if effectiveSession.InstanceID == "" {
+		effectiveSession.InstanceID = registry.instanceID
+	}
 	ctx := context.Background()
-	existing, found, err := registry.fetchByConnID(ctx, session.ConnID)
+	existing, found, err := registry.fetchByConnID(ctx, effectiveSession.ConnID)
 	if err != nil {
 		return err
 	}
 	previousConnID := ""
-	if session.UserID > 0 {
-		previousConnID, err = registry.client.Get(ctx, registry.userKey(session.UserID)).Result()
+	if effectiveSession.UserID > 0 {
+		previousConnID, err = registry.client.Get(ctx, registry.userKey(effectiveSession.UserID)).Result()
 		if err != nil && err != redislib.Nil {
 			return err
 		}
 	}
-	payload, err := json.Marshal(session)
+	payload, err := json.Marshal(effectiveSession)
 	if err != nil {
 		return err
 	}
 	pipeline := registry.client.TxPipeline()
-	if found && existing.UserID > 0 && existing.UserID != session.UserID {
+	if found && existing.UserID > 0 && existing.UserID != effectiveSession.UserID {
 		pipeline.Del(ctx, registry.userKey(existing.UserID))
 	}
-	if session.UserID > 0 {
-		if previousConnID != "" && previousConnID != session.ConnID {
+	if effectiveSession.UserID > 0 {
+		if previousConnID != "" && previousConnID != effectiveSession.ConnID {
 			pipeline.Del(ctx, registry.connKey(previousConnID))
 		}
-		pipeline.Set(ctx, registry.userKey(session.UserID), session.ConnID, 0)
+		pipeline.Set(ctx, registry.userKey(effectiveSession.UserID), effectiveSession.ConnID, registry.ttl)
 	}
-	pipeline.Set(ctx, registry.connKey(session.ConnID), payload, 0)
+	pipeline.Set(ctx, registry.connKey(effectiveSession.ConnID), payload, registry.ttl)
 	_, err = pipeline.Exec(ctx)
 	return err
-}
-
-// FindByUserID retrieves an active session by user ID.
-func (registry *RedisSessionRegistry) FindByUserID(userID int) (Session, bool) {
-	connID, err := registry.client.Get(context.Background(), registry.userKey(userID)).Result()
-	if err != nil {
-		return Session{}, false
-	}
-	session, found, fetchErr := registry.fetchByConnID(context.Background(), connID)
-	if fetchErr != nil || !found {
-		return Session{}, false
-	}
-	return session, true
-}
-
-// FindByConnID retrieves an active session by connection ID.
-func (registry *RedisSessionRegistry) FindByConnID(connID string) (Session, bool) {
-	session, found, err := registry.fetchByConnID(context.Background(), connID)
-	if err != nil {
-		return Session{}, false
-	}
-	return session, found
-}
-
-// Remove deletes session indexes by connection ID.
-func (registry *RedisSessionRegistry) Remove(connID string) {
-	ctx := context.Background()
-	session, found, err := registry.fetchByConnID(ctx, connID)
-	if err != nil {
-		return
-	}
-	pipeline := registry.client.TxPipeline()
-	pipeline.Del(ctx, registry.connKey(connID))
-	if found && session.UserID > 0 {
-		pipeline.Del(ctx, registry.userKey(session.UserID))
-	}
-	_, _ = pipeline.Exec(ctx)
 }

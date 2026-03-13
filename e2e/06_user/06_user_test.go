@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	usermodel "github.com/momlesstomato/pixel-server/core/postgres/model/user"
 	"github.com/momlesstomato/pixel-server/pkg/user/application"
 	"github.com/momlesstomato/pixel-server/pkg/user/domain"
-	"github.com/momlesstomato/pixel-server/pkg/user/infrastructure/postgresstore"
+	usermodel "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/model"
+	userstore "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/store"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -16,7 +16,7 @@ import (
 // Test06UserCreateAndLookupFlow verifies end-to-end user realm persistence flow.
 func Test06UserCreateAndLookupFlow(t *testing.T) {
 	database := openDatabase(t)
-	repository, err := postgresstore.NewRepository(database)
+	repository, err := userstore.NewRepository(database)
 	if err != nil {
 		t.Fatalf("expected repository creation success, got %v", err)
 	}
@@ -43,7 +43,7 @@ func Test06UserCreateAndLookupFlow(t *testing.T) {
 // Test06UserSoftDeleteFlow verifies end-to-end user soft-delete behavior.
 func Test06UserSoftDeleteFlow(t *testing.T) {
 	database := openDatabase(t)
-	repository, err := postgresstore.NewRepository(database)
+	repository, err := userstore.NewRepository(database)
 	if err != nil {
 		t.Fatalf("expected repository creation success, got %v", err)
 	}

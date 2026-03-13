@@ -4,10 +4,13 @@ import (
 	"context"
 
 	"github.com/gofiber/contrib/websocket"
+	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
 	packettelemetry "github.com/momlesstomato/pixel-server/pkg/handshake/packet/telemetry"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+	packetsnavigation "github.com/momlesstomato/pixel-server/pkg/session/packet/navigation"
 	"go.uber.org/zap"
 )
 
@@ -35,29 +38,27 @@ func (handler *Handler) Handle(connection *websocket.Conn) {
 		handler.abortConnection(connection)
 		return
 	}
+	disposables := []coreconnection.Disposable{disposable}
+	allMessages, allDisposable, err := handler.subscribeChannel(ctx, sessionnotification.AllChannel())
+	if err != nil {
+		cancel()
+		handler.abortConnection(connection)
+		return
+	}
+	if allDisposable != nil {
+		disposables = append(disposables, allDisposable)
+		go handler.consumeBroadcast(ctx, allMessages, connID, transport, cancel)
+	}
 	authSignal, pongSignal, heartbeatStop := make(chan struct{}), make(chan struct{}, 1), func() {}
-	defer handler.disposeConnection(cancel, disposable, useCases.disconnect, heartbeatStop, connID, connection)
-	go func() {
-		if useCases.timeout.Wait(ctx, connID, authSignal) != nil {
-			cancel()
-		}
-	}()
-	go func() {
-		select {
-		case signal, open := <-signals:
-			if open {
-				_ = transport.closeLocal(signal.Code, signal.Reason)
-			}
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	handler.readLoop(ctx, connection, transport, useCases, connID, authSignal, pongSignal, &heartbeatStop, cancel)
+	defer handler.disposeConnection(cancel, disposables, useCases.disconnect, heartbeatStop, connID, connection)
+	handler.startRuntimeWatchers(ctx, useCases, connID, authSignal, signals, transport, cancel)
+	handler.readLoop(ctx, connection, transport, useCases, connID, authSignal, pongSignal, &heartbeatStop, &disposables, cancel)
 }
 
 // readLoop reads websocket packets and applies handshake session workflows.
-func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn, transport *Transport, useCases *runtimeUseCases, connID string, authSignal chan struct{}, pongSignal chan struct{}, heartbeatStop *func(), cancel context.CancelFunc) {
-	authenticated, machineID := false, ""
+func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn, transport *Transport, useCases *runtimeUseCases, connID string, authSignal chan struct{}, pongSignal chan struct{}, heartbeatStop *func(), disposables *[]coreconnection.Disposable, cancel context.CancelFunc) {
+	authenticated, machineID, userSubscribed := false, "", false
+	errorMeter := newProtocolErrorMeter()
 	for {
 		messageType, payload, err := connection.ReadMessage()
 		if err != nil {
@@ -67,6 +68,9 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 			continue
 		}
 		frames, err := transport.DecodeFrames(payload)
+		if err != nil && handler.handleProtocolError(connID, transport, 0, protocolErrorMalformedPacket, &errorMeter) {
+			return
+		}
 		if err != nil {
 			continue
 		}
@@ -80,34 +84,63 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 			case packetcrypto.ClientCompleteDiffiePacketID:
 				handler.handleCompleteDiffie(connID, frame.Body, transport, useCases)
 			case packetauth.SSOTicketPacketID:
-				if !handler.handleSSO(ctx, connID, frame.Body, machineID, useCases.authenticate) {
+				if authenticated {
+					if handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorWrongState, &errorMeter) {
+						return
+					}
+					continue
+				}
+				if !handler.handleAuthPacket(ctx, connID, frame.Body, machineID, transport, useCases, authSignal, pongSignal, heartbeatStop, disposables, cancel, &userSubscribed) {
 					return
 				}
-				if !authenticated {
-					authenticated = true
-					close(authSignal)
-					*heartbeatStop = handler.startHeartbeat(ctx, connID, useCases.heartbeat, pongSignal, cancel)
-				}
+				authenticated = true
 			case packetsession.ClientDisconnectPacketID:
 				if handler.handleDisconnect(connID, frame.Body, useCases.disconnect) {
 					return
 				}
 			case packetsession.ClientPongPacketID:
-				if authenticated {
-					packet := packetsession.ClientPongPacket{}
-					if packet.Decode(frame.Body) == nil {
-						select {
-						case pongSignal <- struct{}{}:
-						default:
-						}
+				packet := packetsession.ClientPongPacket{}
+				if !authenticated || packet.Decode(frame.Body) != nil {
+					errorCode := protocolErrorWrongState
+					if authenticated {
+						errorCode = protocolErrorMalformedPacket
 					}
+					if handler.handleProtocolError(connID, transport, frame.PacketID, errorCode, &errorMeter) {
+						return
+					}
+					continue
+				}
+				select {
+				case pongSignal <- struct{}{}:
+				default:
 				}
 			case packettelemetry.ClientLatencyTestPacketID:
-				if authenticated {
-					packet := packettelemetry.ClientLatencyTestPacket{}
-					if packet.Decode(frame.Body) == nil {
-						_ = useCases.latency.Respond(connID, packet.RequestID)
+				packet := packettelemetry.ClientLatencyTestPacket{}
+				if !authenticated || packet.Decode(frame.Body) != nil {
+					errorCode := protocolErrorWrongState
+					if authenticated {
+						errorCode = protocolErrorMalformedPacket
 					}
+					if handler.handleProtocolError(connID, transport, frame.PacketID, errorCode, &errorMeter) {
+						return
+					}
+					continue
+				}
+				_ = useCases.latency.Respond(connID, packet.RequestID)
+			case packetsnavigation.DesktopViewRequestPacketID:
+				if !authenticated {
+					if handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorWrongState, &errorMeter) {
+						return
+					}
+					continue
+				}
+				if useCases.desktop != nil && !handler.handleDesktopView(ctx, connID, frame.Body, useCases.desktop) &&
+					handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorMalformedPacket, &errorMeter) {
+					return
+				}
+			default:
+				if handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorUnknownPacket, &errorMeter) {
+					return
 				}
 			}
 		}

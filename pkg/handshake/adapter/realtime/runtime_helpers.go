@@ -2,12 +2,22 @@ package realtime
 
 import (
 	"context"
+	"time"
 
 	"github.com/gofiber/contrib/websocket"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
+	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/sessionflow"
 	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
+	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
+	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
 )
+
+const sessionLeaseRefreshInterval = 60 * time.Second
+const protocolErrorUnknownPacket int32 = 1
+const protocolErrorMalformedPacket int32 = 2
+const protocolErrorWrongState int32 = 3
+const protocolErrorLimitPerMinute = 10
 
 // abortConnection closes one websocket connection after startup failure.
 func (handler *Handler) abortConnection(connection *websocket.Conn) {
@@ -15,9 +25,13 @@ func (handler *Handler) abortConnection(connection *websocket.Conn) {
 }
 
 // disposeConnection applies one shared connection cleanup lifecycle.
-func (handler *Handler) disposeConnection(cancel context.CancelFunc, disposable coreconnection.Disposable, disconnect *sessionflow.DisconnectUseCase, heartbeatStop func(), connID string, connection *websocket.Conn) {
+func (handler *Handler) disposeConnection(cancel context.CancelFunc, disposables []coreconnection.Disposable, disconnect *sessionflow.DisconnectUseCase, heartbeatStop func(), connID string, connection *websocket.Conn) {
 	heartbeatStop()
-	_ = disposable.Dispose()
+	for _, disposable := range disposables {
+		if disposable != nil {
+			_ = disposable.Dispose()
+		}
+	}
 	disconnect.Cleanup(connID)
 	cancel()
 	_ = connection.Close()
@@ -31,7 +45,25 @@ func (handler *Handler) startHeartbeat(ctx context.Context, connID string, useCa
 			cancel()
 		}
 	}()
+	go handler.refreshSessionLease(heartbeatCtx, connID, cancel)
 	return stop
+}
+
+// refreshSessionLease keeps Redis-backed session keys alive while heartbeat is active.
+func (handler *Handler) refreshSessionLease(ctx context.Context, connID string, cancel context.CancelFunc) {
+	ticker := time.NewTicker(sessionLeaseRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if handler.sessions.Touch(connID) != nil {
+				cancel()
+				return
+			}
+		}
+	}
 }
 
 // handleInitDiffie handles one init_diffie packet and sends server parameters.
@@ -65,4 +97,61 @@ func (handler *Handler) handleCompleteDiffie(connID string, body []byte, transpo
 		_ = transport.Send(connID, packet.PacketID(), encoded)
 		transport.SetCipher(cipher)
 	}
+}
+
+// handleMachineID normalizes and echoes machine identifier payload.
+func (handler *Handler) handleMachineID(connID string, body []byte, transport *Transport, machineID *string) {
+	packet := packetauth.ClientMachineIDPacket{}
+	if packet.Decode(body) != nil {
+		return
+	}
+	normalized, err := handler.policy.Normalize(packet.MachineID)
+	if err != nil {
+		return
+	}
+	*machineID = normalized
+	response := packetauth.ServerMachineIDPacket{MachineID: normalized}
+	encoded, encodeErr := response.Encode()
+	if encodeErr == nil {
+		_ = transport.Send(connID, response.PacketID(), encoded)
+	}
+}
+
+// handleSSO authenticates one SSO packet payload.
+func (handler *Handler) handleSSO(ctx context.Context, connID string, body []byte, machineID string, useCase *authflow.AuthenticateUseCase) (int, bool) {
+	packet := packetauth.SSOTicketPacket{}
+	if packet.Decode(body) != nil {
+		return 0, false
+	}
+	result, err := useCase.Authenticate(ctx, authflow.AuthenticateRequest{ConnID: connID, Ticket: packet.Ticket, MachineID: machineID})
+	return result.UserID, err == nil
+}
+
+// handleDisconnect handles one client disconnect packet and closes connection.
+func (handler *Handler) handleDisconnect(connID string, body []byte, useCase *sessionflow.DisconnectUseCase) bool {
+	packet := packetsession.ClientDisconnectPacket{}
+	if packet.Decode(body) != nil {
+		return false
+	}
+	_ = useCase.Disconnect(connID)
+	return true
+}
+
+// startRuntimeWatchers starts timeout and distributed-close watcher goroutines.
+func (handler *Handler) startRuntimeWatchers(ctx context.Context, useCases *runtimeUseCases, connID string, authSignal <-chan struct{}, signals <-chan CloseSignal, transport *Transport, cancel context.CancelFunc) {
+	go func() {
+		if useCases.timeout.Wait(ctx, connID, authSignal) != nil {
+			cancel()
+		}
+	}()
+	go func() {
+		select {
+		case signal, open := <-signals:
+			if open {
+				_ = transport.closeLocal(signal.Code, signal.Reason)
+			}
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 }

@@ -24,19 +24,19 @@ func NewManager(database *gorm.DB, loaded Config, migrations []*gormigrate.Migra
 	if len(migrations) == 0 {
 		return nil, fmt.Errorf("at least one migration is required")
 	}
-	if len(seeders) == 0 {
-		return nil, fmt.Errorf("at least one seeder is required")
-	}
 	migrationTable := strings.TrimSpace(loaded.MigrationTable)
 	if migrationTable == "" {
 		migrationTable = "schema_migrations"
 	}
-	seedTable := strings.TrimSpace(loaded.SeedTable)
-	if seedTable == "" {
-		seedTable = "schema_seeds"
-	}
 	migrator := gormigrate.New(database, &gormigrate.Options{TableName: migrationTable}, migrations)
-	seeder := gormigrate.New(database, &gormigrate.Options{TableName: seedTable}, seeders)
+	var seeder *gormigrate.Gormigrate
+	if len(seeders) > 0 {
+		seedTable := strings.TrimSpace(loaded.SeedTable)
+		if seedTable == "" {
+			seedTable = "schema_seeds"
+		}
+		seeder = gormigrate.New(database, &gormigrate.Options{TableName: seedTable}, seeders)
+	}
 	return &Manager{migrator: migrator, seeder: seeder}, nil
 }
 
@@ -47,7 +47,17 @@ func (manager *Manager) MigrateUp() error { return manager.migrator.Migrate() }
 func (manager *Manager) MigrateDown() error { return manager.migrator.RollbackLast() }
 
 // SeedUp applies all pending essential seed units.
-func (manager *Manager) SeedUp() error { return manager.seeder.Migrate() }
+func (manager *Manager) SeedUp() error {
+	if manager.seeder == nil {
+		return nil
+	}
+	return manager.seeder.Migrate()
+}
 
 // SeedDown rolls back the last applied essential seed unit.
-func (manager *Manager) SeedDown() error { return manager.seeder.RollbackLast() }
+func (manager *Manager) SeedDown() error {
+	if manager.seeder == nil {
+		return nil
+	}
+	return manager.seeder.RollbackLast()
+}

@@ -5,6 +5,7 @@ import (
 	"github.com/momlesstomato/pixel-server/core/logging"
 	"github.com/momlesstomato/pixel-server/core/postgres"
 	"github.com/momlesstomato/pixel-server/core/redis"
+	"github.com/momlesstomato/pixel-server/core/status"
 	"github.com/momlesstomato/pixel-server/core/users"
 	authenticationdomain "github.com/momlesstomato/pixel-server/pkg/authentication/domain"
 )
@@ -23,6 +24,8 @@ type Config struct {
 	Logging logging.Config `mapstructure:"logging"`
 	// Authentication contains SSO ticket policy settings.
 	Authentication authenticationdomain.Config `mapstructure:"authentication"`
+	// Status contains hotel status scheduling and persistence settings.
+	Status status.Config `mapstructure:"status"`
 }
 
 // AppConfig aliases app runtime configuration shape.
@@ -42,3 +45,6 @@ type LoggingConfig = logging.Config
 
 // AuthenticationConfig aliases authentication runtime configuration shape.
 type AuthenticationConfig = authenticationdomain.Config
+
+// StatusConfig aliases hotel status runtime configuration shape.
+type StatusConfig = status.Config

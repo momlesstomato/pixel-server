@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/pkg/user/domain"
 )
@@ -48,4 +49,18 @@ func (service *Service) DeleteByID(ctx context.Context, id int) error {
 		return fmt.Errorf("user id must be positive")
 	}
 	return service.repository.DeleteByID(ctx, id)
+}
+
+// RecordLogin stamps one successful login event and reports first-login-of-day state.
+func (service *Service) RecordLogin(ctx context.Context, userID int, holder string, loggedAt time.Time) (bool, error) {
+	if userID <= 0 {
+		return false, fmt.Errorf("user id must be positive")
+	}
+	if strings.TrimSpace(holder) == "" {
+		return false, fmt.Errorf("holder is required")
+	}
+	if loggedAt.IsZero() {
+		return false, fmt.Errorf("logged at timestamp is required")
+	}
+	return service.repository.RecordLogin(ctx, userID, strings.TrimSpace(holder), loggedAt.UTC())
 }

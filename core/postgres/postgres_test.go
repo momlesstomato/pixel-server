@@ -4,9 +4,8 @@ import (
 	"testing"
 
 	"github.com/momlesstomato/pixel-server/core/postgres/migrations"
-	systemmodel "github.com/momlesstomato/pixel-server/core/postgres/model/system"
-	usermodel "github.com/momlesstomato/pixel-server/core/postgres/model/user"
 	"github.com/momlesstomato/pixel-server/core/postgres/seeds"
+	usermodel "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/model"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -28,11 +27,11 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if err := manager.MigrateUp(); err != nil {
 		t.Fatalf("expected migration up success, got %v", err)
 	}
-	if !database.Migrator().HasTable(&systemmodel.Setting{}) {
-		t.Fatalf("expected migrated settings table to exist")
-	}
 	if !database.Migrator().HasTable(&usermodel.Record{}) {
 		t.Fatalf("expected migrated users table to exist")
+	}
+	if !database.Migrator().HasTable(&usermodel.LoginEvent{}) {
+		t.Fatalf("expected migrated user login events table to exist")
 	}
 	user := usermodel.Record{Username: "tester"}
 	if err := database.Create(&user).Error; err != nil {
@@ -61,28 +60,8 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if err := manager.SeedUp(); err != nil {
 		t.Fatalf("expected seed up success, got %v", err)
 	}
-	var seededCount int64
-	if err := database.Model(&systemmodel.Setting{}).Where("key = ?", "bootstrap_version").Count(&seededCount).Error; err != nil {
-		t.Fatalf("expected seeded setting count query success, got %v", err)
-	}
-	if seededCount != 1 {
-		t.Fatalf("expected one seeded setting, got %d", seededCount)
-	}
-	var setting systemmodel.Setting
-	if err := database.Where("key = ?", "bootstrap_version").First(&setting).Error; err != nil {
-		t.Fatalf("expected seeded setting lookup success, got %v", err)
-	}
-	if setting.ID == 0 || setting.CreatedAt.IsZero() || setting.UpdatedAt.IsZero() || setting.OwnerID != nil {
-		t.Fatalf("expected seeded setting id, timestamps, and nil owner")
-	}
 	if err := manager.SeedDown(); err != nil {
 		t.Fatalf("expected seed down success, got %v", err)
-	}
-	if err := database.Model(&systemmodel.Setting{}).Where("key = ?", "bootstrap_version").Count(&seededCount).Error; err != nil {
-		t.Fatalf("expected unseed count query success, got %v", err)
-	}
-	if seededCount != 0 {
-		t.Fatalf("expected zero seeded settings after rollback, got %d", seededCount)
 	}
 	if err := manager.MigrateDown(); err != nil {
 		t.Fatalf("expected migration down success, got %v", err)
@@ -90,17 +69,14 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if !database.Migrator().HasTable(&usermodel.Record{}) {
 		t.Fatalf("expected users table to exist after non-destructive rollback step")
 	}
+	if database.Migrator().HasTable(&usermodel.LoginEvent{}) {
+		t.Fatalf("expected user login events table to be dropped")
+	}
 	if err := manager.MigrateDown(); err != nil {
 		t.Fatalf("expected migration down success, got %v", err)
 	}
 	if database.Migrator().HasTable(&usermodel.Record{}) {
 		t.Fatalf("expected users table to be dropped")
-	}
-	if err := manager.MigrateDown(); err != nil {
-		t.Fatalf("expected migration down success, got %v", err)
-	}
-	if database.Migrator().HasTable(&systemmodel.Setting{}) {
-		t.Fatalf("expected settings table to be dropped")
 	}
 }
 
@@ -113,8 +89,8 @@ func TestNewManagerRejectsMissingInputs(t *testing.T) {
 	if _, err := NewManager(database, Config{}, nil, seeds.Registry()); err == nil {
 		t.Fatalf("expected empty migration validation failure")
 	}
-	if _, err := NewManager(database, Config{}, migrations.Registry(), nil); err == nil {
-		t.Fatalf("expected empty seeder validation failure")
+	if _, err := NewManager(database, Config{}, migrations.Registry(), nil); err != nil {
+		t.Fatalf("expected nil seeder list acceptance, got %v", err)
 	}
 }
 

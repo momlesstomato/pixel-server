@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // ErrUserNotFound defines missing user lookup behavior.
@@ -24,4 +25,6 @@ type Repository interface {
 	FindByID(context.Context, int) (User, error)
 	// DeleteByID soft-deletes one user by identifier.
 	DeleteByID(context.Context, int) error
+	// RecordLogin persists one successful login event and reports whether it is first login in UTC day.
+	RecordLogin(context.Context, int, string, time.Time) (bool, error)
 }

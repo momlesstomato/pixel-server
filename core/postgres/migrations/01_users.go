@@ -2,14 +2,14 @@ package migrations
 
 import (
 	gormigrate "github.com/go-gormigrate/gormigrate/v2"
-	usermodel "github.com/momlesstomato/pixel-server/core/postgres/model/user"
+	usermodel "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/model"
 	"gorm.io/gorm"
 )
 
-// Step02Users returns migration step for users schema.
-func Step02Users() *gormigrate.Migration {
+// Step01Users returns migration step for users schema.
+func Step01Users() *gormigrate.Migration {
 	return &gormigrate.Migration{
-		ID: "20260312_02_users",
+		ID: "20260312_01_users",
 		Migrate: func(database *gorm.DB) error {
 			return database.AutoMigrate(&usermodel.Record{})
 		},

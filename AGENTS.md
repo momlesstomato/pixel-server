@@ -16,8 +16,12 @@ This document defines mandatory project constraints and success criteria.
 - Structs, interfaces, and function definitions must live in their corresponding package/module domain.
 - Cross-cutting contracts must be avoided in centralized files when ownership is clear (for example, config contracts in `core/config`, logging contracts in `core/logging`, transport contracts in `core/http`).
 - Package design must stay distributed by responsibility to avoid bloated "catch-all" files and to keep future realm/packet growth isolated by module.
+- Package and folder names must be short and intention-revealing; avoid overly long or stacked names when a concise equivalent exists (for example, prefer `infrastructure/model` and `infrastructure/store` over verbose variants).
 - Configuration models must also follow distributed ownership by section and must not be centralized in a monolithic `core/config/types.go`.
 - Configuration section types must live in their owning module package (for example, `core/redis/config.go`, `core/logging/config.go`, `core/postgres/config.go`, `core/users/config.go`, `core/app/config.go`).
+- ORM models must live under their owning realm/module and never in cross-realm catch-all model packages.
+- Shared model hubs such as `core/postgres/model/` are forbidden; realm persistence models must live in their realm infrastructure package (for example, `pkg/user/infrastructure/model`).
+- Generic key/value configuration vault models in PostgreSQL are forbidden; runtime configuration must come from environment/config modules, not DB-stored generic settings.
 - Code must follow HashiCorp and Linux philosophy:
   - small focused units,
   - composability,
