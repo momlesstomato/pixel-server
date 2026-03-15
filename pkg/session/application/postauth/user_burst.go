@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	permissiondomain "github.com/momlesstomato/pixel-server/pkg/permission/domain"
 	userdomain "github.com/momlesstomato/pixel-server/pkg/user/domain"
 	userignorepacket "github.com/momlesstomato/pixel-server/pkg/user/packet/ignore"
 	userpacket "github.com/momlesstomato/pixel-server/pkg/user/packet/profile"
@@ -23,6 +24,10 @@ type userBurstSnapshot struct {
 	lastAccessDate string
 	// ignoredUsernames stores ignored usernames payload.
 	ignoredUsernames []string
+	// access stores resolved user access payload.
+	access permissiondomain.Access
+	// perks stores resolved user perk grants.
+	perks []permissiondomain.PerkGrant
 }
 
 // sendUserBurst sends user profile, permissions, perks, noobness, settings, and home room packets.
@@ -66,9 +71,14 @@ func (useCase *UseCase) loadUserBurstSnapshot(ctx context.Context, userID int) (
 	if err != nil {
 		return userBurstSnapshot{}, err
 	}
+	access, err := useCase.access.ResolveAccess(ctx, userID)
+	if err != nil {
+		return userBurstSnapshot{}, err
+	}
 	return userBurstSnapshot{
 		user: user, settings: settings, respectsRemaining: remaining, respectsPetRemaining: petRemaining,
 		lastAccessDate: useCase.now().UTC().Format(time.RFC3339), ignoredUsernames: ignoredUsernames,
+		access: access, perks: useCase.access.ResolvePerks(access),
 	}, nil
 }
 
@@ -88,10 +98,19 @@ func (useCase *UseCase) sendUserIdentityPackets(connID string, snapshot userBurs
 
 // sendUserAccessPackets sends permissions, perks, and noobness packets.
 func (useCase *UseCase) sendUserAccessPackets(connID string, snapshot userBurstSnapshot) error {
-	if err := sendPacket(useCase.transport, connID, userpacket.UserPermissionsPacketID, userpacket.UserPermissionsPacket{}); err != nil {
+	permissions := userpacket.UserPermissionsPacket{
+		ClubLevel:     int32(snapshot.access.PrimaryGroup.ClubLevel),
+		SecurityLevel: int32(snapshot.access.PrimaryGroup.SecurityLevel),
+		IsAmbassador:  snapshot.access.PrimaryGroup.IsAmbassador,
+	}
+	if err := sendPacket(useCase.transport, connID, userpacket.UserPermissionsPacketID, permissions); err != nil {
 		return err
 	}
-	perks := userpacket.UserPerksPacket{Entries: []userpacket.PerkEntry{{Code: "USE_GUIDE", ErrorMessage: "", IsAllowed: true}, {Code: "CAMERA", ErrorMessage: "", IsAllowed: true}}}
+	entries := make([]userpacket.PerkEntry, 0, len(snapshot.perks))
+	for _, perk := range snapshot.perks {
+		entries = append(entries, userpacket.PerkEntry{Code: perk.Code, ErrorMessage: perk.ErrorMessage, IsAllowed: perk.IsAllowed})
+	}
+	perks := userpacket.UserPerksPacket{Entries: entries}
 	if err := sendPacket(useCase.transport, connID, userpacket.UserPerksPacketID, perks); err != nil {
 		return err
 	}

@@ -46,7 +46,7 @@ func Test07HotelCloseBroadcastDisconnect(t *testing.T) {
 	handler.ConfigureBroadcaster(broadcaster)
 	statusStore, _ := statusredisstore.NewStore(redisClient, "hotel:status:test")
 	statusService, _ := statushotel.NewService(statusStore, broadcaster, corestatus.Config{OpenHour: 0, OpenMinute: 0, CloseHour: 23, CloseMinute: 59, BroadcastChannel: "broadcast:all", CountdownTickSeconds: 60, DefaultMaintenanceDurationMinutes: 15})
-	handler.ConfigurePostAuth(statusService, users, users, "pixel-server")
+	handler.ConfigurePostAuth(statusService, users, users, sessionAccessReader{}, "pixel-server")
 	connection, cleanup := testkit.StartWebSocket(t, handler.Handle)
 	defer cleanup()
 	testkit.SendPacket(t, connection, packetsecurity.ClientMachineIDPacket{MachineID: strings.Repeat("a", 64), Fingerprint: "x", Capabilities: "y"})

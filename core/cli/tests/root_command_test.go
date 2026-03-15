@@ -53,3 +53,15 @@ func TestNewRootCommandRegistersUser(t *testing.T) {
 		t.Fatalf("expected user command to be registered")
 	}
 }
+
+// TestNewRootCommandRegistersGroup verifies group command composition.
+func TestNewRootCommandRegistersGroup(t *testing.T) {
+	command := cli.NewRootCommand(cli.Dependencies{})
+	group, _, err := command.Find([]string{"group"})
+	if err != nil {
+		t.Fatalf("expected group command lookup success, got %v", err)
+	}
+	if group == nil || group.Name() != "group" {
+		t.Fatalf("expected group command to be registered")
+	}
+}

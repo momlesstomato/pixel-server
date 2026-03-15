@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/momlesstomato/pixel-server/core/app"
 	"github.com/momlesstomato/pixel-server/core/logging"
+	corepermission "github.com/momlesstomato/pixel-server/core/permission"
 	"github.com/momlesstomato/pixel-server/core/postgres"
 	"github.com/momlesstomato/pixel-server/core/redis"
 	"github.com/momlesstomato/pixel-server/core/status"
@@ -26,6 +27,8 @@ type Config struct {
 	Authentication authenticationdomain.Config `mapstructure:"authentication"`
 	// Status contains hotel status scheduling and persistence settings.
 	Status status.Config `mapstructure:"status"`
+	// Permission contains permission module cache and event settings.
+	Permission corepermission.Config `mapstructure:"permission"`
 }
 
 // AppConfig aliases app runtime configuration shape.
@@ -48,3 +51,6 @@ type AuthenticationConfig = authenticationdomain.Config
 
 // StatusConfig aliases hotel status runtime configuration shape.
 type StatusConfig = status.Config
+
+// PermissionConfig aliases permission runtime configuration shape.
+type PermissionConfig = corepermission.Config

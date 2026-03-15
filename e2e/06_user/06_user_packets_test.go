@@ -14,6 +14,7 @@ import (
 	"github.com/momlesstomato/pixel-server/e2e/testkit"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
+	permissiondomain "github.com/momlesstomato/pixel-server/pkg/permission/domain"
 	statushotel "github.com/momlesstomato/pixel-server/pkg/status/application/hotelstatus"
 	statusredisstore "github.com/momlesstomato/pixel-server/pkg/status/infrastructure/redisstore"
 	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
@@ -49,7 +50,7 @@ func Test06UserRealtimePacketFlow(t *testing.T) {
 	bus, _ := handshakerealtime.NewRedisCloseSignalBus(redisClient, "handshake:test")
 	registry, _ := coreconnection.NewRedisSessionRegistryWithOptions(redisClient, coreconnection.RedisSessionRegistryOptions{InstanceID: "pixel-server"})
 	handler, _ := handshakerealtime.NewHandler(packetValidator{values: map[string]int{"ticket-1": actor.ID}}, registry, packetsecurity.NewMachineIDPolicy(strings.NewReader(strings.Repeat("a", 32))), bus, nil, 2*time.Second)
-	handler.ConfigurePostAuth(statusService, users, users, "pixel-server")
+	handler.ConfigurePostAuth(statusService, users, users, packetAccessReader{}, "pixel-server")
 	handler.ConfigureUserRuntime(func(transport *handshakerealtime.Transport) (handshakerealtime.UserRuntime, error) {
 		return userrealtime.NewRuntime(users, registry, transport, userrealtime.Options{})
 	})
@@ -93,4 +94,17 @@ func openUserPacketDatabase(t *testing.T) *gorm.DB {
 		t.Fatalf("expected sqlite migration success, got %v", err)
 	}
 	return database
+}
+
+// packetAccessReader defines deterministic post-auth permission payloads.
+type packetAccessReader struct{}
+
+// ResolveAccess returns deterministic access payload.
+func (packetAccessReader) ResolveAccess(context.Context, int) (permissiondomain.Access, error) {
+	return permissiondomain.Access{PrimaryGroup: permissiondomain.Group{ID: 1}}, nil
+}
+
+// ResolvePerks returns deterministic perk payload.
+func (packetAccessReader) ResolvePerks(permissiondomain.Access) []permissiondomain.PerkGrant {
+	return []permissiondomain.PerkGrant{}
 }

@@ -19,23 +19,29 @@ type ServerDependencies struct {
 	Broadcaster broadcast.Broadcaster
 	// BroadcastChannel stores the broadcast-all channel name.
 	BroadcastChannel string
+	// Permissions stores permission resolution behavior.
+	Permissions PermissionProvider
+	// EmitPermissionChecked stores permission-check event emission behavior.
+	EmitPermissionChecked bool
 }
 
 // serverImpl implements sdk.Server for one plugin.
 type serverImpl struct {
-	logger   sdk.Logger
-	events   *pluginEventBus
-	sessions *pluginSessionAPI
-	packets  *pluginPacketAPI
+	logger      sdk.Logger
+	events      *pluginEventBus
+	sessions    *pluginSessionAPI
+	packets     *pluginPacketAPI
+	permissions *pluginPermissionAPI
 }
 
 // newServerImpl creates a Server implementation for one plugin.
 func newServerImpl(name string, dispatcher *Dispatcher, deps ServerDependencies, logger *zap.Logger) *serverImpl {
 	return &serverImpl{
-		logger:   &pluginLogger{sugar: logger.Sugar().Named("plugin." + name)},
-		events:   &pluginEventBus{dispatcher: dispatcher, owner: name},
-		sessions: &pluginSessionAPI{registry: deps.Registry},
-		packets:  &pluginPacketAPI{broadcaster: deps.Broadcaster, channel: deps.BroadcastChannel, handlers: &sync.Map{}},
+		logger:      &pluginLogger{sugar: logger.Sugar().Named("plugin." + name)},
+		events:      &pluginEventBus{dispatcher: dispatcher, owner: name},
+		sessions:    &pluginSessionAPI{registry: deps.Registry},
+		packets:     &pluginPacketAPI{broadcaster: deps.Broadcaster, channel: deps.BroadcastChannel, handlers: &sync.Map{}},
+		permissions: &pluginPermissionAPI{provider: deps.Permissions, fire: dispatcher.Fire, emitChecks: deps.EmitPermissionChecked},
 	}
 }
 
@@ -50,6 +56,9 @@ func (s *serverImpl) Sessions() sdk.SessionAPI { return s.sessions }
 
 // Packets returns the packet send and handler registration API.
 func (s *serverImpl) Packets() sdk.PacketAPI { return s.packets }
+
+// Permissions returns permission and group resolution APIs.
+func (s *serverImpl) Permissions() sdk.PermissionAPI { return s.permissions }
 
 // pluginLogger wraps zap.SugaredLogger behind sdk.Logger.
 type pluginLogger struct {
@@ -109,11 +118,6 @@ func (a *pluginSessionAPI) Count() int {
 		return 0
 	}
 	return len(sessions)
-}
-
-// mapSessionInfo converts a core session to SDK session info.
-func mapSessionInfo(s coreconnection.Session) sdk.SessionInfo {
-	return sdk.SessionInfo{ConnID: s.ConnID, UserID: s.UserID, MachineID: s.MachineID, InstanceID: s.InstanceID}
 }
 
 // pluginPacketAPI provides packet injection and handler registration.

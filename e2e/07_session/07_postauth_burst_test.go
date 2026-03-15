@@ -14,6 +14,7 @@ import (
 	"github.com/momlesstomato/pixel-server/e2e/testkit"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
+	permissiondomain "github.com/momlesstomato/pixel-server/pkg/permission/domain"
 	statushotel "github.com/momlesstomato/pixel-server/pkg/status/application/hotelstatus"
 	statusredisstore "github.com/momlesstomato/pixel-server/pkg/status/infrastructure/redisstore"
 	userapplication "github.com/momlesstomato/pixel-server/pkg/user/application"
@@ -46,7 +47,7 @@ func Test07PostAuthBurstAndLoginStamp(t *testing.T) {
 	bus, _ := handshakerealtime.NewRedisCloseSignalBus(redisClient, "handshake:test")
 	registry, _ := coreconnection.NewRedisSessionRegistryWithOptions(redisClient, coreconnection.RedisSessionRegistryOptions{InstanceID: "pixel-server"})
 	handler, _ := handshakerealtime.NewHandler(ticketValidator{values: map[string]int{"ticket-1": created.ID, "ticket-2": created.ID}}, registry, packetsecurity.NewMachineIDPolicy(strings.NewReader(strings.Repeat("a", 32))), bus, nil, 2*time.Second)
-	handler.ConfigurePostAuth(statusService, users, users, "pixel-server")
+	handler.ConfigurePostAuth(statusService, users, users, sessionAccessReader{}, "pixel-server")
 	connection, cleanup := testkit.StartWebSocket(t, handler.Handle)
 	testkit.SendPacket(t, connection, packetsecurity.ClientMachineIDPacket{MachineID: strings.Repeat("a", 64), Fingerprint: "x", Capabilities: "y"})
 	_ = testkit.ReadFrame(t, connection)
@@ -124,4 +125,17 @@ func equalIDs(left []uint16, right []uint16) bool {
 		}
 	}
 	return true
+}
+
+// sessionAccessReader defines deterministic post-auth permission payloads.
+type sessionAccessReader struct{}
+
+// ResolveAccess returns deterministic access payload.
+func (sessionAccessReader) ResolveAccess(context.Context, int) (permissiondomain.Access, error) {
+	return permissiondomain.Access{PrimaryGroup: permissiondomain.Group{ID: 1}}, nil
+}
+
+// ResolvePerks returns deterministic perk payload.
+func (sessionAccessReader) ResolvePerks(permissiondomain.Access) []permissiondomain.PerkGrant {
+	return []permissiondomain.PerkGrant{}
 }

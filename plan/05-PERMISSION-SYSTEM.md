@@ -60,16 +60,19 @@ wildcard resolution or dotted hierarchy.
 
 ## Design Decisions
 
-### Single Group Per User
+### Multi-Group Per User
 
-Each user belongs to **exactly one** permission group. This avoids the
-complexity of multi-group inheritance and permission merging. If a server
-needs a "VIP Moderator" role, the admin creates a group with both VIP
-club level and moderation permissions. This is explicit and predictable.
+Each user may belong to **multiple permission groups** via
+`user_permission_groups`. Effective permissions are the union of all group
+grants. Effective protocol attributes (`clubLevel`, `securityLevel`,
+`isAmbassador`) are resolved from the **highest-priority group**.
 
-**Rationale:** Habbo vendors use single-rank assignment. Multi-group
-systems (like Bukkit) add complexity that is unnecessary for the Habbo
-use case where role combinations are finite and admin-defined.
+**Priority resolution:** higher `priority` wins; ties are resolved by
+lower `id` for deterministic behavior.
+
+**Ambassador override:** ambassador state is true when either the effective
+group has `is_ambassador = true` or the merged permission set grants the
+dotted permission `role.ambassador`.
 
 ### No Permission Definition Table
 
@@ -150,7 +153,7 @@ Validation happens in the application layer using Go constants.
 
 ```
 permission_groups ──1:N──> group_permissions
-users ──N:1──> permission_groups (via group_id FK)
+users ──1:N──> user_permission_groups ──N:1──> permission_groups
 ```
 
 ---
@@ -350,19 +353,20 @@ All behind API key middleware.
 
 | Method | Path | Description | Milestone |
 |--------|------|-------------|-----------|
-| `GET` | `/api/groups` | List all permission groups | **M1** |
-| `GET` | `/api/groups/{id}` | Get group with permissions | **M1** |
-| `POST` | `/api/groups` | Create permission group | **M1** |
-| `PATCH` | `/api/groups/{id}` | Update group attributes | **M1** |
-| `DELETE` | `/api/groups/{id}` | Delete group (if not default, no users assigned) | **M1** |
-| `GET` | `/api/groups/{id}/permissions` | List group permissions | **M1** |
-| `POST` | `/api/groups/{id}/permissions` | Add permissions to group | **M1** |
-| `DELETE` | `/api/groups/{id}/permissions/{perm}` | Remove permission from group | **M1** |
-| `PATCH` | `/api/users/{id}/group` | Assign user to group | **M2** |
+| `GET` | `/api/v1/groups` | List all permission groups | **M1** |
+| `GET` | `/api/v1/groups/{id}` | Get group with permissions | **M1** |
+| `POST` | `/api/v1/groups` | Create permission group | **M1** |
+| `PATCH` | `/api/v1/groups/{id}` | Update group attributes | **M1** |
+| `DELETE` | `/api/v1/groups/{id}` | Delete group (if not default, no users assigned) | **M1** |
+| `GET` | `/api/v1/groups/{id}/permissions` | List group permissions | **M1** |
+| `POST` | `/api/v1/groups/{id}/permissions` | Add permissions to group | **M1** |
+| `DELETE` | `/api/v1/groups/{id}/permissions/{perm}` | Remove permission from group | **M1** |
+| `PATCH` | `/api/v1/users/{id}/group` | Replace with one group | **M2** |
+| `PATCH` | `/api/v1/users/{id}/groups` | Replace with multiple groups | **M2** |
 
 ### API Request/Response Examples
 
-**POST /api/groups**
+**POST /api/v1/groups**
 ```json
 {
   "name": "moderator",
@@ -374,17 +378,17 @@ All behind API key middleware.
 }
 ```
 
-**POST /api/groups/{id}/permissions**
+**POST /api/v1/groups/{id}/permissions**
 ```json
 {
   "permissions": ["moderation.kick", "moderation.mute", "moderation.alert", "perk.*"]
 }
 ```
 
-**PATCH /api/users/{id}/group**
+**PATCH /api/v1/users/{id}/groups**
 ```json
 {
-  "groupId": 3
+  "groupIds": [3, 4]
 }
 ```
 
@@ -395,14 +399,14 @@ Mirror API 1:1 per AGENTS.md.
 | Command | Description | Milestone |
 |---------|-------------|-----------|
 | `pixelsv group list` | List all groups | **M1** |
-| `pixelsv group get <name>` | Get group details + permissions | **M1** |
+| `pixelsv group get <id>` | Get group details + permissions | **M1** |
 | `pixelsv group create <name> --club 0 --security 1` | Create group | **M1** |
-| `pixelsv group update <name> --display "Senior Mod"` | Update group | **M1** |
-| `pixelsv group delete <name>` | Delete group | **M1** |
-| `pixelsv group perm add <group> <perm> [<perm>...]` | Grant permissions | **M1** |
-| `pixelsv group perm remove <group> <perm>` | Revoke permission | **M1** |
-| `pixelsv group perm list <group>` | List permissions | **M1** |
-| `pixelsv user group <userId> <groupName>` | Assign user to group | **M2** |
+| `pixelsv group update <id> --display "Senior Mod"` | Update group | **M1** |
+| `pixelsv group delete <id>` | Delete group | **M1** |
+| `pixelsv group perm add <group-id> <perm> [<perm>...]` | Grant permissions | **M1** |
+| `pixelsv group perm remove <group-id> <perm>` | Revoke permission | **M1** |
+| `pixelsv group perm list <group-id>` | List permissions | **M1** |
+| `pixelsv group assign-user <userId> <groupId> [<groupId>...]` | Replace user groups | **M2** |
 
 ---
 
@@ -410,11 +414,11 @@ Mirror API 1:1 per AGENTS.md.
 
 ### SDK Events
 
-New events added to `sdk/event.go`:
+New events added under `sdk/events/permission/`:
 
 | Event | Cancellable | Fields | Milestone |
 |-------|-------------|--------|-----------|
-| `UserGroupChanged` | Yes | ConnID, UserID, OldGroupID, NewGroupID | **M2** |
+| `UserGroupChanged` | Yes | UserID, OldGroupID, NewGroupID, OldGroupIDs, NewGroupIDs | **M2** |
 | `PermissionChecked` | No | UserID, Permission, Granted | **M3** |
 
 ### Plugin Permission Check API
@@ -469,24 +473,29 @@ core/permission/
 
 pkg/permission/
 ├── domain/
-│   ├── group.go      ← Group aggregate, Repository interface
-│   └── grant.go      ← Permission grant value object
+│   ├── group.go       ← Group aggregate and access snapshot
+│   ├── grant.go       ← Permission grant value object + validation
+│   └── repository.go  ← Repository contract
 ├── application/
-│   ├── service.go    ← CRUD use cases for groups + grants
-│   └── perk.go       ← Perk resolution use case
+│   ├── service.go         ← Service composition + cache helpers
+│   ├── access.go          ← Access and wildcard resolution
+│   ├── perks.go           ← Perk mapping and resolution
+│   ├── group_mutation.go  ← CRUD mutation flows
+│   └── assignment.go      ← User multi-group assignment + live updates
 ├── adapter/
-│   └── httpapi/
-│       ├── routes.go ← REST routes registration
-│       └── openapi.go← OpenAPI spec
+│   ├── httpapi/       ← REST routes + OpenAPI
+│   ├── command/       ← Cobra CLI group commands
+│   └── notification/  ← Live 411/2586 publisher
 ├── infrastructure/
 │   ├── model/
-│   │   ├── group.go  ← GORM model
-│   │   └── grant.go  ← GORM model
+│   │   ├── group.go       ← permission_groups model
+│   │   ├── grant.go       ← group_permissions model
+│   │   └── assignment.go  ← user_permission_groups model
 │   └── store/
-│       └── repository.go ← PostgreSQL repository
-└── packet/
-    ├── permissions.go ← user.permissions S2C (ID 411)
-    └── perks.go       ← user.perks S2C (ID 2586)
+│       └── *.go            ← PostgreSQL repository operations
+└── infrastructure/migration + seed
+    ├── migrations for group/grant/assignment tables
+    └── default group and grant seed units
 ```
 
 ---
@@ -587,43 +596,43 @@ duplicate entries. No transaction needed for idempotent inserts.
 
 | # | Task | Depends On | Status |
 |---|------|------------|--------|
-| 1 | Create `permission_groups` table + migration | - | PENDING |
-| 2 | Create `group_permissions` table + migration | 1 | PENDING |
-| 3 | Create `Group` domain aggregate + `Repository` interface | 1 | PENDING |
-| 4 | Create `Grant` value object | 2 | PENDING |
-| 5 | Implement `HasPermission` resolver with wildcard matching | 3 | PENDING |
-| 6 | Implement GORM repository for groups + permissions | 3,4 | PENDING |
-| 7 | Implement group CRUD application service | 6 | PENDING |
-| 8 | Seed default groups (default, vip, moderator, admin) | 6 | PENDING |
-| 9 | REST API: group CRUD + permission management | 7 | PENDING |
-| 10 | CLI: group commands | 9 | PENDING |
-| 11 | OpenAPI spec for group endpoints | 9 | PENDING |
-| 12 | Redis cache for group + permissions | 6 | PENDING |
-| 13 | Unit tests: resolver wildcard matching | 5 | PENDING |
-| 14 | Unit tests: repository CRUD | 6 | PENDING |
-| 15 | Integration tests: API endpoints | 9 | PENDING |
+| 1 | Create `permission_groups` table + migration | - | DONE |
+| 2 | Create `group_permissions` table + migration | 1 | DONE |
+| 3 | Create `Group` domain aggregate + `Repository` interface | 1 | DONE |
+| 4 | Create `Grant` value object | 2 | DONE |
+| 5 | Implement `HasPermission` resolver with wildcard matching | 3 | DONE |
+| 6 | Implement GORM repository for groups + permissions | 3,4 | DONE |
+| 7 | Implement group CRUD application service | 6 | DONE |
+| 8 | Seed default groups (default, vip, moderator, admin) | 6 | DONE |
+| 9 | REST API: group CRUD + permission management | 7 | DONE |
+| 10 | CLI: group commands | 9 | DONE |
+| 11 | OpenAPI spec for group endpoints | 9 | DONE |
+| 12 | Redis cache for group + permissions | 6 | DONE |
+| 13 | Unit tests: resolver wildcard matching | 5 | DONE |
+| 14 | Unit tests: repository CRUD | 6 | DONE |
+| 15 | Integration tests: API endpoints | 9 | DONE |
 
 ### Milestone 2: User Integration + Live Updates
 
 | # | Task | Depends On | Status |
 |---|------|------------|--------|
-| 16 | Add `group_id` FK to `users` table (migration) | M1 | PENDING |
-| 17 | Wire group resolution into `user.permissions` packet | 16 | PENDING |
-| 18 | Wire perk resolution into `user.perks` packet | 17 | PENDING |
-| 19 | API: PATCH /api/users/{id}/group | 16 | PENDING |
-| 20 | CLI: user group assignment | 19 | PENDING |
-| 21 | Fire `UserGroupChanged` plugin event | 19 | PENDING |
-| 22 | Live packet update on group change (send 411 + 2586) | 21 | PENDING |
-| 23 | Unit + integration tests for M2 | all M2 | PENDING |
+| 16 | Add `user_permission_groups` assignment table + backfill migration | M1 | DONE |
+| 17 | Wire group resolution into `user.permissions` packet | 16 | DONE |
+| 18 | Wire perk resolution into `user.perks` packet | 17 | DONE |
+| 19 | API: PATCH /api/v1/users/{id}/group and `/groups` | 16 | DONE |
+| 20 | CLI: user group assignment | 19 | DONE |
+| 21 | Fire `UserGroupChanged` plugin event | 19 | DONE |
+| 22 | Live packet update on group change (send 411 + 2586) | 21 | DONE |
+| 23 | Unit + integration tests for M2 | all M2 | DONE |
 
 ### Milestone 3: Plugin API + Permission Checks
 
 | # | Task | Depends On | Status |
 |---|------|------------|--------|
-| 24 | Add `PermissionAPI` to `sdk.Server` interface | M2 | PENDING |
-| 25 | Implement `pluginPermissionAPI` wrapper | 24 | PENDING |
-| 26 | Fire `PermissionChecked` event (opt-in, not default) | 25 | PENDING |
-| 27 | E2E test: custom plugin permission check | 25 | PENDING |
+| 24 | Add `PermissionAPI` to `sdk.Server` interface | M2 | DONE |
+| 25 | Implement `pluginPermissionAPI` wrapper | 24 | DONE |
+| 26 | Fire `PermissionChecked` event (opt-in, not default) | 25 | DONE |
+| 27 | E2E test: custom plugin permission check | 25 | DONE |
 | 28 | Documentation: permission system wiki page | all | PENDING |
 
 ---
@@ -632,9 +641,9 @@ duplicate entries. No transaction needed for idempotent inserts.
 
 ### Migration Order
 
-The `permission_groups` and `group_permissions` tables must be created
-BEFORE the `users` table migration that adds `group_id`. The seed script
-for default groups must run between these two migrations.
+`permission_groups` and `group_permissions` are migrated before user-group
+assignment migration. `user_permission_groups` runs after users schema so
+legacy `records.group_id` can be backfilled into assignment rows.
 
 ### Perk Code Registry
 

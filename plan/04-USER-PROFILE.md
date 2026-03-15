@@ -602,9 +602,9 @@ and empty arrays until those realms are implemented.
 ### Migration Strategy
 
 Extending the existing `users` table is a non-destructive `ALTER TABLE
-ADD COLUMN` with defaults. The `group_id` FK requires the
-`permission_groups` table to exist first — this means **05-PERMISSION-SYSTEM
-Milestone 1 must complete before 04-USER-PROFILE Milestone 1**.
+ADD COLUMN` with defaults. Permission linkage is now resolved through
+`user_permission_groups` (multi-group) with a backfill from legacy
+`group_id`, so user-profile milestones no longer block on a single-group FK.
 
 New tables (`user_settings`, `user_wardrobe_slots`, `user_ignores`,
 `user_respects`) are created fresh with no data migration.

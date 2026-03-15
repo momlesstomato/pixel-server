@@ -12,6 +12,7 @@ import (
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	managementhttpapi "github.com/momlesstomato/pixel-server/pkg/management/adapter/httpapi"
+	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
 	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
 )
@@ -23,7 +24,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		return err
 	}
 	handler.ConfigureBroadcaster(services.broadcaster)
-	handler.ConfigurePostAuth(services.hotelStatus, services.users, services.users, runtime.Config.App.Name)
+	handler.ConfigurePostAuth(services.hotelStatus, services.users, services.users, services.permissions, runtime.Config.App.Name)
 	handler.ConfigureUserRuntime(func(transport *handshakerealtime.Transport) (handshakerealtime.UserRuntime, error) {
 		options := userrealtime.Options{
 			Debounce: 2 * time.Second,
@@ -61,7 +62,10 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 	if err := userhttpapi.RegisterRoutes(module, services.users); err != nil {
 		return err
 	}
-	paths := mergeOpenAPIPaths(authenticationhttpapi.OpenAPIPaths(), managementhttpapi.OpenAPIPaths(), userhttpapi.OpenAPIPaths())
+	if err := permissionhttpapi.RegisterRoutes(module, services.permissions); err != nil {
+		return err
+	}
+	paths := mergeOpenAPIPaths(authenticationhttpapi.OpenAPIPaths(), managementhttpapi.OpenAPIPaths(), userhttpapi.OpenAPIPaths(), permissionhttpapi.OpenAPIPaths())
 	return httpopenapi.RegisterRoutes(module, httpopenapi.BuildDocument(wsPath, paths), "", "")
 }
 

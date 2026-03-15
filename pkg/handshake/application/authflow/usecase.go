@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/authentication"
-	sdk "github.com/momlesstomato/pixel-sdk"
 )
 
 // AuthenticateUseCase defines authentication workflow behavior.

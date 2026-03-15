@@ -30,4 +30,6 @@ type Server interface {
 	Sessions() SessionAPI
 	// Packets returns the packet send and handler registration API.
 	Packets() PacketAPI
+	// Permissions returns permission and group resolution API.
+	Permissions() PermissionAPI
 }
