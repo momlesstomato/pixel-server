@@ -8,6 +8,7 @@ import (
 
 	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/momlesstomato/pixel-server/core/broadcast"
+	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	sessionnavigation "github.com/momlesstomato/pixel-server/pkg/session/application/navigation"
 	sessionpostauth "github.com/momlesstomato/pixel-server/pkg/session/application/postauth"
 )
@@ -34,6 +35,11 @@ func (handler *Handler) ConfigureDesktopView(checker sessionnavigation.RoomCheck
 // ConfigurePluginEvents wires plugin event dispatch behavior.
 func (handler *Handler) ConfigurePluginEvents(fire func(sdk.Event)) {
 	handler.fire = fire
+}
+
+// SetUserFinder configures user existence verification behavior for the authentication flow.
+func (handler *Handler) SetUserFinder(finder authflow.UserFinder) {
+	handler.userFinder = finder
 }
 
 // ConfigureUserRuntime wires authenticated user packet runtime behavior.

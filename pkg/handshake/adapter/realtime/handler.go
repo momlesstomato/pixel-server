@@ -56,6 +56,8 @@ type Handler struct {
 	fire func(sdk.Event)
 	// userRuntimeFactory creates authenticated user packet handlers.
 	userRuntimeFactory func(*Transport) (UserRuntime, error)
+	// userFinder verifies user existence after ticket validation.
+	userFinder authflow.UserFinder
 }
 
 // runtimeUseCases defines handshake runtime use-case wiring behavior.
@@ -128,6 +130,9 @@ func (handler *Handler) newRuntimeUseCases(transport *Transport) (*runtimeUseCas
 	if handler.fire != nil {
 		authenticate.SetEventFirer(handler.fire)
 		disconnect.SetEventFirer(handler.fire)
+	}
+	if handler.userFinder != nil {
+		authenticate.SetUserFinder(handler.userFinder)
 	}
 	return &runtimeUseCases{
 		authenticate: authenticate, timeout: timeout, disconnect: disconnect, heartbeat: heartbeat,
