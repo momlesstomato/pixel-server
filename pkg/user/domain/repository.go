@@ -53,12 +53,16 @@ type Repository interface {
 	SaveWardrobeSlot(context.Context, int, WardrobeSlot) error
 	// ListIgnoredUsernames resolves ignored usernames for one user.
 	ListIgnoredUsernames(context.Context, int) ([]string, error)
+	// ListIgnoredUsers resolves ignored user entries for one user.
+	ListIgnoredUsers(context.Context, int) ([]IgnoreEntry, error)
 	// IgnoreUserByUsername stores one ignore relation by target username.
 	IgnoreUserByUsername(context.Context, int, string) (int, error)
 	// IgnoreUserByID stores one ignore relation by target user identifier.
 	IgnoreUserByID(context.Context, int, int) error
 	// UnignoreUserByUsername removes one ignore relation by target username.
 	UnignoreUserByUsername(context.Context, int, string) (int, error)
+	// UnignoreUserByID removes one ignore relation by target user identifier.
+	UnignoreUserByID(context.Context, int, int) error
 	// LoadProfile resolves one partial public profile payload.
 	LoadProfile(context.Context, int, bool) (Profile, error)
 	// ListRespects resolves respect audit rows for one target user.

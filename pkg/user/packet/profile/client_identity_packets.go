@@ -11,6 +11,9 @@ const UserUpdateFigurePacketID uint16 = 2730
 // UserSetHomeRoomPacketID defines packet identifier for user.set_home_room.
 const UserSetHomeRoomPacketID uint16 = 1740
 
+// UserGetInfoPacketID defines packet identifier for user.get_info.
+const UserGetInfoPacketID uint16 = 357
+
 // UserRespectPacketID defines packet identifier for user.respect.
 const UserRespectPacketID uint16 = 2694
 
@@ -114,3 +117,15 @@ func (packet *UserRespectPacket) Decode(payload []byte) error {
 	}
 	return err
 }
+
+// UserGetInfoPacket defines user.get_info packet payload.
+type UserGetInfoPacket struct{}
+
+// PacketID returns protocol packet identifier.
+func (packet UserGetInfoPacket) PacketID() uint16 { return UserGetInfoPacketID }
+
+// Encode serializes packet body payload.
+func (packet UserGetInfoPacket) Encode() ([]byte, error) { return []byte{}, nil }
+
+// Decode parses packet body payload.
+func (packet *UserGetInfoPacket) Decode(payload []byte) error { _ = payload; return nil }

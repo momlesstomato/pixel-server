@@ -5,8 +5,8 @@ func OpenAPIPaths() map[string]any {
 	apiKey := []map[string]any{{"ApiKeyAuth": []string{}}}
 	id := []map[string]any{{"name": "id", "in": "path", "required": true, "schema": map[string]any{"type": "integer", "minimum": 1}}}
 	errContent := errResponseContent()
-	profileContent := map[string]any{"application/json": map[string]any{"schema": userProfileSchema()}}
-	settingsContent := map[string]any{"application/json": map[string]any{"schema": userSettingsSchema()}}
+	profileContent := map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object", "required": []string{"id", "username", "figure", "gender", "motto"}, "properties": map[string]any{"id": map[string]any{"type": "integer"}, "username": map[string]any{"type": "string"}, "figure": map[string]any{"type": "string"}, "gender": map[string]any{"type": "string"}, "motto": map[string]any{"type": "string"}, "real_name": map[string]any{"type": "string"}, "respects_received": map[string]any{"type": "integer"}, "home_room_id": map[string]any{"type": "integer"}, "can_change_name": map[string]any{"type": "boolean"}, "noobness_level": map[string]any{"type": "integer"}, "safety_locked": map[string]any{"type": "boolean"}, "group_id": map[string]any{"type": "integer"}}}}}
+	settingsContent := map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object", "properties": map[string]any{"VolumeSystem": map[string]any{"type": "integer"}, "VolumeFurni": map[string]any{"type": "integer"}, "VolumeTrax": map[string]any{"type": "integer"}, "OldChat": map[string]any{"type": "boolean"}, "RoomInvites": map[string]any{"type": "boolean"}, "CameraFollow": map[string]any{"type": "boolean"}, "Flags": map[string]any{"type": "integer"}, "ChatType": map[string]any{"type": "integer"}}}}}
 	return map[string]any{
 		"/api/v1/users/{id}": map[string]any{
 			"get":   profileGetOp(id, apiKey, profileContent, errContent),
@@ -27,6 +27,13 @@ func OpenAPIPaths() map[string]any {
 		},
 		"/api/v1/users/{id}/name-change": map[string]any{
 			"post": nameChangePostOp(id, apiKey, errContent),
+		},
+		"/api/v1/users/{id}/ignores": map[string]any{
+			"get":  ignoresGetOp(id, apiKey, errContent),
+			"post": ignoresPostOp(id, apiKey, errContent),
+		},
+		"/api/v1/users/{id}/ignores/{targetId}": map[string]any{
+			"delete": ignoresDeleteOp(id, apiKey, errContent),
 		},
 	}
 }
@@ -129,41 +136,29 @@ func nameChangePostOp(params, sec []map[string]any, fail map[string]any) map[str
 	}
 }
 
-// userProfileSchema returns the JSON Schema for a user profile response.
-func userProfileSchema() map[string]any {
+// ignoresGetOp returns the GET /api/v1/users/{id}/ignores operation map.
+func ignoresGetOp(params, sec []map[string]any, fail map[string]any) map[string]any {
+	ok200 := map[string]any{"description": "Ignored users", "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object", "properties": map[string]any{"entries": map[string]any{"type": "array", "items": map[string]any{"type": "object", "properties": map[string]any{"user_id": map[string]any{"type": "integer"}, "username": map[string]any{"type": "string"}}}}}}}}}
 	return map[string]any{
-		"type":     "object",
-		"required": []string{"id", "username", "figure", "gender", "motto"},
-		"properties": map[string]any{
-			"id":                map[string]any{"type": "integer"},
-			"username":          map[string]any{"type": "string"},
-			"figure":            map[string]any{"type": "string"},
-			"gender":            map[string]any{"type": "string"},
-			"motto":             map[string]any{"type": "string"},
-			"real_name":         map[string]any{"type": "string"},
-			"respects_received": map[string]any{"type": "integer"},
-			"home_room_id":      map[string]any{"type": "integer"},
-			"can_change_name":   map[string]any{"type": "boolean"},
-			"noobness_level":    map[string]any{"type": "integer"},
-			"safety_locked":     map[string]any{"type": "boolean"},
-			"group_id":          map[string]any{"type": "integer"},
-		},
+		"tags": []string{"user"}, "summary": "List ignored users",
+		"parameters": params, "responses": map[string]any{"200": ok200, "404": map[string]any{"description": "User not found", "content": fail}, "401": map[string]any{"description": "Unauthorized", "content": fail}}, "security": sec,
 	}
 }
 
-// userSettingsSchema returns the JSON Schema for a user settings response.
-func userSettingsSchema() map[string]any {
+// ignoresPostOp returns the POST /api/v1/users/{id}/ignores operation map.
+func ignoresPostOp(params, sec []map[string]any, fail map[string]any) map[string]any {
+	body := map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object", "required": []string{"target_user_id"}, "properties": map[string]any{"target_user_id": map[string]any{"type": "integer", "minimum": 1}}}}}}
 	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"VolumeSystem": map[string]any{"type": "integer"},
-			"VolumeFurni":  map[string]any{"type": "integer"},
-			"VolumeTrax":   map[string]any{"type": "integer"},
-			"OldChat":      map[string]any{"type": "boolean"},
-			"RoomInvites":  map[string]any{"type": "boolean"},
-			"CameraFollow": map[string]any{"type": "boolean"},
-			"Flags":        map[string]any{"type": "integer"},
-			"ChatType":     map[string]any{"type": "integer"},
-		},
+		"tags": []string{"user"}, "summary": "Admin ignore user",
+		"parameters": params, "requestBody": body, "responses": map[string]any{"204": map[string]any{"description": "Ignored", "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object"}}}}, "400": map[string]any{"description": "Invalid payload", "content": fail}, "404": map[string]any{"description": "User not found", "content": fail}, "401": map[string]any{"description": "Unauthorized", "content": fail}}, "security": sec,
+	}
+}
+
+// ignoresDeleteOp returns the DELETE /api/v1/users/{id}/ignores/{targetId} operation map.
+func ignoresDeleteOp(params, sec []map[string]any, fail map[string]any) map[string]any {
+	allParams := append(params, map[string]any{"name": "targetId", "in": "path", "required": true, "schema": map[string]any{"type": "integer", "minimum": 1}})
+	return map[string]any{
+		"tags": []string{"user"}, "summary": "Admin unignore user",
+		"parameters": allParams, "responses": map[string]any{"204": map[string]any{"description": "Unignored", "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object"}}}}, "404": map[string]any{"description": "User not found", "content": fail}, "401": map[string]any{"description": "Unauthorized", "content": fail}}, "security": sec,
 	}
 }

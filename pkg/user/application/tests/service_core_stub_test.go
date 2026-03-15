@@ -90,6 +90,11 @@ func (stub coreRepositoryStub) ListIgnoredUsernames(_ context.Context, _ int) ([
 	return []string{}, nil
 }
 
+// ListIgnoredUsers returns deterministic ignored user entries.
+func (stub coreRepositoryStub) ListIgnoredUsers(_ context.Context, _ int) ([]domain.IgnoreEntry, error) {
+	return []domain.IgnoreEntry{}, nil
+}
+
 // IgnoreUserByUsername returns deterministic ignored user identifier.
 func (stub coreRepositoryStub) IgnoreUserByUsername(_ context.Context, _ int, _ string) (int, error) {
 	return 2, nil
@@ -101,6 +106,11 @@ func (stub coreRepositoryStub) IgnoreUserByID(_ context.Context, _ int, _ int) e
 // UnignoreUserByUsername returns deterministic unignore result.
 func (stub coreRepositoryStub) UnignoreUserByUsername(_ context.Context, _ int, _ string) (int, error) {
 	return 2, nil
+}
+
+// UnignoreUserByID returns deterministic unignore result.
+func (stub coreRepositoryStub) UnignoreUserByID(_ context.Context, _ int, _ int) error {
+	return nil
 }
 
 // LoadProfile returns deterministic profile payload.

@@ -12,6 +12,14 @@ type WardrobeSlot struct {
 	Gender string
 }
 
+// IgnoreEntry defines one stored ignore relation entry.
+type IgnoreEntry struct {
+	// UserID stores ignored user identifier.
+	UserID int
+	// Username stores ignored user name.
+	Username string
+}
+
 // RespectRecord defines one stored respect audit event.
 type RespectRecord struct {
 	// ID stores stable respect record identifier.

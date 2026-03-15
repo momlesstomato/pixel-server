@@ -44,6 +44,30 @@ func (service *Service) ListIgnoredUsernames(ctx context.Context, userID int) ([
 	return service.repository.ListIgnoredUsernames(ctx, userID)
 }
 
+// ListIgnoredUsers resolves ignored user entries for one user.
+func (service *Service) ListIgnoredUsers(ctx context.Context, userID int) ([]domain.IgnoreEntry, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("user id must be positive")
+	}
+	return service.repository.ListIgnoredUsers(ctx, userID)
+}
+
+// AdminIgnoreUser stores one admin-initiated ignore relation.
+func (service *Service) AdminIgnoreUser(ctx context.Context, userID int, targetUserID int) error {
+	if userID <= 0 || targetUserID <= 0 {
+		return fmt.Errorf("user ids must be positive")
+	}
+	return service.repository.IgnoreUserByID(ctx, userID, targetUserID)
+}
+
+// AdminUnignoreUser removes one admin-initiated ignore relation.
+func (service *Service) AdminUnignoreUser(ctx context.Context, userID int, targetUserID int) error {
+	if userID <= 0 || targetUserID <= 0 {
+		return fmt.Errorf("user ids must be positive")
+	}
+	return service.repository.UnignoreUserByID(ctx, userID, targetUserID)
+}
+
 // IgnoreUserByUsername validates and stores one ignore relation by target username.
 func (service *Service) IgnoreUserByUsername(ctx context.Context, connID string, userID int, username string) (int, error) {
 	targetID, err := service.repository.IgnoreUserByUsername(ctx, userID, strings.TrimSpace(username))

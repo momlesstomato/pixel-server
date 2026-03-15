@@ -52,6 +52,26 @@ func (repository *Repository) ListIgnoredUsernames(ctx context.Context, userID i
 	return usernames, nil
 }
 
+// ListIgnoredUsers resolves ignored user entries for one user.
+func (repository *Repository) ListIgnoredUsers(ctx context.Context, userID int) ([]domain.IgnoreEntry, error) {
+	if _, err := repository.loadRecord(ctx, userID); err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		UserID   int
+		Username string
+	}
+	query := repository.database.WithContext(ctx).Table("ignores").Select("users.id AS user_id, users.username").Joins("JOIN users ON users.id = ignores.ignored_user_id")
+	if err := query.Where("ignores.user_id = ? AND users.deleted_at IS NULL", userID).Order("users.username ASC").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	entries := make([]domain.IgnoreEntry, 0, len(rows))
+	for _, row := range rows {
+		entries = append(entries, domain.IgnoreEntry{UserID: row.UserID, Username: row.Username})
+	}
+	return entries, nil
+}
+
 // IgnoreUserByUsername stores one ignore relation by target username.
 func (repository *Repository) IgnoreUserByUsername(ctx context.Context, userID int, username string) (int, error) {
 	target, err := repository.resolveTarget(ctx, strings.TrimSpace(username))
@@ -87,6 +107,12 @@ func (repository *Repository) UnignoreUserByUsername(ctx context.Context, userID
 		return 0, result.Error
 	}
 	return target.ID, nil
+}
+
+// UnignoreUserByID removes one ignore relation by target user identifier.
+func (repository *Repository) UnignoreUserByID(ctx context.Context, userID int, targetUserID int) error {
+	result := repository.database.WithContext(ctx).Where("user_id = ? AND ignored_user_id = ?", userID, targetUserID).Delete(&usermodel.Ignore{})
+	return result.Error
 }
 
 // LoadProfile resolves one partial public profile payload.

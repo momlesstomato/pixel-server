@@ -117,3 +117,14 @@ func (stub serviceStub) ListRespects(context.Context, int, int, int) ([]domain.R
 func (stub serviceStub) ForceChangeName(context.Context, int, string) (domain.NameResult, error) {
 	return domain.NameResult{ResultCode: domain.NameResultAvailable, Name: "beta"}, nil
 }
+
+// ListIgnoredUsers returns deterministic ignored user entries.
+func (stub serviceStub) ListIgnoredUsers(context.Context, int) ([]domain.IgnoreEntry, error) {
+	return []domain.IgnoreEntry{}, nil
+}
+
+// AdminIgnoreUser returns deterministic ignore result.
+func (stub serviceStub) AdminIgnoreUser(context.Context, int, int) error { return nil }
+
+// AdminUnignoreUser returns deterministic unignore result.
+func (stub serviceStub) AdminUnignoreUser(context.Context, int, int) error { return nil }

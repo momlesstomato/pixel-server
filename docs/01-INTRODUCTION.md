@@ -86,3 +86,6 @@ accepted at `/ws`. The REST API requires the `X-API-Key` header.
 | [04-CONFIGURATION](04-CONFIGURATION.md) | Complete environment variable reference |
 | [01-session/](01-session/) | Authentication flow, SSO tokens, session lifecycle |
 | [02-management/](02-management/) | Hotel status, maintenance, broadcasts, moderation |
+| [03-plugins/](03-plugins/) | Plugin system, SDK, event bus, handler lifecycle |
+| [04-user/](04-user/) | User identity, settings, social features, name changes |
+| [05-permissions/](05-permissions/) | Permission groups, resolution, client perks |

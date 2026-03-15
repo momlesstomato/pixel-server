@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	bannedpacket "github.com/momlesstomato/pixel-server/pkg/user/packet/banned"
 	userpacket "github.com/momlesstomato/pixel-server/pkg/user/packet/profile"
 )
 
@@ -36,12 +37,12 @@ func TestIdentityPacketEncoders(t *testing.T) {
 	if _, err := noobness.Encode(); err != nil {
 		t.Fatalf("expected noobness encode success, got %v", err)
 	}
-	banned := userpacket.UserBannedPacket{Message: "banned"}
+	banned := bannedpacket.UserBannedPacket{Message: "banned"}
 	encoded, err := banned.Encode()
 	if err != nil {
 		t.Fatalf("expected banned encode success, got %v", err)
 	}
-	decoded := userpacket.UserBannedPacket{}
+	decoded := bannedpacket.UserBannedPacket{}
 	if err := decoded.Decode(encoded); err != nil || decoded.Message != "banned" {
 		t.Fatalf("unexpected banned decode payload %+v err=%v", decoded, err)
 	}

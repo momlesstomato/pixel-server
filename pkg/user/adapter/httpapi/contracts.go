@@ -26,4 +26,10 @@ type Service interface {
 	ListRespects(context.Context, int, int, int) ([]domain.RespectRecord, error)
 	// ForceChangeName applies one administrative user rename operation.
 	ForceChangeName(context.Context, int, string) (domain.NameResult, error)
+	// ListIgnoredUsers resolves ignored user entries for one user.
+	ListIgnoredUsers(context.Context, int) ([]domain.IgnoreEntry, error)
+	// AdminIgnoreUser stores one admin-initiated ignore relation.
+	AdminIgnoreUser(context.Context, int, int) error
+	// AdminUnignoreUser removes one admin-initiated ignore relation.
+	AdminUnignoreUser(context.Context, int, int) error
 }
