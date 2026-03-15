@@ -18,6 +18,8 @@ type AuthenticateUseCase struct {
 	sessions SessionRegistry
 	// transport sends packets and closes connections.
 	transport Transport
+	// users resolves real user display names for identity packets.
+	users UserFinder
 	// now provides deterministic time source for session timestamps.
 	now func() time.Time
 	// fire dispatches optional plugin lifecycle events.
@@ -43,6 +45,11 @@ func (useCase *AuthenticateUseCase) SetEventFirer(fire func(sdk.Event)) {
 	useCase.fire = fire
 }
 
+// SetUserFinder wires real user identity resolution for identity account packets.
+func (useCase *AuthenticateUseCase) SetUserFinder(users UserFinder) {
+	useCase.users = users
+}
+
 // Authenticate validates ticket, handles duplicate sessions, and emits auth packets.
 func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request AuthenticateRequest) (AuthenticateResult, error) {
 	if request.ConnID == "" {
@@ -56,6 +63,10 @@ func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request Au
 	userID, err := useCase.validator.Validate(ctx, ticket)
 	if err != nil {
 		useCase.closeWithReason(request.ConnID, packetauth.DisconnectReasonInvalidLoginTicket, UnauthorizedCloseCode, "unauthorized")
+		return AuthenticateResult{}, err
+	}
+	username, err := useCase.resolveUsername(ctx, request.ConnID, userID)
+	if err != nil {
 		return AuthenticateResult{}, err
 	}
 	if useCase.fire != nil {
@@ -90,7 +101,7 @@ func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request Au
 	if err := useCase.sendAuthenticationOK(request.ConnID); err != nil {
 		return AuthenticateResult{}, err
 	}
-	if err := useCase.sendIdentityAccounts(request.ConnID, userID); err != nil {
+	if err := useCase.sendIdentityAccounts(request.ConnID, userID, username); err != nil {
 		return AuthenticateResult{}, err
 	}
 	if useCase.fire != nil {
@@ -109,14 +120,27 @@ func (useCase *AuthenticateUseCase) sendAuthenticationOK(connID string) error {
 	return useCase.transport.Send(connID, packet.PacketID(), body)
 }
 
-// sendIdentityAccounts sends identity account list packet.
-func (useCase *AuthenticateUseCase) sendIdentityAccounts(connID string, userID int) error {
-	packet := packetauth.IdentityAccountsPacket{Accounts: []packetauth.IdentityAccount{{ID: int32(userID), Name: fmt.Sprintf("Player#%d", userID)}}}
+// sendIdentityAccounts sends identity account list packet with provided display name.
+func (useCase *AuthenticateUseCase) sendIdentityAccounts(connID string, userID int, name string) error {
+	packet := packetauth.IdentityAccountsPacket{Accounts: []packetauth.IdentityAccount{{ID: int32(userID), Name: name}}}
 	body, err := packet.Encode()
 	if err != nil {
 		return err
 	}
 	return useCase.transport.Send(connID, packet.PacketID(), body)
+}
+
+// resolveUsername returns the real username when UserFinder is set, or disconnects on failure.
+func (useCase *AuthenticateUseCase) resolveUsername(ctx context.Context, connID string, userID int) (string, error) {
+	if useCase.users == nil {
+		return fmt.Sprintf("Player#%d", userID), nil
+	}
+	username, err := useCase.users.FindByID(ctx, userID)
+	if err != nil {
+		useCase.closeWithReason(connID, packetauth.DisconnectReasonInvalidLoginTicket, UnauthorizedCloseCode, "user not found")
+		return "", fmt.Errorf("resolve username for user %d: %w", userID, err)
+	}
+	return username, nil
 }
 
 // closeWithReason sends one disconnect reason packet and closes the connection.

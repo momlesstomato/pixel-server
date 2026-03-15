@@ -73,6 +73,7 @@ This document defines mandatory project constraints and success criteria.
 - PostgreSQL access must use an ORM.
 - PostgreSQL migration management is mandatory with explicit up/down support.
 - PostgreSQL seeding management is mandatory with explicit up/down support.
+- Every PostgreSQL schema or seed behavior change must be delivered as a new migration/seed step with a new ID; do not modify semantics of already-applied steps without adding a new backfill step.
 - Seeding must include only essential testing/bootstrap data and must not be treated as full production population.
 - Migration and seeding tooling must be robust, deterministic, and reversible.
 - Redis is the mandatory caching/runtime state layer where appropriate.

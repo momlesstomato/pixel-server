@@ -15,6 +15,7 @@ import (
 	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
 	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
+	userapplication "github.com/momlesstomato/pixel-server/pkg/user/application"
 )
 
 // registerServeWebSocket registers websocket endpoint behavior.
@@ -24,6 +25,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		return err
 	}
 	handler.ConfigureBroadcaster(services.broadcaster)
+	handler.ConfigureUserFinder(&userFinderAdapter{service: services.users})
 	handler.ConfigurePostAuth(services.hotelStatus, services.users, services.users, services.permissions, runtime.Config.App.Name)
 	handler.ConfigureUserRuntime(func(transport *handshakerealtime.Transport) (handshakerealtime.UserRuntime, error) {
 		options := userrealtime.Options{
@@ -67,6 +69,21 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 	}
 	paths := mergeOpenAPIPaths(authenticationhttpapi.OpenAPIPaths(), managementhttpapi.OpenAPIPaths(), userhttpapi.OpenAPIPaths(), permissionhttpapi.OpenAPIPaths())
 	return httpopenapi.RegisterRoutes(module, httpopenapi.BuildDocument(wsPath, paths), "", "")
+}
+
+// userFinderAdapter adapts user application Service to authflow.UserFinder interface.
+type userFinderAdapter struct {
+	// service stores user application service behavior.
+	service *userapplication.Service
+}
+
+// FindByID resolves one username by user identifier.
+func (adapter *userFinderAdapter) FindByID(ctx context.Context, id int) (string, error) {
+	user, err := adapter.service.FindByID(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return user.Username, nil
 }
 
 // busCloserAdapter adapts DistributedCloseSignalBus to SessionCloser interface.

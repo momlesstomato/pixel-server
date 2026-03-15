@@ -120,6 +120,12 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if err := manager.MigrateDown(); err != nil {
 		t.Fatalf("expected migration down success, got %v", err)
 	}
+	if !database.Migrator().HasTable(&usermodel.Record{}) {
+		t.Fatalf("expected users table to remain after transitional rename rollback step")
+	}
+	if err := manager.MigrateDown(); err != nil {
+		t.Fatalf("expected migration down success, got %v", err)
+	}
 	if database.Migrator().HasTable(&usermodel.Record{}) {
 		t.Fatalf("expected users table to be dropped")
 	}

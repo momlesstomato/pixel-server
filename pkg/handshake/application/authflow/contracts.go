@@ -7,6 +7,12 @@ import (
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 )
 
+// UserFinder defines username resolution behavior for identity account packets.
+type UserFinder interface {
+	// FindByID resolves the display username for one user identifier.
+	FindByID(context.Context, int) (string, error)
+}
+
 // UnauthorizedCloseCode defines the websocket close code for auth failures.
 const UnauthorizedCloseCode = websocket.CloseAbnormalClosure
 

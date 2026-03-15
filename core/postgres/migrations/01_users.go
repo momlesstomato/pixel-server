@@ -18,3 +18,22 @@ func Step01Users() *gormigrate.Migration {
 		},
 	}
 }
+
+// Step01UsersRenameLegacyRecords returns migration step for records->users table migration.
+func Step01UsersRenameLegacyRecords() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260314_04_users_table_rename",
+		Migrate: func(database *gorm.DB) error {
+			if database.Migrator().HasTable(&usermodel.Record{}) {
+				return nil
+			}
+			if !database.Migrator().HasTable("records") {
+				return nil
+			}
+			return database.Exec("ALTER TABLE records RENAME TO users").Error
+		},
+		Rollback: func(database *gorm.DB) error {
+			return nil
+		},
+	}
+}

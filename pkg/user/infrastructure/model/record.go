@@ -43,3 +43,8 @@ type Record struct {
 	// DeletedAt stores row soft-delete timestamp.
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
+
+// TableName returns the persisted table name for user records.
+func (Record) TableName() string {
+	return "users"
+}

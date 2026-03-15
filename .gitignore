@@ -62,3 +62,4 @@ logs/
 vendor/*
 !vendor/.gitignore
 !vendor/README.md
+emulator/

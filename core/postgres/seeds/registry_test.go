@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSeedSteps verifies seed step registry contents.
 func TestRegistryReturnsOrderedSeedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 4 {
-		t.Fatalf("expected four seed steps, got %d", len(steps))
+	if len(steps) != 8 {
+		t.Fatalf("expected eight seed steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260313_01_system_user" {
 		t.Fatalf("unexpected seed step metadata")
@@ -18,6 +18,18 @@ func TestRegistryReturnsOrderedSeedSteps(t *testing.T) {
 		t.Fatalf("unexpected seed step metadata")
 	}
 	if steps[3] == nil || steps[3].ID != "20260314_02_default_group_permissions" {
+		t.Fatalf("unexpected seed step metadata")
+	}
+	if steps[4] == nil || steps[4].ID != "20260314_03_test_users" {
+		t.Fatalf("unexpected seed step metadata")
+	}
+	if steps[5] == nil || steps[5].ID != "20260314_04_test_user_settings" {
+		t.Fatalf("unexpected seed step metadata")
+	}
+	if steps[6] == nil || steps[6].ID != "20260314_05_demo_users_backfill" {
+		t.Fatalf("unexpected seed step metadata")
+	}
+	if steps[7] == nil || steps[7].ID != "20260314_06_demo_user_settings_backfill" {
 		t.Fatalf("unexpected seed step metadata")
 	}
 }

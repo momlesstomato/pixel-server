@@ -1,8 +1,6 @@
 package seeds
 
 import (
-	"errors"
-
 	gormigrate "github.com/go-gormigrate/gormigrate/v2"
 	usermodel "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/model"
 	"gorm.io/gorm"
@@ -14,12 +12,12 @@ func Step01SystemUser() *gormigrate.Migration {
 		ID: "20260313_01_system_user",
 		Migrate: func(database *gorm.DB) error {
 			var row usermodel.Record
-			err := database.Where("username = ?", "system").First(&row).Error
-			if err == nil {
-				return nil
+			query := database.Where("username = ?", "system").Limit(1).Find(&row)
+			if query.Error != nil {
+				return query.Error
 			}
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
-				return err
+			if query.RowsAffected > 0 {
+				return nil
 			}
 			return database.Create(&usermodel.Record{Username: "system", RealName: "System", CanChangeName: false, NoobnessLevel: 0}).Error
 		},

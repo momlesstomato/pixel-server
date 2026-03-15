@@ -45,8 +45,8 @@ func (repository *Repository) ListIgnoredUsernames(ctx context.Context, userID i
 		return nil, err
 	}
 	usernames := []string{}
-	query := repository.database.WithContext(ctx).Table("ignores").Select("records.username").Joins("JOIN records ON records.id = ignores.ignored_user_id")
-	if err := query.Where("ignores.user_id = ? AND records.deleted_at IS NULL", userID).Order("records.username ASC").Scan(&usernames).Error; err != nil {
+	query := repository.database.WithContext(ctx).Table("ignores").Select("users.username").Joins("JOIN users ON users.id = ignores.ignored_user_id")
+	if err := query.Where("ignores.user_id = ? AND users.deleted_at IS NULL", userID).Order("users.username ASC").Scan(&usernames).Error; err != nil {
 		return nil, err
 	}
 	return usernames, nil

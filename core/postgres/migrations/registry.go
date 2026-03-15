@@ -9,6 +9,7 @@ func Registry() []*gormigrate.Migration {
 		permissionmigration.Step01PermissionGroups(),
 		permissionmigration.Step02GroupPermissions(),
 		Step01Users(),
+		Step01UsersRenameLegacyRecords(),
 		permissionmigration.Step03UserPermissionGroups(),
 		Step02UserLoginEvents(),
 		Step03UserSettings(),
