@@ -167,8 +167,9 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 					if handled {
 						continue
 					}
+					continue
 				}
-				if handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorUnknownPacket, &errorMeter) {
+				if !authenticated && handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorUnknownPacket, &errorMeter) {
 					return
 				}
 			}
