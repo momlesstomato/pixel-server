@@ -31,6 +31,12 @@ type serveServices struct {
 	handler     *handshakerealtime.Handler
 }
 
+// FindByID verifies user existence by identifier, satisfying the authflow.UserFinder interface.
+func (services *serveServices) FindByID(ctx context.Context, id int) error {
+	_, err := services.users.FindByID(ctx, id)
+	return err
+}
+
 // buildServeServices constructs shared application dependencies.
 func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 	ssoStore, err := authenticationredisstore.NewRedisStore(runtime.Redis, runtime.Config.Authentication.KeyPrefix)

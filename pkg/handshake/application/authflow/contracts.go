@@ -22,6 +22,12 @@ type TicketValidator interface {
 	Validate(context.Context, string) (int, error)
 }
 
+// UserFinder defines user existence verification behavior for post-ticket validation.
+type UserFinder interface {
+	// FindByID verifies a user exists by identifier, returning error when not found.
+	FindByID(context.Context, int) error
+}
+
 // SessionRegistry defines session lifecycle persistence behavior.
 type SessionRegistry interface {
 	// Register stores or updates one connection session.

@@ -22,6 +22,8 @@ type AuthenticateUseCase struct {
 	now func() time.Time
 	// fire dispatches optional plugin lifecycle events.
 	fire func(sdk.Event)
+	// userFinder verifies user existence after ticket validation.
+	userFinder UserFinder
 }
 
 // NewAuthenticateUseCase creates authentication workflow behavior.
@@ -43,6 +45,11 @@ func (useCase *AuthenticateUseCase) SetEventFirer(fire func(sdk.Event)) {
 	useCase.fire = fire
 }
 
+// SetUserFinder configures optional user existence verification behavior.
+func (useCase *AuthenticateUseCase) SetUserFinder(finder UserFinder) {
+	useCase.userFinder = finder
+}
+
 // Authenticate validates ticket, handles duplicate sessions, and emits auth packets.
 func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request AuthenticateRequest) (AuthenticateResult, error) {
 	if request.ConnID == "" {
@@ -57,6 +64,12 @@ func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request Au
 	if err != nil {
 		useCase.closeWithReason(request.ConnID, packetauth.DisconnectReasonInvalidLoginTicket, UnauthorizedCloseCode, "unauthorized")
 		return AuthenticateResult{}, err
+	}
+	if useCase.userFinder != nil {
+		if err := useCase.userFinder.FindByID(ctx, userID); err != nil {
+			useCase.closeWithReason(request.ConnID, packetauth.DisconnectReasonInvalidLoginTicket, UnauthorizedCloseCode, "user not found")
+			return AuthenticateResult{}, err
+		}
 	}
 	if useCase.fire != nil {
 		validating := &sdk.AuthValidating{ConnID: request.ConnID, UserID: userID, Ticket: ticket}

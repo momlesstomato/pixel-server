@@ -10,5 +10,6 @@ func Registry() []*gormigrate.Migration {
 		Step02SystemSettings(),
 		permissionseed.Step01DefaultGroups(),
 		permissionseed.Step02DefaultPermissions(),
+		Step03TestUsers(),
 	}
 }

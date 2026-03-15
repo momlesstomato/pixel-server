@@ -25,6 +25,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 	}
 	handler.ConfigureBroadcaster(services.broadcaster)
 	handler.ConfigurePostAuth(services.hotelStatus, services.users, services.users, services.permissions, runtime.Config.App.Name)
+	handler.SetUserFinder(services)
 	handler.ConfigureUserRuntime(func(transport *handshakerealtime.Transport) (handshakerealtime.UserRuntime, error) {
 		options := userrealtime.Options{
 			Debounce: 2 * time.Second,
