@@ -72,7 +72,7 @@ type Module struct {
 	disposeError error
 }
 
-// New creates a Fiber module with zapfiber middleware pre-configured.
+// New creates a Fiber module with zapfiber and ray-id trace middlewares pre-configured.
 func New(options Options) *Module {
 	logger := options.Logger
 	if logger == nil {
@@ -83,7 +83,11 @@ func New(options Options) *Module {
 	if fiberConfig.ReadBufferSize <= 0 {
 		fiberConfig.ReadBufferSize = DefaultReadBufferSize
 	}
+	if fiberConfig.ErrorHandler == nil {
+		fiberConfig.ErrorHandler = buildErrorHandler(logger)
+	}
 	app := fiber.New(fiberConfig)
+	app.Use(TraceMiddleware())
 	app.Use(fiberzap.New(fiberzap.Config{
 		Logger: logger,
 		Next: func(_ *fiber.Ctx) bool {
@@ -94,6 +98,26 @@ func New(options Options) *Module {
 		app:                  app,
 		webSocketPaths:       map[string]struct{}{},
 		webSocketConnections: map[*websocket.Conn]struct{}{},
+	}
+}
+
+// buildErrorHandler returns a Fiber error handler that logs errors with ray_id context.
+func buildErrorHandler(logger *zap.Logger) fiber.ErrorHandler {
+	return func(ctx *fiber.Ctx, err error) error {
+		code := nethttp.StatusInternalServerError
+		message := "internal server error"
+		var fiberErr *fiber.Error
+		if errors.As(err, &fiberErr) {
+			code = fiberErr.Code
+			message = fiberErr.Message
+		}
+		rayID := RayID(ctx)
+		if code >= nethttp.StatusInternalServerError {
+			logger.Error("http error", zap.String("ray_id", rayID), zap.Int("status", code), zap.Error(err))
+		}
+		ctx.Set(HeaderRayID, rayID)
+		ctx.Status(code)
+		return ctx.JSON(fiber.Map{"error": message})
 	}
 }
 

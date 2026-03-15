@@ -2,6 +2,7 @@ package httpapi
 
 // OpenAPIPaths returns OpenAPI path items owned by authentication HTTP routes.
 func OpenAPIPaths() map[string]any {
+	errContent := errResponseContent()
 	return map[string]any{
 		"/api/v1/sso": map[string]any{
 			"post": map[string]any{
@@ -13,15 +14,11 @@ func OpenAPIPaths() map[string]any {
 					"content": map[string]any{
 						"application/json": map[string]any{
 							"schema": map[string]any{
-								"type": "object",
-								"required": []string{
-									"user_id",
-								},
+								"type":     "object",
+								"required": []string{"user_id"},
 								"properties": map[string]any{
-									"user_id": map[string]any{"type": "integer", "minimum": 1},
-									"ttl_seconds": map[string]any{
-										"type": "integer", "minimum": 1,
-									},
+									"user_id":     map[string]any{"type": "integer", "minimum": 1},
+									"ttl_seconds": map[string]any{"type": "integer", "minimum": 1},
 								},
 							},
 						},
@@ -43,12 +40,22 @@ func OpenAPIPaths() map[string]any {
 							},
 						},
 					},
-					"400": map[string]any{"description": "Invalid payload"},
-					"401": map[string]any{"description": "Invalid API key"},
-					"500": map[string]any{"description": "Internal server error"},
+					"400": map[string]any{"description": "Invalid payload", "content": errContent},
+					"401": map[string]any{"description": "Invalid API key", "content": errContent},
+					"500": map[string]any{"description": "Internal server error", "content": errContent},
 				},
 				"security": []map[string]any{{"ApiKeyAuth": []string{}}},
 			},
 		},
 	}
 }
+
+// errResponseContent returns an application/json content block referencing ErrorResponse schema.
+func errResponseContent() map[string]any {
+	return map[string]any{
+		"application/json": map[string]any{
+			"schema": map[string]any{"$ref": "#/components/schemas/ErrorResponse"},
+		},
+	}
+}
+

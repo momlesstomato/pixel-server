@@ -56,6 +56,8 @@ This document defines mandatory project constraints and success criteria.
 - API and CLI capabilities must remain 1:1 in behavior and feature surface.
 - OpenAPI/Swagger is mandatory for HTTP APIs.
 - Every HTTP endpoint must have a corresponding OpenAPI path specification.
+- Every OpenAPI path response entry must include a `content` block with an `application/json` schema for every status code it declares; bare description-only responses are forbidden.
+- Every HTTP request must carry a `X-Ray-ID` trace identifier in its response header; errors must be logged with the associated `ray_id` via the structured logger.
 - Swagger UI and raw OpenAPI document routes must be exposed and kept in sync with implemented endpoints.
 - Protocol-level disconnect packets and WebSocket close frames must be paired consistently (reason packet first, close frame second) using WebSocket-standard close codes.
 

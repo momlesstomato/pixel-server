@@ -21,6 +21,11 @@ func BuildDocument(webSocketPath string, extraPaths map[string]any) map[string]a
 	if path == "" {
 		path = "/ws"
 	}
+	errContent := map[string]any{
+		"application/json": map[string]any{
+			"schema": map[string]any{"$ref": "#/components/schemas/ErrorResponse"},
+		},
+	}
 	paths := map[string]any{
 		path: map[string]any{
 			"get": map[string]any{
@@ -28,9 +33,17 @@ func BuildDocument(webSocketPath string, extraPaths map[string]any) map[string]a
 				"summary":     "WebSocket endpoint",
 				"description": "Upgrades to websocket transport for realtime communication.",
 				"responses": map[string]any{
-					"101": map[string]any{"description": "Switching Protocols"},
-					"401": map[string]any{"description": "Invalid API key"},
-					"426": map[string]any{"description": "WebSocket upgrade required"},
+					"101": map[string]any{
+						"description": "Switching Protocols",
+						"content": map[string]any{
+							"application/json": map[string]any{"schema": map[string]any{"type": "object"}},
+						},
+					},
+					"401": map[string]any{"description": "Invalid API key", "content": errContent},
+					"426": map[string]any{
+						"description": "WebSocket upgrade required",
+						"content":     errContent,
+					},
 				},
 				"security": []map[string]any{{"ApiKeyAuth": []string{}}},
 			},
@@ -41,7 +54,12 @@ func BuildDocument(webSocketPath string, extraPaths map[string]any) map[string]a
 				"summary":     "OpenAPI document",
 				"description": "Returns OpenAPI 3.1 specification for all API endpoints.",
 				"responses": map[string]any{
-					"200": map[string]any{"description": "OpenAPI specification"},
+					"200": map[string]any{
+						"description": "OpenAPI specification",
+						"content": map[string]any{
+							"application/json": map[string]any{"schema": map[string]any{"type": "object"}},
+						},
+					},
 				},
 				"security": []any{},
 			},
@@ -52,7 +70,12 @@ func BuildDocument(webSocketPath string, extraPaths map[string]any) map[string]a
 				"summary":     "Swagger UI",
 				"description": "Returns Swagger UI page for API exploration.",
 				"responses": map[string]any{
-					"200": map[string]any{"description": "Swagger UI HTML"},
+					"200": map[string]any{
+						"description": "Swagger UI HTML",
+						"content": map[string]any{
+							"text/html": map[string]any{"schema": map[string]any{"type": "string"}},
+						},
+					},
 				},
 				"security": []any{},
 			},
@@ -67,15 +90,9 @@ func BuildDocument(webSocketPath string, extraPaths map[string]any) map[string]a
 			"title":   "Pixel Server API",
 			"version": "1.0.0",
 		},
-		"paths": paths,
-		"components": map[string]any{
-			"securitySchemes": map[string]any{
-				"ApiKeyAuth": map[string]any{
-					"type": "apiKey", "in": "header", "name": corehttp.DefaultAPIKeyHeader,
-				},
-			},
-		},
-		"security": []map[string]any{{"ApiKeyAuth": []string{}}},
+		"paths":      paths,
+		"components": BuildComponents(),
+		"security":   []map[string]any{{"ApiKeyAuth": []string{}}},
 	}
 }
 
