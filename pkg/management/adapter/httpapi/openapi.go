@@ -140,5 +140,3 @@ func OpenAPIPaths() map[string]any {
 		},
 	}
 }
-
-

@@ -132,7 +132,7 @@ func nameChangePostOp(params, sec []map[string]any, fail map[string]any) map[str
 // userProfileSchema returns the JSON Schema for a user profile response.
 func userProfileSchema() map[string]any {
 	return map[string]any{
-		"type": "object",
+		"type":     "object",
 		"required": []string{"id", "username", "figure", "gender", "motto"},
 		"properties": map[string]any{
 			"id":                map[string]any{"type": "integer"},
@@ -167,4 +167,3 @@ func userSettingsSchema() map[string]any {
 		},
 	}
 }
-

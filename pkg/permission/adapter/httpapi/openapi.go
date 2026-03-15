@@ -40,4 +40,3 @@ func OpenAPIPaths() map[string]any {
 func errResponseContent() map[string]any {
 	return map[string]any{"application/json": map[string]any{"schema": map[string]any{"$ref": "#/components/schemas/ErrorResponse"}}}
 }
-
