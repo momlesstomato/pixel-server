@@ -4,28 +4,28 @@ import (
 	"context"
 	"time"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	messengerapplication "github.com/momlesstomato/pixel-server/pkg/messenger/application"
 	"github.com/momlesstomato/pixel-server/pkg/messenger/domain"
-	sdk "github.com/momlesstomato/pixel-sdk"
 )
 
 // repositoryStub provides deterministic repository behavior for tests.
 type repositoryStub struct {
-	friendships     []domain.Friendship
-	areFriends      bool
-	friendCount     int
-	relationship    domain.RelationshipType
-	relCounts       []domain.RelationshipCount
-	request         domain.FriendRequest
-	requestFound    bool
-	requests        []domain.FriendRequest
-	offline         []domain.OfflineMessage
-	searchResults   []domain.SearchResult
-	userID          int
-	usernameFound   bool
-	callErr         error
+	friendships   []domain.Friendship
+	areFriends    bool
+	friendCount   int
+	relationship  domain.RelationshipType
+	relCounts     []domain.RelationshipCount
+	request       domain.FriendRequest
+	requestFound  bool
+	requests      []domain.FriendRequest
+	offline       []domain.OfflineMessage
+	searchResults []domain.SearchResult
+	userID        int
+	usernameFound bool
+	callErr       error
 }
 
 // ListFriendships returns stub friendships.
@@ -173,9 +173,9 @@ func (s *sessionRegistryStub) ListAll() ([]coreconnection.Session, error) { retu
 // newTestService creates a test messenger service from stubs.
 func newTestService(repo domain.Repository, sessions coreconnection.SessionRegistry, bus broadcast.Broadcaster) *messengerapplication.Service {
 	service, err := messengerapplication.NewService(repo, sessions, bus, messengerapplication.Config{
-		MaxFriends:      200,
-		FloodCooldownMs: 750,
-		FloodViolations: 4,
+		MaxFriends:       200,
+		FloodCooldownMs:  750,
+		FloodViolations:  4,
 		FloodMuteSeconds: 20,
 	})
 	if err != nil {

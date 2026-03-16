@@ -57,8 +57,20 @@ type Profile struct {
 	Figure string
 	// Motto stores profile motto value.
 	Motto string
+	// Registration stores account registration date string.
+	Registration string
+	// AchievementPoints stores profile achievement points.
+	AchievementPoints int
+	// FriendsCount stores total friends count.
+	FriendsCount int
+	// IsMyFriend stores whether viewer and target are friends.
+	IsMyFriend bool
+	// RequestSent stores whether viewer has a pending request to target.
+	RequestSent bool
 	// IsOnline stores current online marker.
 	IsOnline bool
+	// SecondsSinceLastVisit stores elapsed seconds since target last access.
+	SecondsSinceLastVisit int
 	// OpenProfileWindow stores client open profile flag.
 	OpenProfileWindow bool
 }

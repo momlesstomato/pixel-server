@@ -117,12 +117,15 @@ func (service *Service) UnignoreUserByUsername(ctx context.Context, connID strin
 	return targetID, nil
 }
 
-// LoadProfile resolves one user public profile payload.
-func (service *Service) LoadProfile(ctx context.Context, userID int, openProfileWindow bool) (domain.Profile, error) {
+// LoadProfile resolves one user public profile payload for one viewer.
+func (service *Service) LoadProfile(ctx context.Context, viewerUserID int, userID int, openProfileWindow bool) (domain.Profile, error) {
 	if userID <= 0 {
 		return domain.Profile{}, fmt.Errorf("user id must be positive")
 	}
-	return service.repository.LoadProfile(ctx, userID, openProfileWindow)
+	if viewerUserID < 0 {
+		return domain.Profile{}, fmt.Errorf("viewer user id must be zero or positive")
+	}
+	return service.repository.LoadProfile(ctx, viewerUserID, userID, openProfileWindow)
 }
 
 // ListRespects resolves respect audit rows for one target user.

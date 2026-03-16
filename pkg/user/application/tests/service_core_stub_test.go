@@ -114,7 +114,7 @@ func (stub coreRepositoryStub) UnignoreUserByID(_ context.Context, _ int, _ int)
 }
 
 // LoadProfile returns deterministic profile payload.
-func (stub coreRepositoryStub) LoadProfile(_ context.Context, userID int, openProfileWindow bool) (domain.Profile, error) {
+func (stub coreRepositoryStub) LoadProfile(_ context.Context, _ int, userID int, openProfileWindow bool) (domain.Profile, error) {
 	return domain.Profile{UserID: userID, OpenProfileWindow: openProfileWindow}, nil
 }
 

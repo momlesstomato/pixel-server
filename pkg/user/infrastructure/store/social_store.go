@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/pkg/user/domain"
 	usermodel "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/model"
@@ -115,15 +116,65 @@ func (repository *Repository) UnignoreUserByID(ctx context.Context, userID int, 
 	return result.Error
 }
 
-// LoadProfile resolves one partial public profile payload.
-func (repository *Repository) LoadProfile(ctx context.Context, userID int, openProfileWindow bool) (domain.Profile, error) {
+// LoadProfile resolves one partial public profile payload for one viewer.
+func (repository *Repository) LoadProfile(ctx context.Context, viewerUserID int, userID int, openProfileWindow bool) (domain.Profile, error) {
 	record, err := repository.loadRecord(ctx, userID)
 	if err != nil {
 		return domain.Profile{}, err
 	}
+	var friendsCount int64
+	hasFriendships := repository.database.WithContext(ctx).Migrator().HasTable("messenger_friendships")
+	hasRequests := repository.database.WithContext(ctx).Migrator().HasTable("friend_requests")
+	if hasFriendships {
+		if err = repository.database.WithContext(ctx).Table("messenger_friendships").
+			Where("user_one_id = ? OR user_two_id = ?", userID, userID).
+			Count(&friendsCount).Error; err != nil {
+			return domain.Profile{}, err
+		}
+	}
+	isMyFriend := false
+	requestSent := false
+	if viewerUserID > 0 && viewerUserID != userID && hasFriendships {
+		left := viewerUserID
+		right := userID
+		if right < left {
+			left, right = right, left
+		}
+		var pairCount int64
+		if err = repository.database.WithContext(ctx).Table("messenger_friendships").
+			Where("user_one_id = ? AND user_two_id = ?", left, right).
+			Count(&pairCount).Error; err != nil {
+			return domain.Profile{}, err
+		}
+		isMyFriend = pairCount > 0
+		if hasRequests {
+			var requestCount int64
+			if err = repository.database.WithContext(ctx).Table("friend_requests").
+				Where("from_user_id = ? AND to_user_id = ?", viewerUserID, userID).
+				Count(&requestCount).Error; err != nil {
+				return domain.Profile{}, err
+			}
+			requestSent = requestCount > 0
+		}
+	}
+	secondsSinceLastVisit := 0
+	if record.LastAccessAt != nil {
+		elapsed := int(time.Since(record.LastAccessAt.UTC()).Seconds())
+		if elapsed > 0 {
+			secondsSinceLastVisit = elapsed
+		}
+	}
 	return domain.Profile{
 		UserID: int(record.ID), Username: record.Username, Figure: record.Figure,
-		Motto: record.Motto, IsOnline: true, OpenProfileWindow: openProfileWindow,
+		Motto: record.Motto,
+		Registration: record.CreatedAt.UTC().Format("02-01-2006"),
+		AchievementPoints: 0,
+		FriendsCount: int(friendsCount),
+		IsMyFriend: isMyFriend,
+		RequestSent: requestSent,
+		IsOnline: false,
+		SecondsSinceLastVisit: secondsSinceLastVisit,
+		OpenProfileWindow: openProfileWindow,
 	}, nil
 }
 

@@ -63,8 +63,8 @@ type Repository interface {
 	UnignoreUserByUsername(context.Context, int, string) (int, error)
 	// UnignoreUserByID removes one ignore relation by target user identifier.
 	UnignoreUserByID(context.Context, int, int) error
-	// LoadProfile resolves one partial public profile payload.
-	LoadProfile(context.Context, int, bool) (Profile, error)
+	// LoadProfile resolves one partial public profile payload for one viewer.
+	LoadProfile(context.Context, int, int, bool) (Profile, error)
 	// ListRespects resolves respect audit rows for one target user.
 	ListRespects(context.Context, int, int, int) ([]RespectRecord, error)
 	// IsUsernameAvailable checks whether one username is available.

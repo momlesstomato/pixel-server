@@ -70,7 +70,7 @@ func (p MessengerMessageErrorComposer) PacketID() uint16 { return MessengerMessa
 // Encode serializes packet body payload.
 func (p MessengerMessageErrorComposer) Encode() ([]byte, error) {
 	w := codec.NewWriter()
-		w.WriteInt32(p.ErrorCode)
+	w.WriteInt32(p.ErrorCode)
 	w.WriteInt32(p.UserID)
-		return w.Bytes(), nil
+	return w.Bytes(), nil
 }

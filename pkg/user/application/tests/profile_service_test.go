@@ -139,7 +139,7 @@ func (stub repositoryStub) UnignoreUserByID(context.Context, int, int) error {
 }
 
 // LoadProfile returns deterministic profile payload.
-func (stub repositoryStub) LoadProfile(context.Context, int, bool) (domain.Profile, error) {
+func (stub repositoryStub) LoadProfile(context.Context, int, int, bool) (domain.Profile, error) {
 	return domain.Profile{UserID: 1}, nil
 }
 

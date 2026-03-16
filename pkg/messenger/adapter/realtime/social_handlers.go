@@ -49,18 +49,18 @@ func (runtime *Runtime) handleSetRelationship(ctx context.Context, connID string
 		runtime.logger.Sugar().Warnw("set relationship failed", "conn", connID, "err", err)
 		return nil
 	}
-	profiles, err := runtime.service.GetUserProfiles(ctx, []int{userID})
+	profiles, err := runtime.service.GetUserProfiles(ctx, []int{int(pkt.UserID)})
 	if err != nil || len(profiles) == 0 {
 		return nil
 	}
 	p := profiles[0]
-	_, online := runtime.sessions.FindByUserID(userID)
+	_, online := runtime.sessions.FindByUserID(int(pkt.UserID))
 	entry := packetrequest.FriendUpdateEntry{
-		Action: 0, FriendID: int32(userID), Username: p.Username,
+		Action: 0, FriendID: pkt.UserID, Username: p.Username,
 		Online: online, Figure: p.Figure, Motto: p.Motto,
 		Relationship: int16(rel),
 	}
-	go runtime.publishFriendUpdate(ctx, int(pkt.UserID), []packetrequest.FriendUpdateEntry{entry})
+	go runtime.publishFriendUpdate(ctx, userID, []packetrequest.FriendUpdateEntry{entry})
 	return nil
 }
 
@@ -74,15 +74,31 @@ func (runtime *Runtime) handleGetRelationships(ctx context.Context, connID strin
 	if err != nil {
 		return nil
 	}
+	sampleIDs := make([]int, 0, len(counts))
+	for _, c := range counts {
+		if len(c.SampleUserIDs) == 0 {
+			continue
+		}
+		sampleID := c.SampleUserIDs[0]
+		sampleIDs = append(sampleIDs, sampleID)
+	}
+	profiles, _ := runtime.service.GetUserProfiles(ctx, sampleIDs)
+	profileByID := make(map[int]struct{ Username, Figure string }, len(profiles))
+	for _, p := range profiles {
+		profileByID[p.ID] = struct{ Username, Figure string }{Username: p.Username, Figure: p.Figure}
+	}
 	entries := make([]packetsocial.RelationshipEntry, 0, len(counts))
 	for _, c := range counts {
-		sampleIDs := make([]int32, 0, len(c.SampleUserIDs))
-		for _, id := range c.SampleUserIDs {
-			sampleIDs = append(sampleIDs, int32(id))
+		entry := packetsocial.RelationshipEntry{Type: int32(c.Type), Count: int32(c.Count)}
+		if len(c.SampleUserIDs) > 0 {
+			sampleID := c.SampleUserIDs[0]
+			entry.RandomFriendID = int32(sampleID)
+			if sample, found := profileByID[sampleID]; found {
+				entry.RandomFriendName = sample.Username
+				entry.RandomFriendFigure = sample.Figure
+			}
 		}
-		entries = append(entries, packetsocial.RelationshipEntry{
-			Type: int32(c.Type), Count: int32(c.Count), SampleUserIDs: sampleIDs,
-		})
+		entries = append(entries, entry)
 	}
 	return runtime.sendPacket(connID, packetsocial.MessengerRelationshipsComposer{
 		UserID: pkt.UserID, Entries: entries,

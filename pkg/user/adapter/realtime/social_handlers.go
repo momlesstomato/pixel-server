@@ -93,19 +93,22 @@ func (runtime *Runtime) handleIgnoreByID(ctx context.Context, connID string, use
 }
 
 // handleGetProfile processes one user.get_profile packet.
-func (runtime *Runtime) handleGetProfile(ctx context.Context, connID string, body []byte) error {
+func (runtime *Runtime) handleGetProfile(ctx context.Context, connID string, viewerUserID int, body []byte) error {
 	packet := packetprofileview.UserGetProfilePacket{}
 	if err := packet.Decode(body); err != nil {
 		return runtime.logError(connID, packet.PacketID(), err)
 	}
-	profile, err := runtime.service.LoadProfile(ctx, int(packet.UserID), packet.OpenProfileWindow)
+	profile, err := runtime.service.LoadProfile(ctx, viewerUserID, int(packet.UserID), packet.OpenProfileWindow)
 	if err != nil {
 		return runtime.logError(connID, packet.PacketID(), err)
 	}
+	_, online := runtime.sessions.FindByUserID(int(packet.UserID))
 	response := packetprofileview.UserProfilePacket{
 		UserID: int32(profile.UserID), Username: profile.Username, Figure: profile.Figure,
-		Motto: profile.Motto, Registration: "", AchievementPoints: 0, FriendsCount: 0,
-		IsMyFriend: false, RequestSent: false, IsOnline: profile.IsOnline, SecondsSinceLastVisit: 0,
+		Motto: profile.Motto, Registration: profile.Registration,
+		AchievementPoints: int32(profile.AchievementPoints), FriendsCount: int32(profile.FriendsCount),
+		IsMyFriend: profile.IsMyFriend, RequestSent: profile.RequestSent,
+		IsOnline: online, SecondsSinceLastVisit: int32(profile.SecondsSinceLastVisit),
 		OpenProfileWindow: profile.OpenProfileWindow,
 	}
 	return runtime.sendPacket(connID, response)

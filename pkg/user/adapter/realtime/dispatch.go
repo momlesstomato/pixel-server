@@ -47,7 +47,7 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 	case runtime.packetIDs.IgnoreByID:
 		return true, runtime.handleIgnoreByID(ctx, connID, userID, body)
 	case packetprofileview.UserGetProfilePacketID:
-		return true, runtime.handleGetProfile(ctx, connID, body)
+		return true, runtime.handleGetProfile(ctx, connID, userID, body)
 	case packetname.UserCheckNamePacketID:
 		return true, runtime.handleCheckName(ctx, connID, userID, body)
 	case packetname.UserChangeNamePacketID:

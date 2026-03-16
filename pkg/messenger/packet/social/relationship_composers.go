@@ -8,8 +8,12 @@ type RelationshipEntry struct {
 	Type int32
 	// Count stores the number of friends with this relationship.
 	Count int32
-	// SampleUserIDs stores up to three sample user identifiers.
-	SampleUserIDs []int32
+	// RandomFriendID stores one sample friend identifier for this relationship type.
+	RandomFriendID int32
+	// RandomFriendName stores one sample friend username for this relationship type.
+	RandomFriendName string
+	// RandomFriendFigure stores one sample friend figure for this relationship type.
+	RandomFriendFigure string
 }
 
 // MessengerRelationshipsComposer defines server messenger.relationships payload.
@@ -33,9 +37,12 @@ func (p MessengerRelationshipsComposer) Encode() ([]byte, error) {
 	for _, e := range p.Entries {
 		w.WriteInt32(e.Type)
 		w.WriteInt32(e.Count)
-		w.WriteInt32(int32(len(e.SampleUserIDs)))
-		for _, id := range e.SampleUserIDs {
-			w.WriteInt32(id)
+		w.WriteInt32(e.RandomFriendID)
+		if err := w.WriteString(e.RandomFriendName); err != nil {
+			return nil, err
+		}
+		if err := w.WriteString(e.RandomFriendFigure); err != nil {
+			return nil, err
 		}
 	}
 	return w.Bytes(), nil
