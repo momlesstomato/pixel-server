@@ -166,15 +166,15 @@ func (repository *Repository) LoadProfile(ctx context.Context, viewerUserID int,
 	}
 	return domain.Profile{
 		UserID: int(record.ID), Username: record.Username, Figure: record.Figure,
-		Motto: record.Motto,
-		Registration: record.CreatedAt.UTC().Format("02-01-2006"),
-		AchievementPoints: 0,
-		FriendsCount: int(friendsCount),
-		IsMyFriend: isMyFriend,
-		RequestSent: requestSent,
-		IsOnline: false,
+		Motto:                 record.Motto,
+		Registration:          record.CreatedAt.UTC().Format("02-01-2006"),
+		AchievementPoints:     0,
+		FriendsCount:          int(friendsCount),
+		IsMyFriend:            isMyFriend,
+		RequestSent:           requestSent,
+		IsOnline:              false,
 		SecondsSinceLastVisit: secondsSinceLastVisit,
-		OpenProfileWindow: openProfileWindow,
+		OpenProfileWindow:     openProfileWindow,
 	}, nil
 }
 
