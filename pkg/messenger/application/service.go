@@ -1,0 +1,110 @@
+package application
+
+import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/momlesstomato/pixel-server/core/broadcast"
+	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
+	sdk "github.com/momlesstomato/pixel-sdk"
+	"github.com/momlesstomato/pixel-server/pkg/messenger/domain"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+)
+
+// Config defines messenger service runtime configuration.
+type Config struct {
+	// MaxFriends stores the normal friend list capacity.
+	MaxFriends int `default:"200"`
+	// MaxFriendsVIP stores the VIP friend list capacity.
+	MaxFriendsVIP int `default:"500"`
+	// FloodCooldownMs stores the minimum milliseconds between messages.
+	FloodCooldownMs int `default:"750"`
+	// FloodViolations stores the violation count threshold that triggers a mute.
+	FloodViolations int `default:"4"`
+	// FloodMuteSeconds stores the mute duration in seconds after flood threshold.
+	FloodMuteSeconds int `default:"20"`
+	// OfflineMsgTTLDays stores the offline message retention period in days.
+	OfflineMsgTTLDays int `default:"30"`
+	// FragmentSize stores the number of friends per list fragment packet.
+	FragmentSize int `default:"750"`
+}
+
+// floodState tracks message flood control state per connection.
+type floodState struct {
+	// lastMessage stores the last message timestamp.
+	lastMessage time.Time
+	// violations stores accumulated speed violations.
+	violations int
+	// mutedUntil stores the mute expiry timestamp; zero when not muted.
+	mutedUntil time.Time
+}
+
+// Service defines messenger application use-cases.
+type Service struct {
+	// repository stores messenger persistence contract.
+	repository domain.Repository
+	// sessions stores active connection registry.
+	sessions coreconnection.SessionRegistry
+	// broadcaster stores cross-instance publish behavior.
+	broadcaster broadcast.Broadcaster
+	// fire stores optional plugin event dispatch behavior.
+	fire func(sdk.Event)
+	// flood guards per-connection message rate state.
+	flood map[string]*floodState
+	// floodMu guards the flood map.
+	floodMu sync.Mutex
+	// config stores runtime service configuration.
+	config Config
+}
+
+// NewService creates one messenger service.
+func NewService(repository domain.Repository, sessions coreconnection.SessionRegistry, broadcaster broadcast.Broadcaster, config Config) (*Service, error) {
+	if repository == nil {
+		return nil, fmt.Errorf("messenger repository is required")
+	}
+	if sessions == nil {
+		return nil, fmt.Errorf("session registry is required")
+	}
+	if broadcaster == nil {
+		return nil, fmt.Errorf("broadcaster is required")
+	}
+	if config.MaxFriends <= 0 {
+		config.MaxFriends = 200
+	}
+	if config.MaxFriendsVIP <= 0 {
+		config.MaxFriendsVIP = 500
+	}
+	if config.FloodCooldownMs <= 0 {
+		config.FloodCooldownMs = 750
+	}
+	if config.FloodViolations <= 0 {
+		config.FloodViolations = 4
+	}
+	if config.FloodMuteSeconds <= 0 {
+		config.FloodMuteSeconds = 20
+	}
+	if config.OfflineMsgTTLDays <= 0 {
+		config.OfflineMsgTTLDays = 30
+	}
+	if config.FragmentSize <= 0 {
+		config.FragmentSize = 750
+	}
+	return &Service{
+		repository: repository, sessions: sessions, broadcaster: broadcaster,
+		config: config, flood: make(map[string]*floodState),
+	}, nil
+}
+
+// SetEventFirer configures optional plugin event dispatch behavior.
+func (service *Service) SetEventFirer(fire func(sdk.Event)) {
+	service.fire = fire
+}
+
+// userChannel returns the per-user broadcast channel key.
+func userChannel(userID int) string {
+	return sessionnotification.UserChannel(userID)
+}
+
+// Config returns the service runtime configuration.
+func (service *Service) Config() Config { return service.config }

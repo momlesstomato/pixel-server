@@ -1,6 +1,7 @@
 package migrations
 
 import gormigrate "github.com/go-gormigrate/gormigrate/v2"
+import messengermigration "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/migration"
 import permissionmigration "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/migration"
 
 // Registry returns ordered schema migration steps.
@@ -16,5 +17,9 @@ func Registry() []*gormigrate.Migration {
 		Step04UserRespects(),
 		Step05UserWardrobe(),
 		Step06UserIgnores(),
+		messengermigration.Step01MessengerFriendships(),
+		messengermigration.Step02FriendRequests(),
+		messengermigration.Step03OfflineMessages(),
+		messengermigration.Step04NormalizeFriendships(),
 	}
 }

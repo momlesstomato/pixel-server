@@ -167,6 +167,9 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 					if handled {
 						continue
 					}
+					handler.logger.Debug("packet not handled by any realm",
+						zap.String("conn_id", connID),
+						zap.Uint16("packet_id", frame.PacketID))
 					continue
 				}
 				if !authenticated && handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorUnknownPacket, &errorMeter) {

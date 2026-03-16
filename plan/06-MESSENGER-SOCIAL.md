@@ -20,7 +20,7 @@ PlusEMU is the only vendor that persists offline messages.
 |---------|-------------|--------------------------|-----------------|-------------------|
 | Offline messages | Persistent DB | Dropped | Dropped | **Persistent DB** |
 | Relationships location | friendship table (migrated) | `relation` column | separate `player_relationships` | **friendship table** |
-| Relationship values | 0–3 int | 0–3 short | HEART/SMILE/BOBBA/POOP enum | **0–3 int** |
+| Relationship values | 0–3 int | 0–3 short | HEART/SMILE/BOBBA/POOP enum | **Extendable registry** |
 | Friend categories | Hardcoded 0 | DB-driven | 1 if group chat enabled | **Hardcoded 0** (defer categories) |
 | Flood control | 12/5s window, 1m mute | 750ms cooldown | 750ms + progressive mute | **750ms + progressive mute** |
 | Batch accept cap | 50 | Uncapped | Uncapped | **50** |
@@ -167,9 +167,9 @@ messenger_friendships
 ├── INDEX(user_two_id)
 ```
 
-**Constraint:** relationship values 0–3 only. Enforced in the application
-layer. Relationships are asymmetric — A can mark B as heart while B marks
-A as smile.
+**Constraint:** relationship values are validated against the `KnownRelationships` registry
+in the domain layer. Plugins extend the registry at startup via `RegisterRelationship`.
+Relationships are asymmetric — A can mark B as heart while B marks A as smile.
 
 ### Table 2: `friend_requests`
 
@@ -275,6 +275,18 @@ const (
     RelationshipSmile RelationshipType = 2
     RelationshipBobba RelationshipType = 3
 )
+
+// KnownRelationships maps all registered relationship types to their labels.
+// Plugins call RegisterRelationship to extend the set at startup.
+var KnownRelationships = map[RelationshipType]string{
+    RelationshipNone:  "none",
+    RelationshipHeart: "heart",
+    RelationshipSmile: "smile",
+    RelationshipBobba: "bobba",
+}
+
+func RegisterRelationship(t RelationshipType, label string) { KnownRelationships[t] = label }
+func IsValidRelationship(t RelationshipType) bool { _, ok := KnownRelationships[t]; return ok }
 ```
 
 ### Domain Errors
@@ -528,31 +540,35 @@ transactions.
 
 ## Implementation Roadmap
 
-### Milestone 1 (Core)
+### Milestone 1: Core Messenger
 
-1. Domain model: entities, repository interface, errors
-2. Database tables + migrations
-3. Repository implementation (PostgreSQL)
-4. Application service: friend CRUD, requests, messaging
-5. `messenger.init` → `messenger.friends` + `messenger.requests` flow
-6. `messenger.send_request` → `messenger.new_request` flow
-7. `messenger.accept_friend` / `messenger.decline_friend` flows
-8. `messenger.remove_friend` flow
-9. `messenger.send_msg` → `messenger.new_message` + offline storage
-10. `messenger.friend_update` on connect/disconnect via Redis Pub/Sub
-11. Plugin events for all operations
-12. Flood control implementation
+| # | Task | Depends On | Status |
+|---|------|-----------|--------|
+| 1 | Domain model: entities, repository interface, errors | - | ✅ DONE |
+| 2 | Database tables + migrations | 1 | ✅ DONE |
+| 3 | Repository implementation (PostgreSQL) | 1, 2 | ✅ DONE |
+| 4 | Application service: friend CRUD, requests, messaging | 1, 3 | ✅ DONE |
+| 5 | `messenger.init` → `messenger.friends` + `messenger.requests` flow | 4 | ✅ DONE |
+| 6 | `messenger.send_request` → `messenger.new_request` flow | 4 | ✅ DONE |
+| 7 | `messenger.accept_friend` / `messenger.decline_friend` flows | 4 | ✅ DONE |
+| 8 | `messenger.remove_friend` flow | 4 | ✅ DONE |
+| 9 | `messenger.send_msg` → `messenger.new_message` + offline storage | 4 | ✅ DONE |
+| 10 | `messenger.friend_update` on connect/disconnect via Redis Pub/Sub | 4, 5 | ✅ DONE |
+| 11 | Plugin events for all operations | 4 | ✅ DONE |
+| 12 | Flood control implementation | 4, 9 | ✅ DONE |
 
-### Milestone 2 (Social)
+### Milestone 2: Social Features
 
-1. `messenger.search` → `messenger.search_result` flow
-2. `messenger.follow_friend` → room navigation or `messenger.follow_failed`
-3. `messenger.send_invite` → `messenger.room_invite` routing
-4. `messenger.set_relationship` / `messenger.get_relationships` flows
-5. `messenger.friend_notification` for various notification types
-6. Friend list fragmentation (750 per fragment)
-7. Admin REST API endpoints
-8. Admin CLI commands
-9. OpenAPI specifications
-10. Offline message delivery on login
-11. E2E tests for all flows
+| # | Task | Depends On | Status |
+|---|------|-----------|--------|
+| 1 | `messenger.search` → `messenger.search_result` flow | M1 | ✅ DONE |
+| 2 | `messenger.follow_friend` → room navigation or `messenger.follow_failed` | M1 | ✅ DONE |
+| 3 | `messenger.send_invite` → `messenger.room_invite` routing | M1 | ✅ DONE |
+| 4 | `messenger.set_relationship` / `messenger.get_relationships` flows | M1 | ✅ DONE |
+| 5 | `messenger.friend_notification` for various notification types | M1 | ✅ DONE |
+| 6 | Friend list fragmentation (750 per fragment) | M1.5 | ✅ DONE |
+| 7 | Admin REST API endpoints | M1 | ✅ DONE |
+| 8 | Admin CLI commands | M1 | ✅ DONE |
+| 9 | OpenAPI specifications | 7 | ✅ DONE |
+| 10 | Offline message delivery on login | M1.9 | ✅ DONE |
+| 11 | E2E tests for all flows | M1, M2.1–10 | ✅ DONE |

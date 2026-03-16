@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSteps verifies migration step registry contents.
 func TestRegistryReturnsOrderedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 10 {
-		t.Fatalf("expected ten migration steps, got %d", len(steps))
+	if len(steps) != 14 {
+		t.Fatalf("expected fourteen migration steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260314_01_permission_groups" {
 		t.Fatalf("unexpected migration step metadata")
@@ -36,6 +36,18 @@ func TestRegistryReturnsOrderedSteps(t *testing.T) {
 		t.Fatalf("unexpected migration step metadata")
 	}
 	if steps[9] == nil || steps[9].ID != "20260313_06_user_ignores" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[10] == nil || steps[10].ID != "20260315_01_messenger_friendships" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[11] == nil || steps[11].ID != "20260315_02_friend_requests" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[12] == nil || steps[12].ID != "20260315_03_offline_messages" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[13] == nil || steps[13].ID != "20260315_04_normalize_messenger_friendships" {
 		t.Fatalf("unexpected migration step metadata")
 	}
 }

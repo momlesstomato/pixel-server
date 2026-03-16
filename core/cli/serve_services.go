@@ -10,6 +10,8 @@ import (
 	authenticationapplication "github.com/momlesstomato/pixel-server/pkg/authentication/application"
 	authenticationredisstore "github.com/momlesstomato/pixel-server/pkg/authentication/infrastructure/redisstore"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
+	messengerapplication "github.com/momlesstomato/pixel-server/pkg/messenger/application"
+	messengerstore "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/store"
 	permissionnotification "github.com/momlesstomato/pixel-server/pkg/permission/adapter/notification"
 	permissionapplication "github.com/momlesstomato/pixel-server/pkg/permission/application"
 	permissionstore "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/store"
@@ -28,6 +30,7 @@ type serveServices struct {
 	hotelStatus *sessionhotelstatus.Service
 	users       *userapplication.Service
 	permissions *permissionapplication.Service
+	messenger   *messengerapplication.Service
 	handler     *handshakerealtime.Handler
 }
 
@@ -86,9 +89,22 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		return nil, err
 	}
 	permissions.SetLiveUpdater(liveUpdater)
+	messengerRepository, err := messengerstore.NewRepository(runtime.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
+	messenger, err := messengerapplication.NewService(messengerRepository, registry, broadcaster, messengerapplication.Config{})
+	if err != nil {
+		return nil, err
+	}
 	return &serveServices{
-		sso:      authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
-		registry: registry, bus: bus, broadcaster: broadcaster,
-		hotelStatus: hotelStatus, users: users, permissions: permissions,
+		sso:         authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
+		registry:    registry,
+		bus:         bus,
+		broadcaster: broadcaster,
+		hotelStatus: hotelStatus,
+		users:       users,
+		permissions: permissions,
+		messenger:   messenger,
 	}, nil
 }

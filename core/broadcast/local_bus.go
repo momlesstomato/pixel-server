@@ -22,20 +22,28 @@ func NewLocalBroadcaster() *LocalBroadcaster {
 }
 
 // Publish sends one payload to all active subscribers on one channel.
-func (broadcaster *LocalBroadcaster) Publish(_ context.Context, channel string, payload []byte) error {
+func (broadcaster *LocalBroadcaster) Publish(ctx context.Context, channel string, payload []byte) error {
 	if channel == "" {
 		return fmt.Errorf("channel is required")
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	broadcaster.mutex.RLock()
-	listeners := broadcaster.subscribers[channel]
-	for listener := range listeners {
+	rawListeners := broadcaster.subscribers[channel]
+	listeners := make([]chan []byte, 0, len(rawListeners))
+	for listener := range rawListeners {
+		listeners = append(listeners, listener)
+	}
+	broadcaster.mutex.RUnlock()
+	for _, listener := range listeners {
 		copyPayload := append([]byte(nil), payload...)
 		select {
 		case listener <- copyPayload:
-		default:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
-	broadcaster.mutex.RUnlock()
 	return nil
 }
 

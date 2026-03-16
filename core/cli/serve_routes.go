@@ -12,11 +12,37 @@ import (
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	managementhttpapi "github.com/momlesstomato/pixel-server/pkg/management/adapter/httpapi"
+	messengerhttpapi "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/httpapi"
+	messengerrealtime "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/realtime"
 	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
 	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
 	userapplication "github.com/momlesstomato/pixel-server/pkg/user/application"
 )
+
+// compositeRuntime dispatches packets to an ordered list of user runtimes.
+type compositeRuntime struct {
+	// runtimes stores ordered runtimes to try for each packet.
+	runtimes []handshakerealtime.UserRuntime
+}
+
+// Handle tries each runtime in order until one claims the packet.
+func (c *compositeRuntime) Handle(ctx context.Context, connID string, packetID uint16, payload []byte) (bool, error) {
+	for _, r := range c.runtimes {
+		handled, err := r.Handle(ctx, connID, packetID, payload)
+		if handled || err != nil {
+			return handled, err
+		}
+	}
+	return false, nil
+}
+
+// Dispose releases all runtime resources for one connection.
+func (c *compositeRuntime) Dispose(connID string) {
+	for _, r := range c.runtimes {
+		r.Dispose(connID)
+	}
+}
 
 // registerServeWebSocket registers websocket endpoint behavior.
 func registerServeWebSocket(module *corehttp.Module, path string, runtime *initializer.Runtime, services *serveServices) error {
@@ -39,7 +65,15 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			},
 			Logger: runtime.Logger,
 		}
-		return userrealtime.NewRuntime(services.users, services.registry, transport, options)
+		userRT, err := userrealtime.NewRuntime(services.users, services.registry, transport, options)
+		if err != nil {
+			return nil, err
+		}
+		msgRT, err := messengerrealtime.NewRuntime(services.messenger, services.registry, services.broadcaster, transport, messengerrealtime.Options{Logger: runtime.Logger})
+		if err != nil {
+			return nil, err
+		}
+		return &compositeRuntime{runtimes: []handshakerealtime.UserRuntime{userRT, msgRT}}, nil
 	})
 	services.handler = handler
 	webSocketPath := strings.TrimSpace(path)
@@ -67,7 +101,14 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 	if err := permissionhttpapi.RegisterRoutes(module, services.permissions); err != nil {
 		return err
 	}
-	paths := mergeOpenAPIPaths(authenticationhttpapi.OpenAPIPaths(), managementhttpapi.OpenAPIPaths(), userhttpapi.OpenAPIPaths(), permissionhttpapi.OpenAPIPaths())
+	if err := messengerhttpapi.RegisterRoutes(module, services.messenger); err != nil {
+		return err
+	}
+	paths := mergeOpenAPIPaths(
+		authenticationhttpapi.OpenAPIPaths(), managementhttpapi.OpenAPIPaths(),
+		userhttpapi.OpenAPIPaths(), permissionhttpapi.OpenAPIPaths(),
+		messengerhttpapi.OpenAPIPaths(),
+	)
 	return httpopenapi.RegisterRoutes(module, httpopenapi.BuildDocument(wsPath, paths), "", "")
 }
 
