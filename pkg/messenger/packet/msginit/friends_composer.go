@@ -21,6 +21,8 @@ type FriendEntry struct {
 	Motto string
 	// Relationship stores the relationship type from viewer perspective.
 	Relationship int16
+	// PersistedMessage indicates the friend has offline messages waiting.
+	PersistedMessage bool
 }
 
 // MessengerFriendsComposer defines server messenger.friends fragment payload.
@@ -76,7 +78,7 @@ func encodeFriendEntry(w *codec.Writer, f FriendEntry) error {
 	if err := w.WriteString(""); err != nil {
 		return err
 	}
-	w.WriteBool(true)
+	w.WriteBool(f.PersistedMessage)
 	w.WriteBool(false)
 	w.WriteBool(false)
 	w.WriteUint16(uint16(f.Relationship))

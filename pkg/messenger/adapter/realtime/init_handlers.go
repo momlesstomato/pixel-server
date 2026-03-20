@@ -14,19 +14,36 @@ func (runtime *Runtime) handleInit(ctx context.Context, connID string, userID in
 	if resolved == 0 {
 		resolved = runtime.service.Config().MaxFriendsVIP
 	}
-	composer := packetmsginit.MessengerInitComposer{
+	initComposer := packetmsginit.MessengerInitComposer{
 		UserFriendLimit: int32(resolved),
 		NormalLimit:     int32(runtime.service.Config().MaxFriends),
 		ExtendedLimit:   int32(runtime.service.Config().MaxFriendsVIP),
 	}
-	if err := runtime.sendPacket(connID, composer); err != nil {
+	if err := runtime.sendPacket(connID, initComposer); err != nil {
 		return err
 	}
-	if err := runtime.sendFriendFragments(ctx, connID, userID); err != nil {
+	offline, err := runtime.service.DeliverOfflineMessages(ctx, userID)
+	if err != nil {
 		return err
 	}
-	if err := runtime.deliverOfflineMessages(ctx, connID, userID); err != nil {
+	senders := make(map[int]bool, len(offline))
+	for _, msg := range offline {
+		senders[msg.FromUserID] = true
+	}
+	if err := runtime.sendFriendFragments(ctx, connID, userID, senders); err != nil {
 		return err
+	}
+	for _, msg := range offline {
+		seconds := int32(time.Since(msg.SentAt).Seconds())
+		if seconds < 0 {
+			seconds = 0
+		}
+		composer := packetmessage.MessengerNewMessageComposer{
+			SenderID: int32(msg.FromUserID), Message: msg.Message, SecondsSinceSent: seconds,
+		}
+		if err := runtime.sendPacket(connID, composer); err != nil {
+			runtime.logger.Sugar().Warnw("offline msg delivery failed", "conn", connID, "err", err)
+		}
 	}
 	go runtime.notifyFriendsStatus(userID, true)
 	return nil
@@ -34,7 +51,7 @@ func (runtime *Runtime) handleInit(ctx context.Context, connID string, userID in
 
 // handleGetFriends handles messenger.get_friends - resends friend list fragments.
 func (runtime *Runtime) handleGetFriends(ctx context.Context, connID string, userID int) error {
-	return runtime.sendFriendFragments(ctx, connID, userID)
+	return runtime.sendFriendFragments(ctx, connID, userID, nil)
 }
 
 // handleGetRequests handles messenger.get_requests - resends pending requests.
@@ -43,7 +60,8 @@ func (runtime *Runtime) handleGetRequests(ctx context.Context, connID string, us
 }
 
 // sendFriendFragments sends all friend list fragment packets for one user.
-func (runtime *Runtime) sendFriendFragments(ctx context.Context, connID string, userID int) error {
+// persistedSenders marks which friend user IDs have offline messages waiting; nil means none.
+func (runtime *Runtime) sendFriendFragments(ctx context.Context, connID string, userID int, persistedSenders map[int]bool) error {
 	friends, err := runtime.service.ListFriends(ctx, userID)
 	if err != nil {
 		return err
@@ -66,7 +84,8 @@ func (runtime *Runtime) sendFriendFragments(ctx context.Context, connID string, 
 		entries = append(entries, packetmsginit.FriendEntry{
 			ID: int32(f.UserTwoID), Username: p.Username, Figure: p.Figure,
 			Motto: p.Motto, Online: online,
-			Relationship: packetmsginit.MapRelationship(f.Relationship),
+			Relationship:     packetmsginit.MapRelationship(f.Relationship),
+			PersistedMessage: persistedSenders[f.UserTwoID],
 		})
 	}
 	total := (len(entries) + size - 1) / size
@@ -117,23 +136,3 @@ func (runtime *Runtime) sendPendingRequests(ctx context.Context, connID string, 
 	return runtime.sendPacket(connID, packetmsginit.MessengerRequestsComposer{Requests: entries})
 }
 
-// deliverOfflineMessages fetches and sends offline messages for one user on connect.
-func (runtime *Runtime) deliverOfflineMessages(ctx context.Context, connID string, userID int) error {
-	messages, err := runtime.service.DeliverOfflineMessages(ctx, userID)
-	if err != nil {
-		return err
-	}
-	for _, msg := range messages {
-		seconds := int32(time.Since(msg.SentAt).Seconds())
-		if seconds < 0 {
-			seconds = 0
-		}
-		composer := packetmessage.MessengerNewMessageComposer{
-			SenderID: int32(msg.FromUserID), Message: msg.Message, SecondsSinceSent: seconds,
-		}
-		if err := runtime.sendPacket(connID, composer); err != nil {
-			runtime.logger.Sugar().Warnw("offline msg delivery failed", "conn", connID, "err", err)
-		}
-	}
-	return nil
-}
