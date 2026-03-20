@@ -10,8 +10,12 @@ import (
 
 // handleInit handles messenger.init - sends init, friends fragments, requests, delivers offline, subscribes.
 func (runtime *Runtime) handleInit(ctx context.Context, connID string, userID int) error {
+	resolved := runtime.service.ResolvedFriendLimit(ctx, userID)
+	if resolved == 0 {
+		resolved = runtime.service.Config().MaxFriendsVIP
+	}
 	composer := packetmsginit.MessengerInitComposer{
-		UserFriendLimit: int32(runtime.service.Config().MaxFriends),
+		UserFriendLimit: int32(resolved),
 		NormalLimit:     int32(runtime.service.Config().MaxFriends),
 		ExtendedLimit:   int32(runtime.service.Config().MaxFriendsVIP),
 	}

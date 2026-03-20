@@ -43,6 +43,9 @@ func (service *Service) SendRequest(ctx context.Context, connID string, fromUser
 		return domain.FriendRequest{}, false, err
 	}
 	if reverseFound {
+		if err = service.checkFriendLimits(ctx, fromUserID, toUserID); err != nil {
+			return domain.FriendRequest{}, false, err
+		}
 		if err = service.repository.DeleteRequest(ctx, reverse.ID); err != nil {
 			return domain.FriendRequest{}, false, err
 		}
@@ -62,6 +65,31 @@ func (service *Service) SendRequest(ctx context.Context, connID string, fromUser
 	return req, false, err
 }
 
+// checkFriendLimits verifies that neither user has reached their permitted friend cap.
+func (service *Service) checkFriendLimits(ctx context.Context, userOneID, userTwoID int) error {
+	limitOne := service.ResolvedFriendLimit(ctx, userOneID)
+	if limitOne > 0 {
+		count, err := service.repository.CountFriends(ctx, userOneID)
+		if err != nil {
+			return err
+		}
+		if count >= limitOne {
+			return domain.ErrFriendListFull
+		}
+	}
+	limitTwo := service.ResolvedFriendLimit(ctx, userTwoID)
+	if limitTwo > 0 {
+		count, err := service.repository.CountFriends(ctx, userTwoID)
+		if err != nil {
+			return err
+		}
+		if count >= limitTwo {
+			return domain.ErrTargetFriendListFull
+		}
+	}
+	return nil
+}
+
 // AcceptRequest accepts one friend request by from-user identifier.
 // If the request row was already removed (e.g. by a concurrent decline) the
 // method still proceeds: it skips deletion and falls back to an AreFriends
@@ -73,6 +101,9 @@ func (service *Service) AcceptRequest(ctx context.Context, userID, fromUserID in
 	}
 	reverse, reverseFound, err := service.repository.FindRequestByUsers(ctx, userID, fromUserID)
 	if err != nil {
+		return err
+	}
+	if err = service.checkFriendLimits(ctx, userID, fromUserID); err != nil {
 		return err
 	}
 	if service.fire != nil {

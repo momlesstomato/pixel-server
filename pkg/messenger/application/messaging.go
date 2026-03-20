@@ -22,7 +22,7 @@ func (service *Service) SendMessage(ctx context.Context, connID string, fromUser
 	if len(message) > maxMessageLength {
 		message = message[:maxMessageLength]
 	}
-	if err := service.checkFlood(connID); err != nil {
+	if err := service.checkFlood(ctx, connID, fromUserID); err != nil {
 		return err
 	}
 	if service.fire != nil {
@@ -80,7 +80,13 @@ func (service *Service) PurgeOldOfflineMessages(ctx context.Context) error {
 }
 
 // checkFlood enforces message rate limiting for one connection.
-func (service *Service) checkFlood(connID string) error {
+// When the sender holds messenger.flood.bypass the check is skipped entirely.
+func (service *Service) checkFlood(ctx context.Context, connID string, userID int) error {
+	if service.checker != nil {
+		if ok, _ := service.checker.HasPermission(ctx, userID, domain.PermFloodBypass); ok {
+			return nil
+		}
+	}
 	service.floodMu.Lock()
 	defer service.floodMu.Unlock()
 	state, ok := service.flood[connID]

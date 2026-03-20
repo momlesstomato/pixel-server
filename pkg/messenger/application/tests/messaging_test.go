@@ -75,3 +75,28 @@ func TestPurgeOldOfflineMessages_Positive(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+// TestSendMessage_FloodBlocked verifies that rapid messages trigger ErrSenderMuted.
+func TestSendMessage_FloodBlocked(t *testing.T) {
+	repo := repositoryStub{areFriends: true}
+	service := newTestService(repo, &sessionRegistryStub{}, &broadcasterStub{})
+	for i := 0; i < 5; i++ {
+		_ = service.SendMessage(context.Background(), "conn1", 1, 2, "hi")
+	}
+	err := service.SendMessage(context.Background(), "conn1", 1, 2, "hi")
+	if err != domain.ErrSenderMuted {
+		t.Fatalf("expected ErrSenderMuted after flood, got %v", err)
+	}
+}
+
+// TestSendMessage_FloodBypass_SkipsRateLimit verifies messenger.flood.bypass skips flood enforcement.
+func TestSendMessage_FloodBypass_SkipsRateLimit(t *testing.T) {
+	repo := repositoryStub{areFriends: true}
+	checker := &permissionCheckerStub{grants: map[string]bool{domain.PermFloodBypass: true}}
+	service := newTestServiceWithChecker(repo, &sessionRegistryStub{}, &broadcasterStub{}, checker)
+	for i := 0; i < 10; i++ {
+		if err := service.SendMessage(context.Background(), "conn1", 1, 2, "hi"); err != nil {
+			t.Fatalf("unexpected error on iteration %d: %v", i, err)
+		}
+	}
+}

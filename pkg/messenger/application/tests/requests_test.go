@@ -119,3 +119,61 @@ func TestDeclineAllRequests_InvalidUser(t *testing.T) {
 		t.Fatal("expected error for zero userID")
 	}
 }
+
+// TestSendRequest_FriendListFull verifies ErrFriendListFull when sender is at cap.
+func TestSendRequest_FriendListFull(t *testing.T) {
+	repo := repositoryStub{usernameFound: true, userID: 2, friendCount: 2, requestFound: true,
+		request: domain.FriendRequest{ID: 10, FromUserID: 2, ToUserID: 1}}
+	service := newTestService(repo, &sessionRegistryStub{}, &broadcasterStub{})
+	_, _, err := service.SendRequest(context.Background(), "conn1", 1, "user2")
+	if err != domain.ErrFriendListFull {
+		t.Fatalf("expected ErrFriendListFull, got %v", err)
+	}
+}
+
+// TestSendRequest_TargetFriendListFull verifies ErrTargetFriendListFull when target is at cap.
+func TestSendRequest_TargetFriendListFull(t *testing.T) {
+	callCount := 0
+	repo := countingRepositoryStub{
+		repositoryStub: repositoryStub{usernameFound: true, userID: 2, requestFound: true,
+			request: domain.FriendRequest{ID: 10, FromUserID: 2, ToUserID: 1}},
+		countByCall: func(userID int) int {
+			callCount++
+			if callCount == 1 {
+				return 0
+			}
+			return 2
+		},
+	}
+	service := newTestService(repo, &sessionRegistryStub{}, &broadcasterStub{})
+	_, _, err := service.SendRequest(context.Background(), "conn1", 1, "user2")
+	if err != domain.ErrTargetFriendListFull {
+		t.Fatalf("expected ErrTargetFriendListFull, got %v", err)
+	}
+}
+
+// TestSendRequest_UnlimitedPermission verifies no friend cap for messenger.friends.unlimited holders.
+func TestSendRequest_UnlimitedPermission(t *testing.T) {
+	repo := repositoryStub{usernameFound: true, userID: 2, friendCount: 999, requestFound: true,
+		request: domain.FriendRequest{ID: 10, FromUserID: 2, ToUserID: 1}}
+	checker := &permissionCheckerStub{grants: map[string]bool{domain.PermFriendsUnlimited: true}}
+	service := newTestServiceWithChecker(repo, &sessionRegistryStub{}, &broadcasterStub{}, checker)
+	_, accepted, err := service.SendRequest(context.Background(), "conn1", 1, "user2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !accepted {
+		t.Fatal("expected auto-accepted=true")
+	}
+}
+
+// TestAcceptRequest_FriendListFull verifies ErrFriendListFull when accepter is at cap.
+func TestAcceptRequest_FriendListFull(t *testing.T) {
+	req := domain.FriendRequest{ID: 1, FromUserID: 5, ToUserID: 3}
+	repo := repositoryStub{request: req, requestFound: true, friendCount: 2}
+	service := newTestService(repo, &sessionRegistryStub{}, &broadcasterStub{})
+	err := service.AcceptRequest(context.Background(), 3, 5)
+	if err != domain.ErrFriendListFull {
+		t.Fatalf("expected ErrFriendListFull, got %v", err)
+	}
+}

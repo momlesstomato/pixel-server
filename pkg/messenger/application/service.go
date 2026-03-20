@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -50,6 +51,8 @@ type Service struct {
 	broadcaster broadcast.Broadcaster
 	// fire stores optional plugin event dispatch behavior.
 	fire func(sdk.Event)
+	// checker stores optional permission resolution behavior.
+	checker domain.PermissionChecker
 	// flood guards per-connection message rate state.
 	flood map[string]*floodState
 	// floodMu guards the flood map.
@@ -99,6 +102,25 @@ func NewService(repository domain.Repository, sessions coreconnection.SessionReg
 // SetEventFirer configures optional plugin event dispatch behavior.
 func (service *Service) SetEventFirer(fire func(sdk.Event)) {
 	service.fire = fire
+}
+
+// SetPermissionChecker configures optional permission resolution behavior.
+func (service *Service) SetPermissionChecker(checker domain.PermissionChecker) {
+	service.checker = checker
+}
+
+// ResolvedFriendLimit returns the effective friend limit for one user.
+// Returns 0 when the user holds the unlimited permission.
+func (service *Service) ResolvedFriendLimit(ctx context.Context, userID int) int {
+	if service.checker != nil {
+		if ok, _ := service.checker.HasPermission(ctx, userID, domain.PermFriendsUnlimited); ok {
+			return 0
+		}
+		if ok, _ := service.checker.HasPermission(ctx, userID, domain.PermFriendsExtended); ok {
+			return service.config.MaxFriendsVIP
+		}
+	}
+	return service.config.MaxFriends
 }
 
 // userChannel returns the per-user broadcast channel key.

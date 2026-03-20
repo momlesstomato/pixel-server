@@ -170,19 +170,52 @@ func (s *sessionRegistryStub) Remove(_ string) {}
 // ListAll returns nil.
 func (s *sessionRegistryStub) ListAll() ([]coreconnection.Session, error) { return nil, nil }
 
+// countingRepositoryStub wraps repositoryStub with a per-call CountFriends callback.
+type countingRepositoryStub struct {
+	repositoryStub
+	countByCall func(userID int) int
+}
+
+// CountFriends delegates to countByCall when set, otherwise falls back to repositoryStub.
+func (c countingRepositoryStub) CountFriends(_ context.Context, userID int) (int, error) {
+	if c.countByCall != nil {
+		return c.countByCall(userID), c.repositoryStub.callErr
+	}
+	return c.repositoryStub.friendCount, c.repositoryStub.callErr
+}
+
+// permissionCheckerStub provides deterministic permission resolution for tests.
+type permissionCheckerStub struct {
+	grants map[string]bool
+}
+
+// HasPermission reports whether the permission is present in the grants map.
+func (p *permissionCheckerStub) HasPermission(_ context.Context, _ int, permission string) (bool, error) {
+	return p.grants[permission], nil
+}
+
 // newTestService creates a test messenger service from stubs.
 func newTestService(repo domain.Repository, sessions coreconnection.SessionRegistry, bus broadcast.Broadcaster) *messengerapplication.Service {
+	return newTestServiceWithChecker(repo, sessions, bus, nil)
+}
+
+// newTestServiceWithChecker creates a test messenger service with optional permission checker.
+func newTestServiceWithChecker(repo domain.Repository, sessions coreconnection.SessionRegistry, bus broadcast.Broadcaster, checker domain.PermissionChecker) *messengerapplication.Service {
 	service, err := messengerapplication.NewService(repo, sessions, bus, messengerapplication.Config{
-		MaxFriends:       200,
+		MaxFriends:       2,
+		MaxFriendsVIP:    5,
 		FloodCooldownMs:  750,
 		FloodViolations:  4,
 		FloodMuteSeconds: 20,
 	})
 	if err != nil {
-		panic("newTestService: " + err.Error())
+		panic("newTestServiceWithChecker: " + err.Error())
 	}
 	var firer func(sdk.Event)
 	service.SetEventFirer(firer)
+	if checker != nil {
+		service.SetPermissionChecker(checker)
+	}
 	return service
 }
 

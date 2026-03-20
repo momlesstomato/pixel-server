@@ -15,7 +15,11 @@ func Step02DefaultPermissions() *gormigrate.Migration {
 			return ensurePermissions(database)
 		},
 		Rollback: func(database *gorm.DB) error {
-			return database.Where("permission IN ?", []string{"*", "perk.*", "perk.safe_chat", "perk.helpers", "perk.citizen", "moderation.kick", "moderation.mute", "moderation.alert"}).Delete(&permissionmodel.Grant{}).Error
+			return database.Where("permission IN ?", []string{
+				"*", "perk.*", "perk.safe_chat", "perk.helpers", "perk.citizen",
+				"moderation.kick", "moderation.mute", "moderation.alert",
+				"messenger.friends.extended", "messenger.flood.bypass",
+			}).Delete(&permissionmodel.Grant{}).Error
 		},
 	}
 }
@@ -35,10 +39,12 @@ func ensurePermissions(database *gorm.DB) error {
 		{GroupID: nameToID["default"], Permission: "perk.helpers"},
 		{GroupID: nameToID["default"], Permission: "perk.citizen"},
 		{GroupID: nameToID["vip"], Permission: "perk.*"},
+		{GroupID: nameToID["vip"], Permission: "messenger.friends.extended"},
 		{GroupID: nameToID["moderator"], Permission: "perk.*"},
 		{GroupID: nameToID["moderator"], Permission: "moderation.kick"},
 		{GroupID: nameToID["moderator"], Permission: "moderation.mute"},
 		{GroupID: nameToID["moderator"], Permission: "moderation.alert"},
+		{GroupID: nameToID["moderator"], Permission: "messenger.flood.bypass"},
 		{GroupID: nameToID["admin"], Permission: "*"},
 	}
 	filtered := make([]permissionmodel.Grant, 0, len(grants))
