@@ -38,6 +38,10 @@ type Repository interface {
 	GetAndDeleteOfflineMessages(ctx context.Context, userID int) ([]OfflineMessage, error)
 	// DeleteOfflineMessagesOlderThan removes messages whose sent_at precedes the cutoff epoch.
 	DeleteOfflineMessagesOlderThan(ctx context.Context, cutoffUnix int64) error
+	// LogMessage persists one message log row for auditing and security.
+	LogMessage(ctx context.Context, fromUserID, toUserID int, message string) error
+	// DeleteMessageLogOlderThan removes log rows whose sent_at precedes the cutoff epoch.
+	DeleteMessageLogOlderThan(ctx context.Context, cutoffUnix int64) error
 	// SearchUsers returns users whose username contains the query string.
 	SearchUsers(ctx context.Context, query string, limit int) ([]SearchResult, error)
 	// FindUserIDByUsername returns the identifier for one username if it exists.

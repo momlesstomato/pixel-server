@@ -9,6 +9,7 @@ import (
 	"github.com/momlesstomato/pixel-server/core/status"
 	"github.com/momlesstomato/pixel-server/core/users"
 	authenticationdomain "github.com/momlesstomato/pixel-server/pkg/authentication/domain"
+	messengerapplication "github.com/momlesstomato/pixel-server/pkg/messenger/application"
 )
 
 // Config defines the complete application configuration tree.
@@ -29,6 +30,8 @@ type Config struct {
 	Status status.Config `mapstructure:"status"`
 	// Permission contains permission module cache and event settings.
 	Permission corepermission.Config `mapstructure:"permission"`
+	// Messenger contains messenger service settings.
+	Messenger messengerapplication.Config `mapstructure:"messenger"`
 }
 
 // AppConfig aliases app runtime configuration shape.
@@ -54,3 +57,6 @@ type StatusConfig = status.Config
 
 // PermissionConfig aliases permission runtime configuration shape.
 type PermissionConfig = corepermission.Config
+
+// MessengerConfig aliases messenger runtime configuration shape.
+type MessengerConfig = messengerapplication.Config

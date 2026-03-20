@@ -39,6 +39,9 @@ func (service *Service) SendMessage(ctx context.Context, connID string, fromUser
 	if !friends {
 		return domain.ErrNotFriends
 	}
+	if err := service.repository.LogMessage(ctx, fromUserID, toUserID, message); err != nil {
+		return err
+	}
 	_, online := service.sessions.FindByUserID(toUserID)
 	if !online {
 		return service.repository.SaveOfflineMessage(ctx, fromUserID, toUserID, message)
@@ -71,12 +74,6 @@ func (service *Service) SendRoomInvite(ctx context.Context, connID string, fromU
 		}
 	}
 	return nil
-}
-
-// PurgeOldOfflineMessages deletes messages older than the configured TTL.
-func (service *Service) PurgeOldOfflineMessages(ctx context.Context) error {
-	cutoff := time.Now().UTC().AddDate(0, 0, -service.config.OfflineMsgTTLDays)
-	return service.repository.DeleteOfflineMessagesOlderThan(ctx, cutoff.Unix())
 }
 
 // checkFlood enforces message rate limiting for one connection.

@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
@@ -86,6 +87,32 @@ func TestSendMessage_FloodBlocked(t *testing.T) {
 	err := service.SendMessage(context.Background(), "conn1", 1, 2, "hi")
 	if err != domain.ErrSenderMuted {
 		t.Fatalf("expected ErrSenderMuted after flood, got %v", err)
+	}
+}
+
+// logFailStub wraps repositoryStub and returns an error for LogMessage.
+type logFailStub struct{ repositoryStub }
+
+// LogMessage always returns a log failure error.
+func (logFailStub) LogMessage(_ context.Context, _, _ int, _ string) error {
+	return errors.New("log failure")
+}
+
+// TestSendMessage_LogError_PropagatesFailure verifies that a LogMessage error aborts the send.
+func TestSendMessage_LogError_PropagatesFailure(t *testing.T) {
+	repo := logFailStub{repositoryStub{areFriends: true}}
+	service := newTestService(repo, &sessionRegistryStub{}, &broadcasterStub{})
+	err := service.SendMessage(context.Background(), "conn1", 1, 2, "hello")
+	if err == nil {
+		t.Fatal("expected error when LogMessage fails")
+	}
+}
+
+// TestPurgeOldMessageLogs_Positive verifies message log TTL purge runs without error.
+func TestPurgeOldMessageLogs_Positive(t *testing.T) {
+	service := newTestService(repositoryStub{}, &sessionRegistryStub{}, &broadcasterStub{})
+	if err := service.PurgeOldMessageLogs(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

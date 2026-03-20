@@ -16,19 +16,23 @@ import (
 // Config defines messenger service runtime configuration.
 type Config struct {
 	// MaxFriends stores the normal friend list capacity.
-	MaxFriends int `default:"200"`
+	MaxFriends int `mapstructure:"max_friends" default:"200"`
 	// MaxFriendsVIP stores the VIP friend list capacity.
-	MaxFriendsVIP int `default:"500"`
+	MaxFriendsVIP int `mapstructure:"max_friends_vip" default:"500"`
 	// FloodCooldownMs stores the minimum milliseconds between messages.
-	FloodCooldownMs int `default:"750"`
+	FloodCooldownMs int `mapstructure:"flood_cooldown_ms" default:"750"`
 	// FloodViolations stores the violation count threshold that triggers a mute.
-	FloodViolations int `default:"4"`
+	FloodViolations int `mapstructure:"flood_violations" default:"4"`
 	// FloodMuteSeconds stores the mute duration in seconds after flood threshold.
-	FloodMuteSeconds int `default:"20"`
+	FloodMuteSeconds int `mapstructure:"flood_mute_seconds" default:"20"`
 	// OfflineMsgTTLDays stores the offline message retention period in days.
-	OfflineMsgTTLDays int `default:"30"`
+	OfflineMsgTTLDays int `mapstructure:"offline_msg_ttl_days" default:"30"`
+	// MessageLogTTLDays stores the message log retention period in days.
+	MessageLogTTLDays int `mapstructure:"message_log_ttl_days" default:"30"`
+	// PurgeIntervalSeconds stores how often the purge job runs in seconds.
+	PurgeIntervalSeconds int `mapstructure:"purge_interval_seconds" default:"3600"`
 	// FragmentSize stores the number of friends per list fragment packet.
-	FragmentSize int `default:"750"`
+	FragmentSize int `mapstructure:"fragment_size" default:"750"`
 }
 
 // floodState tracks message flood control state per connection.
@@ -89,6 +93,12 @@ func NewService(repository domain.Repository, sessions coreconnection.SessionReg
 	}
 	if config.OfflineMsgTTLDays <= 0 {
 		config.OfflineMsgTTLDays = 30
+	}
+	if config.MessageLogTTLDays <= 0 {
+		config.MessageLogTTLDays = 30
+	}
+	if config.PurgeIntervalSeconds <= 0 {
+		config.PurgeIntervalSeconds = 3600
 	}
 	if config.FragmentSize <= 0 {
 		config.FragmentSize = 750

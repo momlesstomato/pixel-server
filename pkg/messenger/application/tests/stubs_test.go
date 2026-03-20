@@ -105,6 +105,16 @@ func (s repositoryStub) DeleteOfflineMessagesOlderThan(_ context.Context, _ int6
 	return s.callErr
 }
 
+// LogMessage returns stub error.
+func (s repositoryStub) LogMessage(_ context.Context, _, _ int, _ string) error {
+	return s.callErr
+}
+
+// DeleteMessageLogOlderThan returns stub error.
+func (s repositoryStub) DeleteMessageLogOlderThan(_ context.Context, _ int64) error {
+	return s.callErr
+}
+
 // SearchUsers returns stub results.
 func (s repositoryStub) SearchUsers(_ context.Context, _ string, _ int) ([]domain.SearchResult, error) {
 	return s.searchResults, s.callErr

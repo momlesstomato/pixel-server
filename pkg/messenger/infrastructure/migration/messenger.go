@@ -45,6 +45,19 @@ func Step03OfflineMessages() *gormigrate.Migration {
 	}
 }
 
+// Step05MessageLog returns the migration that creates the messenger_message_log table.
+func Step05MessageLog() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260315_05_messenger_message_log",
+		Migrate: func(database *gorm.DB) error {
+			return database.AutoMigrate(&messengermodel.MessageLog{})
+		},
+		Rollback: func(database *gorm.DB) error {
+			return database.Migrator().DropTable(&messengermodel.MessageLog{})
+		},
+	}
+}
+
 // Step04NormalizeFriendships returns the migration that canonicalizes friendship rows to one tuple per pair.
 func Step04NormalizeFriendships() *gormigrate.Migration {
 	return &gormigrate.Migration{

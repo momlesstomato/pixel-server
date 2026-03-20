@@ -93,10 +93,11 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 	if err != nil {
 		return nil, err
 	}
-	messenger, err := messengerapplication.NewService(messengerRepository, registry, broadcaster, messengerapplication.Config{})
+	messenger, err := messengerapplication.NewService(messengerRepository, registry, broadcaster, runtime.Config.Messenger)
 	if err != nil {
 		return nil, err
 	}
+	messenger.StartPurgeTicker(context.Background())
 	return &serveServices{
 		sso:         authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
 		registry:    registry,
