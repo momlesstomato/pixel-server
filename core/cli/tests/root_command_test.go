@@ -65,3 +65,48 @@ func TestNewRootCommandRegistersGroup(t *testing.T) {
 		t.Fatalf("expected group command to be registered")
 	}
 }
+
+// TestNewRootCommandRegistersFurniture verifies furniture command composition.
+func TestNewRootCommandRegistersFurniture(t *testing.T) {
+	command := cli.NewRootCommand(cli.Dependencies{})
+	cmd, _, err := command.Find([]string{"furniture"})
+	if err != nil || cmd == nil || cmd.Name() != "furniture" {
+		t.Fatalf("expected furniture command to be registered, err=%v", err)
+	}
+}
+
+// TestNewRootCommandRegistersInventory verifies inventory command composition.
+func TestNewRootCommandRegistersInventory(t *testing.T) {
+	command := cli.NewRootCommand(cli.Dependencies{})
+	cmd, _, err := command.Find([]string{"inventory"})
+	if err != nil || cmd == nil || cmd.Name() != "inventory" {
+		t.Fatalf("expected inventory command to be registered, err=%v", err)
+	}
+}
+
+// TestNewRootCommandRegistersCatalog verifies catalog command composition.
+func TestNewRootCommandRegistersCatalog(t *testing.T) {
+	command := cli.NewRootCommand(cli.Dependencies{})
+	cmd, _, err := command.Find([]string{"catalog"})
+	if err != nil || cmd == nil || cmd.Name() != "catalog" {
+		t.Fatalf("expected catalog command to be registered, err=%v", err)
+	}
+}
+
+// TestNewRootCommandRegistersEconomy verifies economy command composition.
+func TestNewRootCommandRegistersEconomy(t *testing.T) {
+	command := cli.NewRootCommand(cli.Dependencies{})
+	cmd, _, err := command.Find([]string{"economy"})
+	if err != nil || cmd == nil || cmd.Name() != "economy" {
+		t.Fatalf("expected economy command to be registered, err=%v", err)
+	}
+}
+
+// TestNewRootCommandRegistersSubscription verifies subscription command composition.
+func TestNewRootCommandRegistersSubscription(t *testing.T) {
+	command := cli.NewRootCommand(cli.Dependencies{})
+	cmd, _, err := command.Find([]string{"subscription"})
+	if err != nil || cmd == nil || cmd.Name() != "subscription" {
+		t.Fatalf("expected subscription command to be registered, err=%v", err)
+	}
+}

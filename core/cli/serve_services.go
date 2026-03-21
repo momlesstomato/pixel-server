@@ -9,7 +9,11 @@ import (
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	authenticationapplication "github.com/momlesstomato/pixel-server/pkg/authentication/application"
 	authenticationredisstore "github.com/momlesstomato/pixel-server/pkg/authentication/infrastructure/redisstore"
+	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"
+	economyapplication "github.com/momlesstomato/pixel-server/pkg/economy/application"
+	furnitureapplication "github.com/momlesstomato/pixel-server/pkg/furniture/application"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
+	inventoryapplication "github.com/momlesstomato/pixel-server/pkg/inventory/application"
 	messengerapplication "github.com/momlesstomato/pixel-server/pkg/messenger/application"
 	messengerstore "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/store"
 	permissionnotification "github.com/momlesstomato/pixel-server/pkg/permission/adapter/notification"
@@ -17,6 +21,7 @@ import (
 	permissionstore "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/store"
 	sessionhotelstatus "github.com/momlesstomato/pixel-server/pkg/status/application/hotelstatus"
 	statusredisstore "github.com/momlesstomato/pixel-server/pkg/status/infrastructure/redisstore"
+	subscriptionapplication "github.com/momlesstomato/pixel-server/pkg/subscription/application"
 	userapplication "github.com/momlesstomato/pixel-server/pkg/user/application"
 	userstore "github.com/momlesstomato/pixel-server/pkg/user/infrastructure/store"
 )
@@ -31,6 +36,12 @@ type serveServices struct {
 	users       *userapplication.Service
 	permissions *permissionapplication.Service
 	messenger   *messengerapplication.Service
+	furniture   *furnitureapplication.Service
+	inventory   *inventoryapplication.Service
+	catalog     *catalogapplication.Service
+	economy     *economyapplication.Service
+	subscription *subscriptionapplication.Service
+	economyBundle *economyServiceBundle
 	handler     *handshakerealtime.Handler
 }
 
@@ -77,8 +88,7 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		return nil, err
 	}
 	permissions, err := permissionapplication.NewService(permissionRepository, runtime.Redis, permissionapplication.Config{
-		CachePrefix:          runtime.Config.Permission.CachePrefix,
-		CacheTTL:             time.Duration(runtime.Config.Permission.CacheTTLSeconds) * time.Second,
+		CachePrefix: runtime.Config.Permission.CachePrefix, CacheTTL: time.Duration(runtime.Config.Permission.CacheTTLSeconds) * time.Second,
 		AmbassadorPermission: runtime.Config.Permission.AmbassadorPermission,
 	})
 	if err != nil {
@@ -98,14 +108,16 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		return nil, err
 	}
 	messenger.StartPurgeTicker(context.Background())
+	economyServices, err := buildEconomyServices(runtime)
+	if err != nil {
+		return nil, err
+	}
 	return &serveServices{
-		sso:         authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
-		registry:    registry,
-		bus:         bus,
-		broadcaster: broadcaster,
-		hotelStatus: hotelStatus,
-		users:       users,
-		permissions: permissions,
-		messenger:   messenger,
+		sso: authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
+		registry: registry, bus: bus, broadcaster: broadcaster, hotelStatus: hotelStatus,
+		users: users, permissions: permissions, messenger: messenger,
+		furniture: economyServices.furniture, inventory: economyServices.inventory,
+		catalog: economyServices.catalog, economy: economyServices.economy,
+		subscription: economyServices.subscription, economyBundle: economyServices,
 	}, nil
 }

@@ -18,6 +18,11 @@ import (
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
 	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
 	userapplication "github.com/momlesstomato/pixel-server/pkg/user/application"
+	cataloghttpapi "github.com/momlesstomato/pixel-server/pkg/catalog/adapter/httpapi"
+	economyhttpapi "github.com/momlesstomato/pixel-server/pkg/economy/adapter/httpapi"
+	furniturehttpapi "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/httpapi"
+	inventoryhttpapi "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/httpapi"
+	subscriptionhttpapi "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/httpapi"
 )
 
 // compositeRuntime dispatches packets to an ordered list of user runtimes.
@@ -73,7 +78,13 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		if err != nil {
 			return nil, err
 		}
-		return &compositeRuntime{runtimes: []handshakerealtime.UserRuntime{userRT, msgRT}}, nil
+		runtimes := []handshakerealtime.UserRuntime{userRT, msgRT}
+		ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, runtime.Logger)
+		if err != nil {
+			return nil, err
+		}
+		runtimes = append(runtimes, ecoRTs...)
+		return &compositeRuntime{runtimes: runtimes}, nil
 	})
 	services.handler = handler
 	webSocketPath := strings.TrimSpace(path)
@@ -85,29 +96,30 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 
 // registerServeHTTPRoutes registers all REST API routes and OpenAPI documentation.
 func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, wsPath string) error {
-	if err := authenticationhttpapi.RegisterRoutes(module, services.sso); err != nil {
-		return err
-	}
 	closer := &busCloserAdapter{bus: services.bus}
-	if err := managementhttpapi.RegisterSessionRoutes(module, services.registry, closer); err != nil {
-		return err
-	}
-	if err := managementhttpapi.RegisterHotelRoutes(module, services.hotelStatus); err != nil {
-		return err
-	}
-	if err := userhttpapi.RegisterRoutes(module, services.users); err != nil {
-		return err
-	}
-	if err := permissionhttpapi.RegisterRoutes(module, services.permissions); err != nil {
-		return err
-	}
-	if err := messengerhttpapi.RegisterRoutes(module, services.messenger); err != nil {
-		return err
+	for _, register := range []func(*corehttp.Module) error{
+		func(m *corehttp.Module) error { return authenticationhttpapi.RegisterRoutes(m, services.sso) },
+		func(m *corehttp.Module) error { return managementhttpapi.RegisterSessionRoutes(m, services.registry, closer) },
+		func(m *corehttp.Module) error { return managementhttpapi.RegisterHotelRoutes(m, services.hotelStatus) },
+		func(m *corehttp.Module) error { return userhttpapi.RegisterRoutes(m, services.users) },
+		func(m *corehttp.Module) error { return permissionhttpapi.RegisterRoutes(m, services.permissions) },
+		func(m *corehttp.Module) error { return messengerhttpapi.RegisterRoutes(m, services.messenger) },
+		func(m *corehttp.Module) error { return furniturehttpapi.RegisterRoutes(m, services.furniture) },
+		func(m *corehttp.Module) error { return inventoryhttpapi.RegisterRoutes(m, services.inventory) },
+		func(m *corehttp.Module) error { return cataloghttpapi.RegisterRoutes(m, services.catalog) },
+		func(m *corehttp.Module) error { return economyhttpapi.RegisterRoutes(m, services.economy) },
+		func(m *corehttp.Module) error { return subscriptionhttpapi.RegisterRoutes(m, services.subscription) },
+	} {
+		if err := register(module); err != nil {
+			return err
+		}
 	}
 	paths := mergeOpenAPIPaths(
 		authenticationhttpapi.OpenAPIPaths(), managementhttpapi.OpenAPIPaths(),
 		userhttpapi.OpenAPIPaths(), permissionhttpapi.OpenAPIPaths(),
-		messengerhttpapi.OpenAPIPaths(),
+		messengerhttpapi.OpenAPIPaths(), furniturehttpapi.OpenAPIPaths(),
+		inventoryhttpapi.OpenAPIPaths(), cataloghttpapi.OpenAPIPaths(),
+		economyhttpapi.OpenAPIPaths(), subscriptionhttpapi.OpenAPIPaths(),
 	)
 	return httpopenapi.RegisterRoutes(module, httpopenapi.BuildDocument(wsPath, paths), "", "")
 }
@@ -137,13 +149,3 @@ func (adapter *busCloserAdapter) Close(ctx context.Context, connID string, code 
 	return adapter.bus.Publish(ctx, connID, handshakerealtime.CloseSignal{Code: code, Reason: reason})
 }
 
-// mergeOpenAPIPaths combines multiple OpenAPI path maps.
-func mergeOpenAPIPaths(maps ...map[string]any) map[string]any {
-	merged := map[string]any{}
-	for _, value := range maps {
-		for path, pathItem := range value {
-			merged[path] = pathItem
-		}
-	}
-	return merged
-}

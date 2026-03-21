@@ -2,7 +2,9 @@ package seeds
 
 import (
 	gormigrate "github.com/go-gormigrate/gormigrate/v2"
+	catalogseed "github.com/momlesstomato/pixel-server/pkg/catalog/infrastructure/seed"
 	permissionseed "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/seed"
+	subscriptionseed "github.com/momlesstomato/pixel-server/pkg/subscription/infrastructure/seed"
 )
 
 // Registry returns ordered essential seed steps.
@@ -16,5 +18,7 @@ func Registry() []*gormigrate.Migration {
 		Step04TestUserSettings(),
 		Step05DemoUsersBackfill(),
 		Step06DemoUserSettingsBackfill(),
+		catalogseed.Step01DefaultPages(),
+		subscriptionseed.Step01DefaultClubOffers(),
 	}
 }
