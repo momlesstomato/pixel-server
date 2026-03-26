@@ -4,6 +4,10 @@ import "context"
 
 // Repository defines inventory persistence behavior.
 type Repository interface {
+	// ListCurrencyTypes resolves all registered activity-point currency definitions.
+	ListCurrencyTypes(ctx context.Context) ([]ActivityCurrencyType, error)
+	// FindCurrencyTypeByID resolves one currency type definition by its wire-protocol ID.
+	FindCurrencyTypeByID(ctx context.Context, id int) (ActivityCurrencyType, error)
 	// ListBadges resolves all badge rows for one user.
 	ListBadges(ctx context.Context, userID int) ([]Badge, error)
 	// AwardBadge persists one badge for one user.

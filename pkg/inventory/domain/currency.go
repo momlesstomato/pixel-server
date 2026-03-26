@@ -2,17 +2,35 @@ package domain
 
 import "time"
 
-// CurrencyType identifies an activity-point currency variant.
+// CurrencyType identifies an activity-point currency variant by its registered integer ID.
+// These IDs match the wire-protocol activityPointType field and are stored in the
+// currency_types table. The constants below are the three Habbo-standard seeds;
+// operators may register additional types directly in the database.
 type CurrencyType int
 
 const (
-	// CurrencyDuckets identifies the seasonal duckets currency.
+	// CurrencyDuckets is the ID for duckets (pixel coins); seeded as the default scroll currency.
 	CurrencyDuckets CurrencyType = 0
-	// CurrencyDiamonds identifies the premium diamonds currency.
+	// CurrencyDiamonds is the ID for premium diamonds; seeded as the premium activity currency.
 	CurrencyDiamonds CurrencyType = 5
-	// CurrencySeasonal identifies limited-time seasonal points.
+	// CurrencySeasonal is the ID for seasonal / event points; seeded as the limited-time currency.
 	CurrencySeasonal CurrencyType = 105
 )
+
+// ActivityCurrencyType represents one registered activity-point currency definition
+// as stored in the currency_types table.
+type ActivityCurrencyType struct {
+	// ID stores the wire-protocol activity-point type identifier.
+	ID int
+	// Name stores the unique internal name for this currency.
+	Name string
+	// DisplayName stores the player-visible label for this currency.
+	DisplayName string
+	// Trackable reports whether balance changes are recorded in currency_transactions.
+	Trackable bool
+	// Enabled reports whether this currency is currently active.
+	Enabled bool
+}
 
 // Currency holds one user balance for a specific currency type.
 type Currency struct {

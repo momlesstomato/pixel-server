@@ -32,10 +32,10 @@ type OfferEntry struct {
 	LocalizationID string
 	// PriceCredits stores credit price.
 	PriceCredits int32
-	// PricePoints stores activity point price.
-	PricePoints int32
-	// PointType stores activity point currency type.
-	PointType int32
+	// PriceActivityPoints stores activity point price.
+	PriceActivityPoints int32
+	// ActivityPointType stores activity point currency type.
+	ActivityPointType int32
 	// Giftable stores whether the offer can be gifted.
 	Giftable bool
 	// Products stores individual item products.
@@ -104,8 +104,8 @@ func encodeOfferEntry(w *codec.Writer, offer OfferEntry) error {
 	}
 	w.WriteBool(false)
 	w.WriteInt32(offer.PriceCredits)
-	w.WriteInt32(offer.PricePoints)
-	w.WriteInt32(offer.PointType)
+	w.WriteInt32(offer.PriceActivityPoints)
+	w.WriteInt32(offer.ActivityPointType)
 	w.WriteBool(offer.Giftable)
 	w.WriteInt32(int32(len(offer.Products)))
 	for _, prod := range offer.Products {

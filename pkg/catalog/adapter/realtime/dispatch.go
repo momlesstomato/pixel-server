@@ -139,8 +139,8 @@ func buildOfferEntry(o domain.CatalogOffer) packet.OfferEntry {
 	products := buildOfferProducts(o)
 	return packet.OfferEntry{
 		OfferID: int32(o.ID), LocalizationID: o.CatalogName,
-		PriceCredits: int32(o.CostPrimary), PricePoints: int32(o.CostSecondary),
-		PointType: int32(o.CostSecondaryType), Giftable: false,
+		PriceCredits: int32(o.CostCredits), PriceActivityPoints: int32(o.CostActivityPoints),
+		ActivityPointType: int32(o.ActivityPointType), Giftable: false,
 		Products: products, CanSelectAmount: o.Amount > 1,
 	}
 }
@@ -150,8 +150,12 @@ func buildOfferProducts(o domain.CatalogOffer) []packet.OfferProduct {
 	if o.BadgeID != "" {
 		return []packet.OfferProduct{{TypeCode: "b", IsBadge: true, BadgeCode: o.BadgeID}}
 	}
+	typeCode := o.ItemType
+	if typeCode == "" {
+		typeCode = "s"
+	}
 	return []packet.OfferProduct{{
-		TypeCode: "i", SpriteID: int32(o.ItemDefinitionID),
+		TypeCode: typeCode, SpriteID: int32(o.SpriteID),
 		ExtraData: o.ExtraData, Amount: int32(o.Amount),
 		IsLimited: o.IsLimited(), LimitedTotal: int32(o.LimitedTotal),
 		LimitedRemaining: int32(o.LimitedTotal - o.LimitedSells),

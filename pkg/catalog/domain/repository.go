@@ -58,14 +58,12 @@ type PagePatch struct {
 
 // OfferPatch defines partial catalog offer update payload.
 type OfferPatch struct {
-	// CostPrimary stores optional primary currency price update.
-	CostPrimary *int
-	// CostPrimaryType stores optional primary currency type update.
-	CostPrimaryType *int
-	// CostSecondary stores optional secondary currency price update.
-	CostSecondary *int
-	// CostSecondaryType stores optional secondary currency type update.
-	CostSecondaryType *int
+	// CostCredits stores optional credits price update.
+	CostCredits *int
+	// CostActivityPoints stores optional activity-point price update.
+	CostActivityPoints *int
+	// ActivityPointType stores optional activity-point currency type update.
+	ActivityPointType *int
 	// OfferActive stores optional active flag update.
 	OfferActive *bool
 	// ClubOnly stores optional club restriction update.

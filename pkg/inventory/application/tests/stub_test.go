@@ -20,6 +20,19 @@ type repositoryStub struct {
 	deleteErr error
 }
 
+// ListCurrencyTypes returns a deterministic list of standard currency types.
+func (s repositoryStub) ListCurrencyTypes(_ context.Context) ([]domain.ActivityCurrencyType, error) {
+	return []domain.ActivityCurrencyType{
+		{ID: 0, Name: "duckets", DisplayName: "Duckets", Trackable: true, Enabled: true},
+		{ID: 5, Name: "diamonds", DisplayName: "Diamonds", Trackable: true, Enabled: true},
+	}, nil
+}
+
+// FindCurrencyTypeByID returns a deterministic currency type definition.
+func (s repositoryStub) FindCurrencyTypeByID(_ context.Context, id int) (domain.ActivityCurrencyType, error) {
+	return domain.ActivityCurrencyType{ID: id, Name: "duckets", DisplayName: "Duckets", Enabled: true}, s.findErr
+}
+
 // ListBadges returns deterministic badge list.
 func (s repositoryStub) ListBadges(_ context.Context, _ int) ([]domain.Badge, error) {
 	return []domain.Badge{s.badge}, s.findErr

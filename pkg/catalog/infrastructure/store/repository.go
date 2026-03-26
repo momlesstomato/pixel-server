@@ -54,10 +54,9 @@ func mapPage(row catalogmodel.Page) domain.CatalogPage {
 func mapOffer(row catalogmodel.Offer) domain.CatalogOffer {
 	return domain.CatalogOffer{
 		ID: int(row.ID), PageID: int(row.PageID),
-		ItemDefinitionID: int(row.ItemDefinitionID),
-		CatalogName: row.CatalogName,
-		CostPrimary: row.CostPrimary, CostPrimaryType: row.CostPrimaryType,
-		CostSecondary: row.CostSecondary, CostSecondaryType: row.CostSecondaryType,
+		ItemDefinitionID:   int(row.ItemDefinitionID),
+		CostCredits:        row.CostCredits,
+		CostActivityPoints: row.CostActivityPoints, ActivityPointType: row.ActivityPointType,
 		Amount: row.Amount, LimitedTotal: row.LimitedTotal,
 		LimitedSells: row.LimitedSells, OfferActive: row.OfferActive,
 		ExtraData: row.ExtraData, BadgeID: row.BadgeID,
@@ -71,7 +70,7 @@ func mapVoucher(row catalogmodel.Voucher) domain.Voucher {
 		ID: int(row.ID), Code: row.Code,
 		RewardType: row.RewardType, RewardCurrencyType: row.RewardCurrencyType,
 		RewardData: row.RewardData,
-		MaxUses: row.MaxUses, CurrentUses: row.CurrentUses,
+		MaxUses:    row.MaxUses, CurrentUses: row.CurrentUses,
 		Enabled: row.Enabled, CreatedAt: row.CreatedAt,
 	}
 }

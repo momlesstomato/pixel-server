@@ -10,16 +10,12 @@ type Offer struct {
 	PageID uint `gorm:"not null;index"`
 	// ItemDefinitionID stores the furniture definition foreign key.
 	ItemDefinitionID uint `gorm:"not null;index"`
-	// CatalogName stores the client-visible offer name.
-	CatalogName string `gorm:"size:100;not null;default:''"`
-	// CostPrimary stores the primary currency price component.
-	CostPrimary int `gorm:"column:cost_primary;not null;default:0"`
-	// CostPrimaryType stores the primary currency type identifier.
-	CostPrimaryType int `gorm:"column:cost_primary_type;not null;default:1"`
-	// CostSecondary stores the secondary currency price component.
-	CostSecondary int `gorm:"column:cost_secondary;not null;default:0"`
-	// CostSecondaryType stores the secondary currency type identifier.
-	CostSecondaryType int `gorm:"column:cost_secondary_type;not null;default:0"`
+	// CostCredits stores the credits price component.
+	CostCredits int `gorm:"column:cost_credits;not null;default:0"`
+	// CostActivityPoints stores the activity-point price component.
+	CostActivityPoints int `gorm:"column:cost_activity_points;not null;default:0"`
+	// ActivityPointType stores the activity-point currency type identifier.
+	ActivityPointType int `gorm:"column:activity_point_type;not null;default:0"`
 	// Amount stores number of items per single purchase.
 	Amount int `gorm:"not null;default:1"`
 	// LimitedTotal stores total limited edition print run.

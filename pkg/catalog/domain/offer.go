@@ -1,5 +1,15 @@
 package domain
 
+import "context"
+
+// ActivityCurrencyValidator is a secondary port used to validate that an
+// activity-point type identifier is registered and enabled in the currency
+// registry before persisting a catalog offer.
+type ActivityCurrencyValidator interface {
+	// IsValidActivityPointType reports whether typeID is registered and enabled.
+	IsValidActivityPointType(ctx context.Context, typeID int) (bool, error)
+}
+
 // CatalogOffer defines one purchasable offer within a catalog page.
 type CatalogOffer struct {
 	// ID stores stable offer identifier.
@@ -8,16 +18,23 @@ type CatalogOffer struct {
 	PageID int
 	// ItemDefinitionID stores the furniture definition foreign key.
 	ItemDefinitionID int
-	// CatalogName stores the client-visible offer name.
+	// SpriteID stores the furniture sprite identifier resolved from the
+	// linked item definition at read time. Used by the client to render
+	// the item icon and preview in the catalog.
+	SpriteID int
+	// ItemType stores the furniture type code resolved from the linked
+	// item definition at read time ("s" floor, "i" wall, "e" effect).
+	ItemType string
+	// CatalogName stores the client-visible offer display name.
+	// This field is never stored in the database; it is always resolved
+	// at read time from the linked item definition's public_name.
 	CatalogName string
-	// CostPrimary stores the primary currency price component.
-	CostPrimary int
-	// CostPrimaryType stores the primary currency type identifier.
-	CostPrimaryType int
-	// CostSecondary stores the secondary currency price component.
-	CostSecondary int
-	// CostSecondaryType stores the secondary currency type identifier.
-	CostSecondaryType int
+	// CostCredits stores the credits price component (can be zero for activity-point-only offers).
+	CostCredits int
+	// CostActivityPoints stores the activity-point price component (can be zero).
+	CostActivityPoints int
+	// ActivityPointType stores the activity-point currency type identifier.
+	ActivityPointType int
 	// Amount stores number of items per single purchase.
 	Amount int
 	// LimitedTotal stores total limited edition print run, zero for unlimited.

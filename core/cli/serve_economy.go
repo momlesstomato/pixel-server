@@ -60,6 +60,7 @@ func buildEconomyServices(runtime *initializer.Runtime) (*economyServiceBundle, 
 		return nil, err
 	}
 	catalog.SetCache(runtime.Redis, catalogapplication.CacheConfig{Prefix: "catalog", TTL: 5 * time.Minute})
+	catalog.SetCurrencyValidator(inventoryRepo)
 	economyRepo, err := economystore.NewRepository(runtime.PostgreSQL)
 	if err != nil {
 		return nil, err

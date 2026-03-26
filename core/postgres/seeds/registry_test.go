@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSeedSteps verifies seed step registry contents.
 func TestRegistryReturnsOrderedSeedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 8 {
-		t.Fatalf("expected eight seed steps, got %d", len(steps))
+	if len(steps) != 11 {
+		t.Fatalf("expected eleven seed steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260313_01_system_user" {
 		t.Fatalf("unexpected seed step metadata")
@@ -30,6 +30,9 @@ func TestRegistryReturnsOrderedSeedSteps(t *testing.T) {
 		t.Fatalf("unexpected seed step metadata")
 	}
 	if steps[7] == nil || steps[7].ID != "20260314_06_demo_user_settings_backfill" {
+		t.Fatalf("unexpected seed step metadata")
+	}
+	if steps[8] == nil || steps[8].ID != "20260324_inv_01_currency_types" {
 		t.Fatalf("unexpected seed step metadata")
 	}
 }

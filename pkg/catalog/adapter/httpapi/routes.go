@@ -71,6 +71,22 @@ func registerOfferRoutes(module *corehttp.Module, service Service) {
 		}
 		return ctx.JSON(offers)
 	})
+	module.RegisterPOST("/api/v1/catalog/pages/:id/offers", func(ctx *fiber.Ctx) error {
+		pageID, err := parsePositiveID(ctx.Params("id"))
+		if err != nil {
+			return fiber.NewError(http.StatusBadRequest, err.Error())
+		}
+		var payload domain.CatalogOffer
+		if parseErr := ctx.BodyParser(&payload); parseErr != nil {
+			return fiber.NewError(http.StatusBadRequest, "invalid request body")
+		}
+		payload.PageID = pageID
+		created, createErr := service.CreateOffer(ctx.UserContext(), payload)
+		if createErr != nil {
+			return mapCatalogError(createErr)
+		}
+		return ctx.Status(http.StatusCreated).JSON(created)
+	})
 }
 
 // registerVoucherRoutes registers voucher redemption routes.

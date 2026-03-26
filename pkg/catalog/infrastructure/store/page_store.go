@@ -48,8 +48,8 @@ func (store *Store) CreatePage(ctx context.Context, page domain.CatalogPage) (do
 		Visible: page.Visible, Enabled: page.Enabled,
 		MinPermission: page.MinPermission, ClubOnly: page.ClubOnly,
 		OrderNum: page.OrderNum,
-		Images: strings.Join(page.Images, "|"),
-		Texts: strings.Join(page.Texts, "|"),
+		Images:   strings.Join(page.Images, "|"),
+		Texts:    strings.Join(page.Texts, "|"),
 	}
 	if err := store.database.WithContext(ctx).Create(&row).Error; err != nil {
 		return domain.CatalogPage{}, err

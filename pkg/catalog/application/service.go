@@ -14,6 +14,8 @@ import (
 type Service struct {
 	// repository stores catalog persistence contract implementation.
 	repository domain.Repository
+	// currencyValidator stores optional activity-currency type validation port.
+	currencyValidator domain.ActivityCurrencyValidator
 	// fire stores optional plugin event dispatch behavior.
 	fire func(sdk.Event)
 	// redis stores optional Redis client for cache operations.
@@ -30,6 +32,12 @@ func NewService(repository domain.Repository) (*Service, error) {
 		return nil, fmt.Errorf("catalog repository is required")
 	}
 	return &Service{repository: repository}, nil
+}
+
+// SetCurrencyValidator configures the activity-currency type validator.
+// When set, CreateOffer and UpdateOffer will reject unknown or disabled type IDs.
+func (service *Service) SetCurrencyValidator(v domain.ActivityCurrencyValidator) {
+	service.currencyValidator = v
 }
 
 // SetEventFirer configures optional plugin event dispatch behavior.
@@ -124,6 +132,9 @@ func (service *Service) CreateOffer(ctx context.Context, offer domain.CatalogOff
 	if offer.PageID <= 0 {
 		return domain.CatalogOffer{}, fmt.Errorf("page id must be positive")
 	}
+	if err := service.validateActivityPointType(ctx, offer.CostActivityPoints, offer.ActivityPointType); err != nil {
+		return domain.CatalogOffer{}, err
+	}
 	result, err := service.repository.CreateOffer(ctx, offer)
 	if err == nil {
 		service.invalidateOffers(ctx, offer.PageID)
@@ -136,11 +147,32 @@ func (service *Service) UpdateOffer(ctx context.Context, id int, patch domain.Of
 	if id <= 0 {
 		return domain.CatalogOffer{}, fmt.Errorf("offer id must be positive")
 	}
+	if patch.ActivityPointType != nil {
+		if err := service.validateActivityPointType(ctx, 1, *patch.ActivityPointType); err != nil {
+			return domain.CatalogOffer{}, err
+		}
+	}
 	result, err := service.repository.UpdateOffer(ctx, id, patch)
 	if err == nil {
 		service.invalidateOffers(ctx, result.PageID)
 	}
 	return result, err
+}
+
+// validateActivityPointType returns an error when activityPoints > 0 and the
+// typeID is not registered as an enabled currency type.
+func (service *Service) validateActivityPointType(ctx context.Context, activityPoints int, typeID int) error {
+	if activityPoints <= 0 || service.currencyValidator == nil {
+		return nil
+	}
+	valid, err := service.currencyValidator.IsValidActivityPointType(ctx, typeID)
+	if err != nil {
+		return fmt.Errorf("currency type lookup failed: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("activity point type %d is not registered or disabled", typeID)
+	}
+	return nil
 }
 
 // DeleteOffer removes one catalog offer by identifier.

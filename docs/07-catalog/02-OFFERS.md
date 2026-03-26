@@ -10,11 +10,10 @@ furniture definition to a price and optional constraints.
 | `ID` | int | Stable offer identifier |
 | `PageID` | int | Owning catalog page |
 | `ItemDefinitionID` | int | Foreign key to the furniture item definition |
-| `CatalogName` | string | Client-visible offer name displayed in the shop |
-| `CostPrimary` | int | Primary currency price (Credits) |
-| `CostPrimaryType` | int | Primary currency type identifier (see [Currency Types](#currency-types)) |
-| `CostSecondary` | int | Secondary currency price component |
-| `CostSecondaryType` | int | Secondary currency type identifier |
+| `CatalogName` | string | Display name resolved from `item_definitions.public_name` at read time — **not stored in the database** (see [Name Resolution](#offer-name-resolution)) |
+| `CostCredits` | int | Credits price; zero for activity-point-only offers |
+| `CostActivityPoints` | int | Activity-point price; zero when no activity-point charge |
+| `ActivityPointType` | int | Registered activity-point currency type ID (see [Currency Types](#currency-types)) |
 | `Amount` | int | Number of items delivered per single purchase |
 | `LimitedTotal` | int | Total print run for limited editions; `0` means unlimited |
 | `LimitedSells` | int | Running count of limited edition sold units |
@@ -33,6 +32,35 @@ func (o CatalogOffer) IsLimited() bool { return o.LimitedTotal > 0 }
 // HasStock reports whether limited stock remains.
 func (o CatalogOffer) HasStock() bool
 ```
+
+---
+
+## Offer Name Resolution
+
+Three name concepts exist across the furniture and catalog data models:
+
+| Field | Table | Purpose |
+|-------|-------|---------|
+| `item_name` | `item_definitions` | Internal unique key for server-side logic (interaction dispatch, pattern matching). Never sent to the client. |
+| `public_name` | `item_definitions` | Canonical display name — used in inventory, room view, marketplace, and as the offer display name. |
+| ~~`catalog_name`~~ | ~~`catalog_items`~~ | **Removed.** Previously an optional per-offer alias; the column no longer exists in the schema. |
+
+### How the name is resolved
+
+Every offer query JOINs `item_definitions` and selects `public_name` directly
+as the effective display name:
+
+```sql
+SELECT ci.*, id.public_name AS effective_name
+FROM catalog_items ci
+LEFT JOIN item_definitions id ON id.id = ci.item_definition_id
+```
+
+The `CatalogName` field on the domain entity is always populated from this
+JOIN result. It is not present in any write path (create / update) and is
+not stored in the database.
+
+---
 
 ## Product Types
 
@@ -60,18 +88,36 @@ matching its own furniture type.
 
 ## Currency Types
 
-Activity-point currencies are identified by a numeric type code:
+The Habbo wire protocol encodes offer pricing with two **independent** price
+components; neither is mandatory — both can be zero simultaneously for free
+offers, or only one can carry a charge:
 
-| Code | Currency |
-|------|----------|
-| `0` | Duckets (Pixels) |
-| `5` | Diamonds |
-| `105` | Seasonal / Event points |
+- **Credits (`CostCredits`)** — maps to the wire `priceCredits` field. Set to
+  zero for offers that have no credit cost.
+- **Activity Points (`CostActivityPoints`)** — maps to the wire
+  `priceActivityPoints` field. `ActivityPointType` identifies which registered
+  currency the points belong to.
 
-An offer carries up to two price components: `CostPrimary` in the primary
-currency and `CostSecondary` in the secondary currency. Either may be zero to
-indicate no charge on that component. The client displays each non-zero
-component with its corresponding currency icon.
+### Activity-Point Type Registry
+
+Activity-point type IDs are stored in the `currency_types` database table
+(managed by the inventory realm). The server validates `ActivityPointType`
+against this table when `CostActivityPoints > 0`; unknown or disabled type IDs
+are rejected.
+
+The three Habbo-standard types are seeded on first run:
+
+| ID | Name | Display Name |
+|-----|------|--------------|
+| `0` | `duckets` | Duckets |
+| `5` | `diamonds` | Diamonds |
+| `105` | `seasonal` | Seasonal Points |
+
+Operators may insert additional rows into `currency_types` at any time to
+introduce custom activity-point currencies — no code change is required.
+The convenience constants `CurrencyDuckets`, `CurrencyDiamonds`, and
+`CurrencySeasonal` in `pkg/inventory/domain/currency.go` are named aliases for
+these three seeded IDs and are not a closed list.
 
 ## Limited Editions
 

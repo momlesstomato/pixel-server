@@ -41,9 +41,13 @@ func Registry() []*gormigrate.Migration {
 		catalogmigration.Step03Vouchers(),
 		catalogmigration.Step05VoucherCurrencyType(),
 		catalogmigration.Step07PageDelimiter(),
+		catalogmigration.Step08DropCatalogName(),
+		catalogmigration.Step09DropCostPrimaryType(),
+		catalogmigration.Step10RenameCostColumns(),
 		economymigration.Step01MarketplaceOffers(),
 		economymigration.Step02PriceHistory(),
 		economymigration.Step03TradeLogs(),
 		subscriptionmigration.Step01Subscriptions(),
+		subscriptionmigration.Step02ClubOffers(),
 	}
 }

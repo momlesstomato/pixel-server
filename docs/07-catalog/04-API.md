@@ -63,11 +63,17 @@ the `CatalogPage` domain entity.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/catalog/pages/:id/offers` | List all offers for a page |
+| `POST` | `/api/v1/catalog/pages/:id/offers` | Create an offer for a page |
 
 #### GET /api/v1/catalog/pages/:id/offers
 
 Returns all offers belonging to the specified page as a JSON array. Returns
 `404` when the page ID does not exist.
+
+The `CatalogName` field in the response is always the `public_name` from the
+linked item definition, resolved via JOIN. It is not stored in
+`catalog_items`. See
+[Offer Name Resolution](02-OFFERS.md#offer-name-resolution) for details.
 
 **Response 200**
 ```json
@@ -77,10 +83,9 @@ Returns all offers belonging to the specified page as a JSON array. Returns
     "PageID": 3,
     "ItemDefinitionID": 55,
     "CatalogName": "Iced Table",
-    "CostPrimary": 4,
-    "CostPrimaryType": 0,
-    "CostSecondary": 0,
-    "CostSecondaryType": 0,
+    "CostCredits": 4,
+    "CostActivityPoints": 0,
+    "ActivityPointType": 0,
     "Amount": 1,
     "LimitedTotal": 0,
     "LimitedSells": 0,
@@ -92,6 +97,25 @@ Returns all offers belonging to the specified page as a JSON array. Returns
   }
 ]
 ```
+
+#### POST /api/v1/catalog/pages/:id/offers
+
+Creates a new offer on the specified page. `CatalogName` is not accepted in
+the request body — the display name is always taken from the item definition
+automatically.
+
+**Request body:**
+```json
+{
+  "ItemDefinitionID": 55,
+  "CostCredits": 4,
+  "Amount": 1,
+  "OfferActive": true,
+  "OrderNum": 10
+}
+```
+
+**Response 201** — created offer with `CatalogName` resolved from the item definition.
 
 ### Voucher endpoints
 
