@@ -1,23 +1,25 @@
 package cli
 
 import (
+	"time"
+
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/core/initializer"
-	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"
 	catalogrealtime "github.com/momlesstomato/pixel-server/pkg/catalog/adapter/realtime"
+	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"
 	catalogstore "github.com/momlesstomato/pixel-server/pkg/catalog/infrastructure/store"
-	economyapplication "github.com/momlesstomato/pixel-server/pkg/economy/application"
 	economyrealtime "github.com/momlesstomato/pixel-server/pkg/economy/adapter/realtime"
+	economyapplication "github.com/momlesstomato/pixel-server/pkg/economy/application"
 	economystore "github.com/momlesstomato/pixel-server/pkg/economy/infrastructure/store"
-	furnitureapplication "github.com/momlesstomato/pixel-server/pkg/furniture/application"
 	furniturerealtime "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/realtime"
+	furnitureapplication "github.com/momlesstomato/pixel-server/pkg/furniture/application"
 	furniturestore "github.com/momlesstomato/pixel-server/pkg/furniture/infrastructure/store"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
-	inventoryapplication "github.com/momlesstomato/pixel-server/pkg/inventory/application"
 	inventoryrealtime "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/realtime"
+	inventoryapplication "github.com/momlesstomato/pixel-server/pkg/inventory/application"
 	inventorystore "github.com/momlesstomato/pixel-server/pkg/inventory/infrastructure/store"
-	subscriptionapplication "github.com/momlesstomato/pixel-server/pkg/subscription/application"
 	subscriptionrealtime "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/realtime"
+	subscriptionapplication "github.com/momlesstomato/pixel-server/pkg/subscription/application"
 	subscriptionstore "github.com/momlesstomato/pixel-server/pkg/subscription/infrastructure/store"
 	"go.uber.org/zap"
 )
@@ -57,6 +59,7 @@ func buildEconomyServices(runtime *initializer.Runtime) (*economyServiceBundle, 
 	if err != nil {
 		return nil, err
 	}
+	catalog.SetCache(runtime.Redis, catalogapplication.CacheConfig{Prefix: "catalog", TTL: 5 * time.Minute})
 	economyRepo, err := economystore.NewRepository(runtime.PostgreSQL)
 	if err != nil {
 		return nil, err

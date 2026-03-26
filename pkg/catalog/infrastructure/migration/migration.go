@@ -19,6 +19,28 @@ func Step01CatalogPages() *gormigrate.Migration {
 	}
 }
 
+// Step06MinRankToPermission returns the migration that replaces the integer min_rank
+// column on catalog_pages with a dotted permission string min_permission.
+func Step06MinRankToPermission() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260322_07b_catalog_pages_min_permission",
+		Migrate: func(database *gorm.DB) error {
+			return database.Exec(`
+				ALTER TABLE catalog_pages
+					ADD COLUMN IF NOT EXISTS min_permission VARCHAR(128) NOT NULL DEFAULT '',
+					DROP COLUMN IF EXISTS min_rank
+			`).Error
+		},
+		Rollback: func(database *gorm.DB) error {
+			return database.Exec(`
+				ALTER TABLE catalog_pages
+					ADD COLUMN IF NOT EXISTS min_rank INTEGER NOT NULL DEFAULT 1,
+					DROP COLUMN IF EXISTS min_permission
+			`).Error
+		},
+	}
+}
+
 // Step02CatalogOffers returns the migration that creates the catalog_offers table.
 func Step02CatalogOffers() *gormigrate.Migration {
 	return &gormigrate.Migration{

@@ -18,8 +18,8 @@ type Page struct {
 	Visible bool `gorm:"not null;default:true;index:idx_catalog_pages_visible"`
 	// Enabled stores whether purchasing from this page is allowed.
 	Enabled bool `gorm:"not null;default:true"`
-	// MinRank stores minimum rank required to view the page.
-	MinRank int `gorm:"not null;default:1"`
+	// MinPermission stores dotted permission required to view the page; empty means everyone.
+	MinPermission string `gorm:"size:128;not null;default:''"`
 	// ClubOnly stores whether only club members can access.
 	ClubOnly bool `gorm:"not null;default:false"`
 	// OrderNum stores the display ordering position.

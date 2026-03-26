@@ -28,21 +28,21 @@ import (
 
 // serveServices holds shared dependencies built during serve startup.
 type serveServices struct {
-	sso         *authenticationapplication.Service
-	registry    *coreconnection.RedisSessionRegistry
-	bus         *handshakerealtime.DistributedCloseSignalBus
-	broadcaster broadcast.Broadcaster
-	hotelStatus *sessionhotelstatus.Service
-	users       *userapplication.Service
-	permissions *permissionapplication.Service
-	messenger   *messengerapplication.Service
-	furniture   *furnitureapplication.Service
-	inventory   *inventoryapplication.Service
-	catalog     *catalogapplication.Service
-	economy     *economyapplication.Service
-	subscription *subscriptionapplication.Service
+	sso           *authenticationapplication.Service
+	registry      *coreconnection.RedisSessionRegistry
+	bus           *handshakerealtime.DistributedCloseSignalBus
+	broadcaster   broadcast.Broadcaster
+	hotelStatus   *sessionhotelstatus.Service
+	users         *userapplication.Service
+	permissions   *permissionapplication.Service
+	messenger     *messengerapplication.Service
+	furniture     *furnitureapplication.Service
+	inventory     *inventoryapplication.Service
+	catalog       *catalogapplication.Service
+	economy       *economyapplication.Service
+	subscription  *subscriptionapplication.Service
 	economyBundle *economyServiceBundle
-	handler     *handshakerealtime.Handler
+	handler       *handshakerealtime.Handler
 }
 
 // buildServeServices constructs shared application dependencies.
@@ -113,7 +113,7 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		return nil, err
 	}
 	return &serveServices{
-		sso: authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
+		sso:      authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
 		registry: registry, bus: bus, broadcaster: broadcaster, hotelStatus: hotelStatus,
 		users: users, permissions: permissions, messenger: messenger,
 		furniture: economyServices.furniture, inventory: economyServices.inventory,

@@ -48,8 +48,8 @@ type PagePatch struct {
 	Visible *bool
 	// Enabled stores optional availability update.
 	Enabled *bool
-	// MinRank stores optional rank restriction update.
-	MinRank *int
+	// MinPermission stores optional dotted permission restriction update.
+	MinPermission *string
 	// OrderNum stores optional sort position update.
 	OrderNum *int
 	// PageLayout stores optional layout key update.

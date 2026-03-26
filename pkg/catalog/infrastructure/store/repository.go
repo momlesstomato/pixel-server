@@ -30,10 +30,10 @@ var _ domain.Repository = (*Store)(nil)
 func mapPage(row catalogmodel.Page) domain.CatalogPage {
 	var images, texts []string
 	if row.Images != "" {
-		images = strings.Split(row.Images, ",")
+		images = strings.Split(row.Images, "|")
 	}
 	if row.Texts != "" {
-		texts = strings.Split(row.Texts, ",")
+		texts = strings.Split(row.Texts, "|")
 	}
 	var parentID *int
 	if row.ParentID != nil {
@@ -44,7 +44,7 @@ func mapPage(row catalogmodel.Page) domain.CatalogPage {
 		ID: int(row.ID), ParentID: parentID, Caption: row.Caption,
 		IconImage: row.IconImage, PageLayout: row.PageLayout,
 		Visible: row.Visible, Enabled: row.Enabled,
-		MinRank: row.MinRank, ClubOnly: row.ClubOnly,
+		MinPermission: row.MinPermission, ClubOnly: row.ClubOnly,
 		OrderNum: row.OrderNum, Images: images, Texts: texts,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}

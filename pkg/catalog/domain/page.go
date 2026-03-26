@@ -18,8 +18,8 @@ type CatalogPage struct {
 	Visible bool
 	// Enabled stores whether purchasing from this page is allowed.
 	Enabled bool
-	// MinRank stores minimum rank required to view the page.
-	MinRank int
+	// MinPermission stores dotted permission required to view the page; empty means everyone.
+	MinPermission string
 	// ClubOnly stores whether only club members can access.
 	ClubOnly bool
 	// OrderNum stores the display ordering position.

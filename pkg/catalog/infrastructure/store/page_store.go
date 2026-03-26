@@ -46,10 +46,10 @@ func (store *Store) CreatePage(ctx context.Context, page domain.CatalogPage) (do
 		ParentID: parentID, Caption: page.Caption,
 		IconImage: page.IconImage, PageLayout: page.PageLayout,
 		Visible: page.Visible, Enabled: page.Enabled,
-		MinRank: page.MinRank, ClubOnly: page.ClubOnly,
+		MinPermission: page.MinPermission, ClubOnly: page.ClubOnly,
 		OrderNum: page.OrderNum,
-		Images: strings.Join(page.Images, ","),
-		Texts: strings.Join(page.Texts, ","),
+		Images: strings.Join(page.Images, "|"),
+		Texts: strings.Join(page.Texts, "|"),
 	}
 	if err := store.database.WithContext(ctx).Create(&row).Error; err != nil {
 		return domain.CatalogPage{}, err
@@ -69,8 +69,8 @@ func (store *Store) UpdatePage(ctx context.Context, id int, patch domain.PagePat
 	if patch.Enabled != nil {
 		updates["enabled"] = *patch.Enabled
 	}
-	if patch.MinRank != nil {
-		updates["min_rank"] = *patch.MinRank
+	if patch.MinPermission != nil {
+		updates["min_permission"] = *patch.MinPermission
 	}
 	if patch.OrderNum != nil {
 		updates["order_num"] = *patch.OrderNum

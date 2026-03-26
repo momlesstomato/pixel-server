@@ -27,10 +27,10 @@ func RegisterRoutes(module *corehttp.Module, service Service) error {
 func registerMarketplaceRoutes(module *corehttp.Module, service Service) {
 	module.RegisterGET("/api/v1/marketplace/offers", func(ctx *fiber.Ctx) error {
 		filter := domain.OfferFilter{
-			MinPrice:  ctx.QueryInt("min_price"),
-			MaxPrice:  ctx.QueryInt("max_price"),
-			Offset:    ctx.QueryInt("offset"),
-			Limit:     ctx.QueryInt("limit", 20),
+			MinPrice: ctx.QueryInt("min_price"),
+			MaxPrice: ctx.QueryInt("max_price"),
+			Offset:   ctx.QueryInt("offset"),
+			Limit:    ctx.QueryInt("limit", 20),
 		}
 		offers, total, err := service.ListOpenOffers(ctx.UserContext(), filter)
 		if err != nil {

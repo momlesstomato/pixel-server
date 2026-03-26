@@ -1,7 +1,10 @@
 package packet
 
-// GetSubscriptionPacketID defines packet identifier for user.get_subscription.
+// GetSubscriptionPacketID defines packet identifier for user.get_subscription (c2s).
 const GetSubscriptionPacketID uint16 = 3166
+
+// SubscriptionResponsePacketID defines packet identifier for user.subscription (s2c).
+const SubscriptionResponsePacketID uint16 = 954
 
 // GetClubOffersPacketID defines packet identifier for catalog.get_club_offers.
 const GetClubOffersPacketID uint16 = 3285

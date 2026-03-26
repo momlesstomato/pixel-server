@@ -9,20 +9,20 @@ import (
 	httpopenapi "github.com/momlesstomato/pixel-server/core/http/openapi"
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	authenticationhttpapi "github.com/momlesstomato/pixel-server/pkg/authentication/adapter/httpapi"
+	cataloghttpapi "github.com/momlesstomato/pixel-server/pkg/catalog/adapter/httpapi"
+	economyhttpapi "github.com/momlesstomato/pixel-server/pkg/economy/adapter/httpapi"
+	furniturehttpapi "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/httpapi"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
+	inventoryhttpapi "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/httpapi"
 	managementhttpapi "github.com/momlesstomato/pixel-server/pkg/management/adapter/httpapi"
 	messengerhttpapi "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/httpapi"
 	messengerrealtime "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/realtime"
 	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
+	subscriptionhttpapi "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
 	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
 	userapplication "github.com/momlesstomato/pixel-server/pkg/user/application"
-	cataloghttpapi "github.com/momlesstomato/pixel-server/pkg/catalog/adapter/httpapi"
-	economyhttpapi "github.com/momlesstomato/pixel-server/pkg/economy/adapter/httpapi"
-	furniturehttpapi "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/httpapi"
-	inventoryhttpapi "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/httpapi"
-	subscriptionhttpapi "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/httpapi"
 )
 
 // compositeRuntime dispatches packets to an ordered list of user runtimes.
@@ -99,7 +99,9 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 	closer := &busCloserAdapter{bus: services.bus}
 	for _, register := range []func(*corehttp.Module) error{
 		func(m *corehttp.Module) error { return authenticationhttpapi.RegisterRoutes(m, services.sso) },
-		func(m *corehttp.Module) error { return managementhttpapi.RegisterSessionRoutes(m, services.registry, closer) },
+		func(m *corehttp.Module) error {
+			return managementhttpapi.RegisterSessionRoutes(m, services.registry, closer)
+		},
 		func(m *corehttp.Module) error { return managementhttpapi.RegisterHotelRoutes(m, services.hotelStatus) },
 		func(m *corehttp.Module) error { return userhttpapi.RegisterRoutes(m, services.users) },
 		func(m *corehttp.Module) error { return permissionhttpapi.RegisterRoutes(m, services.permissions) },
@@ -148,4 +150,3 @@ type busCloserAdapter struct {
 func (adapter *busCloserAdapter) Close(ctx context.Context, connID string, code int, reason string) error {
 	return adapter.bus.Publish(ctx, connID, handshakerealtime.CloseSignal{Code: code, Reason: reason})
 }
-

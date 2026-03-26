@@ -38,8 +38,8 @@ func pageSchema() map[string]any {
 		"page_layout":   map[string]any{"type": "string"},
 		"visible":       map[string]any{"type": "boolean"},
 		"enabled":       map[string]any{"type": "boolean"},
-		"min_rank":      map[string]any{"type": "integer"},
-		"min_club_level": map[string]any{"type": "integer"},
+		"min_permission": map[string]any{"type": "string", "description": "Dotted permission required to view page; empty means everyone"},
+		"club_only":      map[string]any{"type": "boolean"},
 		"order_num":     map[string]any{"type": "integer"},
 	}}
 }
@@ -53,8 +53,8 @@ func pageRequestSchema() map[string]any {
 			"page_layout":    map[string]any{"type": "string"},
 			"visible":        map[string]any{"type": "boolean"},
 			"enabled":        map[string]any{"type": "boolean"},
-			"min_rank":       map[string]any{"type": "integer"},
-			"min_club_level": map[string]any{"type": "integer"},
+			"min_permission": map[string]any{"type": "string"},
+			"club_only":      map[string]any{"type": "boolean"},
 			"order_num":      map[string]any{"type": "integer"},
 		}}
 }

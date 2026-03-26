@@ -1,10 +1,16 @@
 package packet
 
-// GetIndexPacketID defines packet identifier for catalog.get_index.
+// GetIndexPacketID defines packet identifier for catalog.get_index (c2s).
 const GetIndexPacketID uint16 = 1195
 
-// GetPagePacketID defines packet identifier for catalog.get_page.
+// IndexResponsePacketID defines packet identifier for catalog.index (s2c).
+const IndexResponsePacketID uint16 = 1032
+
+// GetPagePacketID defines packet identifier for catalog.get_page (c2s).
 const GetPagePacketID uint16 = 412
+
+// PageResponsePacketID defines packet identifier for catalog.page (s2c).
+const PageResponsePacketID uint16 = 804
 
 // PurchasePacketID defines packet identifier for catalog.purchase.
 const PurchasePacketID uint16 = 3492

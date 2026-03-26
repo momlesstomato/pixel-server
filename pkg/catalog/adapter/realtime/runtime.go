@@ -54,3 +54,15 @@ func (runtime *Runtime) userID(connID string) (int, bool) {
 
 // Dispose releases per-connection resources.
 func (runtime *Runtime) Dispose(_ string) {}
+
+// sendPacket encodes and transmits one outgoing packet.
+func (runtime *Runtime) sendPacket(connID string, pkt interface {
+	PacketID() uint16
+	Encode() ([]byte, error)
+}) error {
+	body, err := pkt.Encode()
+	if err != nil {
+		return err
+	}
+	return runtime.transport.Send(connID, pkt.PacketID(), body)
+}
