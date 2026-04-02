@@ -1,5 +1,11 @@
 package packet
 
+// GetFurniturePacketID defines packet identifier for inventory.get_furniture (c2s).
+const GetFurniturePacketID uint16 = 3150
+
+// FurniListPacketID defines packet identifier for inventory.furni_list (s2c).
+const FurniListPacketID uint16 = 994
+
 // PlacePacketID defines packet identifier for furniture.place.
 const PlacePacketID uint16 = 1258
 

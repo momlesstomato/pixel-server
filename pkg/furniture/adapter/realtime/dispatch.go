@@ -3,7 +3,7 @@ package realtime
 import (
 	"context"
 
-	packet "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
+	furnipacket "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
 )
 
 // Handle dispatches one authenticated furniture packet payload.
@@ -13,15 +13,53 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 		return false, nil
 	}
 	switch packetID {
-	case packet.PlacePacketID:
+	case furnipacket.GetFurniturePacketID:
+		return true, runtime.handleGetFurniture(ctx, connID)
+	case furnipacket.PlacePacketID:
 		return true, runtime.handlePlace(ctx, connID, body)
-	case packet.PickupPacketID:
+	case furnipacket.PickupPacketID:
 		return true, runtime.handlePickup(ctx, connID, body)
-	case packet.ToggleMultistatePacketID:
+	case furnipacket.ToggleMultistatePacketID:
 		return true, runtime.handleToggleMultistate(ctx, connID, body)
 	default:
 		return false, nil
 	}
+}
+
+// handleGetFurniture responds with the user's full furniture inventory.
+func (runtime *Runtime) handleGetFurniture(ctx context.Context, connID string) error {
+	userID, _ := runtime.userID(connID)
+	items, err := runtime.service.ListItemsByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	entries := make([]furnipacket.FurniListItem, 0, len(items))
+	for _, item := range items {
+		if item.RoomID != 0 {
+			continue
+		}
+		def, defErr := runtime.service.FindDefinitionByID(ctx, item.DefinitionID)
+		if defErr != nil {
+			continue
+		}
+		entries = append(entries, furnipacket.FurniListItem{
+			ID:                   item.ID,
+			ItemType:             def.ItemType,
+			SpriteID:             def.SpriteID,
+			ExtraData:            item.ExtraData,
+			LimitedNumber:        item.LimitedNumber,
+			LimitedTotal:         item.LimitedTotal,
+			AllowRecycle:         def.AllowRecycle,
+			AllowTrade:           def.AllowTrade,
+			AllowInventoryStack:  def.AllowInventoryStack,
+			AllowMarketplaceSell: def.AllowMarketplaceSell,
+		})
+	}
+	return runtime.sendPacket(connID, furnipacket.FurniListPacket{
+		TotalFragments: 1,
+		FragmentIndex:  0,
+		Items:          entries,
+	})
 }
 
 // handlePlace processes a furniture placement request.

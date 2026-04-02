@@ -22,6 +22,8 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 		return true, runtime.handleGetSubscription(ctx, connID, userID, body)
 	case packet.GetClubOffersPacketID:
 		return true, runtime.handleGetClubOffers(ctx, connID, userID)
+	case packet.GetClubGiftInfoPacketID:
+		return true, runtime.handleGetClubGiftInfo(connID)
 	default:
 		return false, nil
 	}
@@ -48,8 +50,12 @@ func (runtime *Runtime) handleGetClubOffers(ctx context.Context, connID string, 
 		runtime.logger.Error("get club offers failed", zap.Int("user_id", userID), zap.Error(err))
 		return err
 	}
-	_ = offers
-	return nil
+	return runtime.sendPacket(connID, packet.ClubOffersPacket{Offers: offers, WindowID: 0})
+}
+
+// handleGetClubGiftInfo responds with club gift eligibility.
+func (runtime *Runtime) handleGetClubGiftInfo(connID string) error {
+	return runtime.sendPacket(connID, packet.ClubGiftInfoPacket{DaysUntilNextGift: 0, GiftsAvailable: 0})
 }
 
 // parseProductName reads the product name string from a get_subscription body.

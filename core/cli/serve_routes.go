@@ -18,6 +18,7 @@ import (
 	managementhttpapi "github.com/momlesstomato/pixel-server/pkg/management/adapter/httpapi"
 	messengerhttpapi "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/httpapi"
 	messengerrealtime "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/realtime"
+	navigatorhttpapi "github.com/momlesstomato/pixel-server/pkg/navigator/adapter/httpapi"
 	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
 	subscriptionhttpapi "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
@@ -113,6 +114,7 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 		func(m *corehttp.Module) error { return cataloghttpapi.RegisterRoutes(m, services.catalog) },
 		func(m *corehttp.Module) error { return economyhttpapi.RegisterRoutes(m, services.economy) },
 		func(m *corehttp.Module) error { return subscriptionhttpapi.RegisterRoutes(m, services.subscription) },
+		func(m *corehttp.Module) error { return navigatorhttpapi.RegisterRoutes(m, services.navigator) },
 	} {
 		if err := register(module); err != nil {
 			return err
@@ -123,7 +125,7 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 		userhttpapi.OpenAPIPaths(), permissionhttpapi.OpenAPIPaths(),
 		messengerhttpapi.OpenAPIPaths(), furniturehttpapi.OpenAPIPaths(),
 		inventoryhttpapi.OpenAPIPaths(), cataloghttpapi.OpenAPIPaths(),
-		economyhttpapi.OpenAPIPaths(), subscriptionhttpapi.OpenAPIPaths(),
+		economyhttpapi.OpenAPIPaths(), subscriptionhttpapi.OpenAPIPaths(), navigatorhttpapi.OpenAPIPaths(),
 	)
 	return httpopenapi.RegisterRoutes(module, httpopenapi.BuildDocument(wsPath, paths), "", "")
 }

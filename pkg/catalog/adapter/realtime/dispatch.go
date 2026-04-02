@@ -25,6 +25,10 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 		return true, runtime.handlePurchase(ctx, connID, userID, body)
 	case packet.PurchaseGiftPacketID:
 		return true, runtime.handlePurchaseGift(ctx, connID, userID, body)
+	case packet.RedeemVoucherPacketID:
+		return true, runtime.handleRedeemVoucher(ctx, connID, userID, body)
+	case packet.CheckGiftablePacketID:
+		return true, runtime.handleCheckGiftable(ctx, connID, userID, body)
 	default:
 		return false, nil
 	}

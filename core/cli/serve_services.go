@@ -15,8 +15,10 @@ import (
 	furnitureapplication "github.com/momlesstomato/pixel-server/pkg/furniture/application"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	inventoryapplication "github.com/momlesstomato/pixel-server/pkg/inventory/application"
+	inventorydomain "github.com/momlesstomato/pixel-server/pkg/inventory/domain"
 	messengerapplication "github.com/momlesstomato/pixel-server/pkg/messenger/application"
 	messengerstore "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/store"
+	navigatorapplication "github.com/momlesstomato/pixel-server/pkg/navigator/application"
 	permissionnotification "github.com/momlesstomato/pixel-server/pkg/permission/adapter/notification"
 	permissionapplication "github.com/momlesstomato/pixel-server/pkg/permission/application"
 	permissionstore "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/store"
@@ -42,6 +44,7 @@ type serveServices struct {
 	catalog       *catalogapplication.Service
 	economy       *economyapplication.Service
 	subscription  *subscriptionapplication.Service
+	navigator     *navigatorapplication.Service
 	economyBundle *economyServiceBundle
 	handler       *handshakerealtime.Handler
 	fire          func(sdk.Event)
@@ -120,7 +123,8 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		users: users, permissions: permissions, messenger: messenger,
 		furniture: economyServices.furniture, inventory: economyServices.inventory,
 		catalog: economyServices.catalog, economy: economyServices.economy,
-		subscription: economyServices.subscription, economyBundle: economyServices,
+		subscription: economyServices.subscription, navigator: economyServices.navigator,
+		economyBundle: economyServices,
 	}, nil
 }
 
@@ -129,4 +133,30 @@ func (s *serveServices) fireSafe(event sdk.Event) {
 	if s.fire != nil {
 		s.fire(event)
 	}
+}
+
+// inventorySpender adapts inventory.Service to catalogdomain.Spender.
+type inventorySpender struct {
+	// svc stores inventory application service.
+	svc *inventoryapplication.Service
+}
+
+// GetCredits delegates to inventory credit balance lookup.
+func (s *inventorySpender) GetCredits(ctx context.Context, userID int) (int, error) {
+	return s.svc.GetCredits(ctx, userID)
+}
+
+// AddCredits delegates to inventory credit adjustment.
+func (s *inventorySpender) AddCredits(ctx context.Context, userID int, amount int) (int, error) {
+	return s.svc.AddCredits(ctx, userID, amount)
+}
+
+// GetCurrencyBalance delegates to inventory activity-point balance lookup.
+func (s *inventorySpender) GetCurrencyBalance(ctx context.Context, userID int, typeID int) (int, error) {
+	return s.svc.GetCurrency(ctx, userID, inventorydomain.CurrencyType(typeID))
+}
+
+// AddCurrencyBalance delegates to inventory activity-point adjustment.
+func (s *inventorySpender) AddCurrencyBalance(ctx context.Context, userID int, typeID int, amount int) (int, error) {
+	return s.svc.AddCurrencyTracked(ctx, userID, inventorydomain.CurrencyType(typeID), amount, inventorydomain.SourcePurchase, "catalog", "")
 }

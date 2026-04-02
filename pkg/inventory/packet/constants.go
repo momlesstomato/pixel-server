@@ -26,3 +26,12 @@ const EffectsResponsePacketID uint16 = 340
 
 // BadgesResponsePacketID defines server packet identifier for user.badges (full list).
 const BadgesResponsePacketID uint16 = 1087
+
+// CurrentBadgesPacketID defines server packet identifier for user.current_badges (equipped slots).
+const CurrentBadgesPacketID uint16 = 2091
+
+// BadgeReceivedPacketID defines server packet identifier for badge_received notification.
+const BadgeReceivedPacketID uint16 = 2493
+
+// EffectActivatedPacketID defines server packet identifier for user.effect_activated.
+const EffectActivatedPacketID uint16 = 1959

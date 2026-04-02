@@ -20,3 +20,9 @@ const GetClubGiftInfoPacketID uint16 = 487
 
 // SelectClubGiftPacketID defines packet identifier for catalog.select_club_gift.
 const SelectClubGiftPacketID uint16 = 2276
+
+// ClubOffersResponsePacketID defines packet identifier for catalog.club_offers (s2c).
+const ClubOffersResponsePacketID uint16 = 2405
+
+// ClubGiftInfoResponsePacketID defines packet identifier for catalog.club_gift_info (s2c).
+const ClubGiftInfoResponsePacketID uint16 = 619

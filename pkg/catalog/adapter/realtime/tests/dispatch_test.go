@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
+	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/catalog/adapter/realtime"
 	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"
 	"github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 	catalogpacket "github.com/momlesstomato/pixel-server/pkg/catalog/packet"
-	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	inventorypkt "github.com/momlesstomato/pixel-server/pkg/inventory/packet"
 )
 
@@ -25,7 +25,7 @@ func (r repoStub) CreatePage(_ context.Context, p domain.CatalogPage) (domain.Ca
 func (r repoStub) UpdatePage(_ context.Context, _ int, _ domain.PagePatch) (domain.CatalogPage, error) {
 	return domain.CatalogPage{}, nil
 }
-func (r repoStub) DeletePage(_ context.Context, _ int) error                     { return nil }
+func (r repoStub) DeletePage(_ context.Context, _ int) error { return nil }
 func (r repoStub) ListOffersByPageID(_ context.Context, _ int) ([]domain.CatalogOffer, error) {
 	return []domain.CatalogOffer{r.offer}, nil
 }
@@ -38,7 +38,7 @@ func (r repoStub) CreateOffer(_ context.Context, o domain.CatalogOffer) (domain.
 func (r repoStub) UpdateOffer(_ context.Context, _ int, _ domain.OfferPatch) (domain.CatalogOffer, error) {
 	return domain.CatalogOffer{}, nil
 }
-func (r repoStub) DeleteOffer(_ context.Context, _ int) error { return nil }
+func (r repoStub) DeleteOffer(_ context.Context, _ int) error                   { return nil }
 func (r repoStub) IncrementLimitedSells(_ context.Context, _ int) (bool, error) { return true, nil }
 func (r repoStub) FindVoucherByCode(_ context.Context, _ string) (domain.Voucher, error) {
 	return domain.Voucher{}, nil
@@ -46,9 +46,9 @@ func (r repoStub) FindVoucherByCode(_ context.Context, _ string) (domain.Voucher
 func (r repoStub) CreateVoucher(_ context.Context, v domain.Voucher) (domain.Voucher, error) {
 	return v, nil
 }
-func (r repoStub) DeleteVoucher(_ context.Context, _ int) error                { return nil }
-func (r repoStub) ListVouchers(_ context.Context) ([]domain.Voucher, error)    { return nil, nil }
-func (r repoStub) RedeemVoucher(_ context.Context, _ int, _ int) error         { return nil }
+func (r repoStub) DeleteVoucher(_ context.Context, _ int) error             { return nil }
+func (r repoStub) ListVouchers(_ context.Context) ([]domain.Voucher, error) { return nil, nil }
+func (r repoStub) RedeemVoucher(_ context.Context, _ int, _ int) error      { return nil }
 func (r repoStub) HasUserRedeemedVoucher(_ context.Context, _ int, _ int) (bool, error) {
 	return false, nil
 }
@@ -101,9 +101,9 @@ func buildPurchaseBody(pageID, offerID int32) []byte {
 // zeroSpender returns zero balances simulating an empty wallet.
 type zeroSpender struct{}
 
-func (zeroSpender) GetCredits(_ context.Context, _ int) (int, error)                      { return 0, nil }
-func (zeroSpender) AddCredits(_ context.Context, _ int, d int) (int, error)               { return d, nil }
-func (zeroSpender) GetCurrencyBalance(_ context.Context, _ int, _ int) (int, error)       { return 0, nil }
+func (zeroSpender) GetCredits(_ context.Context, _ int) (int, error)                { return 0, nil }
+func (zeroSpender) AddCredits(_ context.Context, _ int, d int) (int, error)         { return d, nil }
+func (zeroSpender) GetCurrencyBalance(_ context.Context, _ int, _ int) (int, error) { return 0, nil }
 func (zeroSpender) AddCurrencyBalance(_ context.Context, _ int, _ int, d int) (int, error) {
 	return d, nil
 }

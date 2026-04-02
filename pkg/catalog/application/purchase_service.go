@@ -29,7 +29,11 @@ func (service *Service) PurchaseOffer(ctx context.Context, connID string, userID
 	}
 	var newCredits int
 	if service.spender != nil {
-		newCredits, _ = service.spender.GetCredits(ctx, userID)
+		var creditsErr error
+		newCredits, creditsErr = service.spender.GetCredits(ctx, userID)
+		if creditsErr != nil {
+			return domain.PurchaseResult{}, creditsErr
+		}
 	}
 	if service.fire != nil {
 		ev := &sdkcatalog.OfferPurchased{ConnID: connID, UserID: userID, OfferID: offer.ID, Quantity: amount}
@@ -49,7 +53,11 @@ func (service *Service) PurchaseOffer(ctx context.Context, connID string, userID
 	}
 	var itemID int
 	if service.itemDeliverer != nil && offer.ItemDefinitionID > 0 {
-		itemID, _ = service.itemDeliverer.DeliverItem(ctx, userID, offer.ItemDefinitionID, extraData, 0, 0)
+		var deliverErr error
+		itemID, deliverErr = service.itemDeliverer.DeliverItem(ctx, userID, offer.ItemDefinitionID, extraData, 0, 0)
+		if deliverErr != nil {
+			return domain.PurchaseResult{}, deliverErr
+		}
 	}
 	if service.fire != nil {
 		service.fire(&sdkcatalog.OfferPurchaseConfirmed{ConnID: connID, UserID: userID, OfferID: offer.ID, Quantity: amount})
@@ -75,7 +83,11 @@ func (service *Service) PurchaseGift(ctx context.Context, connID string, actorUs
 		return domain.PurchaseResult{}, purchaseErr
 	}
 	if service.itemDeliverer != nil && result.Offer.ItemDefinitionID > 0 && recipient.UserID != actorUserID {
-		result.ItemID, _ = service.itemDeliverer.DeliverItem(ctx, recipient.UserID, result.Offer.ItemDefinitionID, extraData, 0, 0)
+		var giftDeliverErr error
+		result.ItemID, giftDeliverErr = service.itemDeliverer.DeliverItem(ctx, recipient.UserID, result.Offer.ItemDefinitionID, extraData, 0, 0)
+		if giftDeliverErr != nil {
+			return domain.PurchaseResult{}, giftDeliverErr
+		}
 	}
 	return result, nil
 }

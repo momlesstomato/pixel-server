@@ -63,11 +63,7 @@ func (runtime *Runtime) sendPostPurchase(connID string, result domain.PurchaseRe
 	if result.ItemID <= 0 {
 		return nil
 	}
-	itemType := packet.FurniListFloor
-	if result.Offer.ItemType == "i" {
-		itemType = packet.FurniListWall
-	}
-	return runtime.sendPacket(connID, packet.FurniListNotificationPacket{ItemID: result.ItemID, ItemType: itemType})
+	return runtime.sendPacket(connID, packet.FurniListNotificationPacket{ItemID: result.ItemID})
 }
 
 // sendPurchaseError maps a purchase error to the appropriate client error packet.

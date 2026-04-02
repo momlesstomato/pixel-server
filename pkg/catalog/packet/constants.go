@@ -38,5 +38,18 @@ const PurchaseNotAllowedPacketID uint16 = 3770
 
 // GiftWrappingConfigResponsePacketID defines packet identifier for catalog.gift_wrapping_config (s2c).
 const GiftWrappingConfigResponsePacketID uint16 = 2234
-// FurniListNotificationPacketID defines packet identifier for inventory item notification.
-const FurniListNotificationPacketID uint16 = 439
+
+// FurniListNotificationPacketID defines packet identifier for unseen inventory items notification (s2c).
+const FurniListNotificationPacketID uint16 = 2103
+
+// VoucherRedeemOKPacketID defines packet identifier for catalog.voucher_redeem_ok (s2c).
+const VoucherRedeemOKPacketID uint16 = 3336
+
+// VoucherRedeemErrorPacketID defines packet identifier for catalog.voucher_redeem_error (s2c).
+const VoucherRedeemErrorPacketID uint16 = 714
+
+// IsOfferGiftablePacketID defines packet identifier for catalog.is_offer_giftable (s2c).
+const IsOfferGiftablePacketID uint16 = 761
+
+// GiftReceiverNotFoundPacketID defines packet identifier for catalog.gift_receiver_not_found (s2c).
+const GiftReceiverNotFoundPacketID uint16 = 1517

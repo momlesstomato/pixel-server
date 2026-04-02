@@ -7,6 +7,7 @@ import (
 	furnituremigration "github.com/momlesstomato/pixel-server/pkg/furniture/infrastructure/migration"
 	inventorymigration "github.com/momlesstomato/pixel-server/pkg/inventory/infrastructure/migration"
 	messengermigration "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/migration"
+	navigatormigration "github.com/momlesstomato/pixel-server/pkg/navigator/infrastructure/migration"
 	permissionmigration "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/migration"
 	subscriptionmigration "github.com/momlesstomato/pixel-server/pkg/subscription/infrastructure/migration"
 )
@@ -52,5 +53,9 @@ func Registry() []*gormigrate.Migration {
 		economymigration.Step03TradeLogs(),
 		subscriptionmigration.Step01Subscriptions(),
 		subscriptionmigration.Step02ClubOffers(),
+		navigatormigration.Step01NavigatorCategories(),
+		navigatormigration.Step02Rooms(),
+		navigatormigration.Step03SavedSearches(),
+		navigatormigration.Step04Favourites(),
 	}
 }
