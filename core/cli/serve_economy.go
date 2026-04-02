@@ -15,6 +15,7 @@ import (
 	economystore "github.com/momlesstomato/pixel-server/pkg/economy/infrastructure/store"
 	furniturerealtime "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/realtime"
 	furnitureapplication "github.com/momlesstomato/pixel-server/pkg/furniture/application"
+	furnituredomain "github.com/momlesstomato/pixel-server/pkg/furniture/domain"
 	furniturestore "github.com/momlesstomato/pixel-server/pkg/furniture/infrastructure/store"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	inventoryrealtime "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/realtime"
@@ -67,6 +68,7 @@ func buildEconomyServices(runtime *initializer.Runtime) (*economyServiceBundle, 
 	catalog.SetCache(runtime.Redis, catalogapplication.CacheConfig{Prefix: "catalog", TTL: 5 * time.Minute})
 	catalog.SetCurrencyValidator(inventoryRepo)
 	catalog.SetSpender(&inventorySpender{svc: inventory})
+	catalog.SetItemDeliverer(&furnitureItemDeliverer{svc: furniture})
 	userRepo, err := userstore.NewRepository(runtime.PostgreSQL)
 	if err != nil {
 		return nil, err
@@ -171,3 +173,23 @@ func (f *userRecipientFinder) FindRecipientByUsername(ctx context.Context, usern
 	return catalogdomain.RecipientInfo{UserID: user.ID, AllowGifts: !user.SafetyLocked}, nil
 }
 
+// furnitureItemDeliverer adapts furniture.Service to catalogdomain.ItemDeliverer.
+type furnitureItemDeliverer struct {
+	// svc stores furniture application service.
+	svc *furnitureapplication.Service
+}
+
+// DeliverItem creates one furniture item instance in the user's inventory.
+func (d *furnitureItemDeliverer) DeliverItem(ctx context.Context, userID int, defID int, extraData string, limitedNumber int, limitedTotal int) (int, error) {
+	item, err := d.svc.CreateItem(ctx, furnituredomain.Item{
+		UserID:        userID,
+		DefinitionID:  defID,
+		ExtraData:     extraData,
+		LimitedNumber: limitedNumber,
+		LimitedTotal:  limitedTotal,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return item.ID, nil
+}

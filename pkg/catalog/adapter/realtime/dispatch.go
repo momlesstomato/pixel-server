@@ -88,4 +88,3 @@ func parseGetPageRequest(body []byte) (int32, string, error) {
 	}
 	return pageID, catalogType, nil
 }
-

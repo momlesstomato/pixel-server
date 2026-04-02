@@ -36,8 +36,8 @@ func (activeOfferRepo) CreateOffer(_ context.Context, o catalogdomain.CatalogOff
 func (activeOfferRepo) UpdateOffer(context.Context, int, catalogdomain.OfferPatch) (catalogdomain.CatalogOffer, error) {
 	return catalogdomain.CatalogOffer{}, nil
 }
-func (activeOfferRepo) DeleteOffer(context.Context, int) error                         { return nil }
-func (activeOfferRepo) IncrementLimitedSells(context.Context, int) (bool, error)       { return true, nil }
+func (activeOfferRepo) DeleteOffer(context.Context, int) error                   { return nil }
+func (activeOfferRepo) IncrementLimitedSells(context.Context, int) (bool, error) { return true, nil }
 func (activeOfferRepo) FindVoucherByCode(context.Context, string) (catalogdomain.Voucher, error) {
 	return catalogdomain.Voucher{}, nil
 }
@@ -45,10 +45,14 @@ func (activeOfferRepo) CreateVoucher(_ context.Context, v catalogdomain.Voucher)
 	v.ID = 1
 	return v, nil
 }
-func (activeOfferRepo) DeleteVoucher(context.Context, int) error                       { return nil }
-func (activeOfferRepo) ListVouchers(context.Context) ([]catalogdomain.Voucher, error)  { return nil, nil }
-func (activeOfferRepo) RedeemVoucher(context.Context, int, int) error                  { return nil }
-func (activeOfferRepo) HasUserRedeemedVoucher(context.Context, int, int) (bool, error) { return false, nil }
+func (activeOfferRepo) DeleteVoucher(context.Context, int) error { return nil }
+func (activeOfferRepo) ListVouchers(context.Context) ([]catalogdomain.Voucher, error) {
+	return nil, nil
+}
+func (activeOfferRepo) RedeemVoucher(context.Context, int, int) error { return nil }
+func (activeOfferRepo) HasUserRedeemedVoucher(context.Context, int, int) (bool, error) {
+	return false, nil
+}
 
 // blockedRecipientFinder always reports AllowGifts=false.
 type blockedRecipientFinder struct{}

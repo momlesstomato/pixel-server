@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/core/initializer"
-	sdk "github.com/momlesstomato/pixel-sdk"
 	authenticationapplication "github.com/momlesstomato/pixel-server/pkg/authentication/application"
 	authenticationredisstore "github.com/momlesstomato/pixel-server/pkg/authentication/infrastructure/redisstore"
 	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"

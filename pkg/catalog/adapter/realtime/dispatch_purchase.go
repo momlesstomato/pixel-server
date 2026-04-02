@@ -3,10 +3,12 @@ package realtime
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 	"github.com/momlesstomato/pixel-server/pkg/catalog/packet"
+	inventorypkt "github.com/momlesstomato/pixel-server/pkg/inventory/packet"
 	"go.uber.org/zap"
 )
 
@@ -21,12 +23,15 @@ func (runtime *Runtime) handlePurchase(ctx context.Context, connID string, userI
 	if err != nil {
 		return err
 	}
-	offer, purchaseErr := runtime.service.PurchaseOffer(ctx, connID, userID, int(offerID), extraData, int(amount))
+	result, purchaseErr := runtime.service.PurchaseOffer(ctx, connID, userID, int(offerID), extraData, int(amount))
 	if purchaseErr != nil {
 		return runtime.sendPurchaseError(connID, purchaseErr)
 	}
-	runtime.logger.Info("catalog purchase successful", zap.Int("user_id", userID), zap.Int32("offer_id", offerID))
-	return runtime.sendPacket(connID, packet.PurchaseOKPacket{Offer: buildOfferEntry(offer)})
+	runtime.logger.Info("catalog purchase successful", zap.Int("user_id", userID), zap.Int("offer_id", result.Offer.ID))
+	if err := runtime.sendPacket(connID, packet.PurchaseOKPacket{Offer: buildOfferEntry(result.Offer)}); err != nil {
+		return err
+	}
+	return runtime.sendPostPurchase(connID, result)
 }
 
 // handlePurchaseGift processes a catalog gift purchase request from the client.
@@ -35,12 +40,34 @@ func (runtime *Runtime) handlePurchaseGift(ctx context.Context, connID string, u
 	if err != nil {
 		return err
 	}
-	offer, purchaseErr := runtime.service.PurchaseGift(ctx, connID, userID, int(offerID), extraData, recipientName)
+	result, purchaseErr := runtime.service.PurchaseGift(ctx, connID, userID, int(offerID), extraData, recipientName)
 	if purchaseErr != nil {
 		return runtime.sendPurchaseError(connID, purchaseErr)
 	}
-	runtime.logger.Info("catalog gift purchase successful", zap.Int("user_id", userID), zap.Int32("offer_id", offerID), zap.String("recipient", recipientName))
-	return runtime.sendPacket(connID, packet.PurchaseOKPacket{Offer: buildOfferEntry(offer)})
+	runtime.logger.Info("catalog gift purchase successful", zap.Int("user_id", userID), zap.Int("offer_id", result.Offer.ID), zap.String("recipient", recipientName))
+	if err := runtime.sendPacket(connID, packet.PurchaseOKPacket{Offer: buildOfferEntry(result.Offer)}); err != nil {
+		return err
+	}
+	return runtime.sendPostPurchase(connID, result)
+}
+
+// sendPostPurchase sends wallet update and inventory notification packets after a purchase.
+func (runtime *Runtime) sendPostPurchase(connID string, result domain.PurchaseResult) error {
+	w := codec.NewWriter()
+	if err := w.WriteString(fmt.Sprintf("%d.0", result.NewCredits)); err != nil {
+		return err
+	}
+	if err := runtime.transport.Send(connID, inventorypkt.CreditsResponsePacketID, w.Bytes()); err != nil {
+		return err
+	}
+	if result.ItemID <= 0 {
+		return nil
+	}
+	itemType := packet.FurniListFloor
+	if result.Offer.ItemType == "i" {
+		itemType = packet.FurniListWall
+	}
+	return runtime.sendPacket(connID, packet.FurniListNotificationPacket{ItemID: result.ItemID, ItemType: itemType})
 }
 
 // sendPurchaseError maps a purchase error to the appropriate client error packet.

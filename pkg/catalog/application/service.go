@@ -21,6 +21,8 @@ type Service struct {
 	spender domain.Spender
 	// recipientFinder stores optional gift recipient lookup port.
 	recipientFinder domain.RecipientFinder
+	// itemDeliverer stores optional furniture item delivery port.
+	itemDeliverer domain.ItemDeliverer
 	// fire stores optional plugin event dispatch behavior.
 	fire func(sdk.Event)
 	// redis stores optional Redis client for cache operations.
@@ -55,6 +57,12 @@ func (service *Service) SetSpender(s domain.Spender) {
 // When not set, gift purchases will return ErrRecipientNotFound.
 func (service *Service) SetRecipientFinder(rf domain.RecipientFinder) {
 	service.recipientFinder = rf
+}
+
+// SetItemDeliverer configures the furniture item delivery port.
+// When set, successful purchases create an item instance in the buyer's inventory.
+func (service *Service) SetItemDeliverer(d domain.ItemDeliverer) {
+	service.itemDeliverer = d
 }
 
 // SetEventFirer configures optional plugin event dispatch behavior.

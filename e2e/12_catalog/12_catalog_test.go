@@ -43,12 +43,12 @@ func Test12PluginReceivesConfirmedEvent(t *testing.T) {
 // Test12PurchaseFreeOfferNoSpenderNeeded verifies zero-cost purchases need no spender.
 func Test12PurchaseFreeOfferNoSpenderNeeded(t *testing.T) {
 	svc, _ := catalogapplication.NewService(activeOfferRepo{})
-	offer, err := svc.PurchaseOffer(context.Background(), "conn", 1, 1, "", 1)
+	result, err := svc.PurchaseOffer(context.Background(), "conn", 1, 1, "", 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if offer.ID != 1 {
-		t.Fatalf("expected offer ID 1, got %d", offer.ID)
+	if result.Offer.ID != 1 {
+		t.Fatalf("expected offer ID 1, got %d", result.Offer.ID)
 	}
 }
 

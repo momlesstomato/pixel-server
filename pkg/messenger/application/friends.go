@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/momlesstomato/pixel-server/core/codec"
 	sdkmessenger "github.com/momlesstomato/pixel-sdk/events/messenger"
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/messenger/domain"
 )
 

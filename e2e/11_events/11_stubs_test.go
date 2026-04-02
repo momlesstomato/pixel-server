@@ -41,8 +41,8 @@ func (catalogStub) CreateOffer(_ context.Context, o catalogdomain.CatalogOffer) 
 func (catalogStub) UpdateOffer(context.Context, int, catalogdomain.OfferPatch) (catalogdomain.CatalogOffer, error) {
 	return catalogdomain.CatalogOffer{}, nil
 }
-func (catalogStub) DeleteOffer(context.Context, int) error                         { return nil }
-func (catalogStub) IncrementLimitedSells(context.Context, int) (bool, error)       { return true, nil }
+func (catalogStub) DeleteOffer(context.Context, int) error                   { return nil }
+func (catalogStub) IncrementLimitedSells(context.Context, int) (bool, error) { return true, nil }
 func (catalogStub) FindVoucherByCode(context.Context, string) (catalogdomain.Voucher, error) {
 	return catalogdomain.Voucher{}, nil
 }
@@ -64,7 +64,9 @@ func (inventoryStub) ListCurrencyTypes(context.Context) ([]inventorydomain.Activ
 func (inventoryStub) FindCurrencyTypeByID(context.Context, int) (inventorydomain.ActivityCurrencyType, error) {
 	return inventorydomain.ActivityCurrencyType{}, nil
 }
-func (inventoryStub) ListBadges(context.Context, int) ([]inventorydomain.Badge, error) { return nil, nil }
+func (inventoryStub) ListBadges(context.Context, int) ([]inventorydomain.Badge, error) {
+	return nil, nil
+}
 func (inventoryStub) AwardBadge(_ context.Context, _ int, code string) (inventorydomain.Badge, error) {
 	return inventorydomain.Badge{ID: 1, BadgeCode: code}, nil
 }
@@ -140,8 +142,8 @@ func (messengerRepoStub) FindRequestByUsers(context.Context, int, int) (messenge
 func (messengerRepoStub) ListRequests(context.Context, int) ([]messengerdomain.FriendRequest, error) {
 	return nil, nil
 }
-func (messengerRepoStub) DeleteRequest(context.Context, int) error     { return nil }
-func (messengerRepoStub) DeleteAllRequests(context.Context, int) error { return nil }
+func (messengerRepoStub) DeleteRequest(context.Context, int) error                   { return nil }
+func (messengerRepoStub) DeleteAllRequests(context.Context, int) error               { return nil }
 func (messengerRepoStub) SaveOfflineMessage(context.Context, int, int, string) error { return nil }
 func (messengerRepoStub) GetAndDeleteOfflineMessages(context.Context, int) ([]messengerdomain.OfflineMessage, error) {
 	return nil, nil
@@ -162,12 +164,16 @@ func (messengerRepoStub) FindUsersByIDs(context.Context, []int) ([]messengerdoma
 // sessionStub provides minimal session registry.
 type sessionStub struct{}
 
-func (sessionStub) Register(coreconnection.Session) error                  { return nil }
-func (*sessionStub) FindByConnID(string) (coreconnection.Session, bool)    { return coreconnection.Session{}, false }
-func (*sessionStub) FindByUserID(int) (coreconnection.Session, bool)       { return coreconnection.Session{}, false }
-func (sessionStub) Touch(string) error                                     { return nil }
-func (sessionStub) Remove(string)                                          {}
-func (sessionStub) ListAll() ([]coreconnection.Session, error)             { return nil, nil }
+func (sessionStub) Register(coreconnection.Session) error { return nil }
+func (*sessionStub) FindByConnID(string) (coreconnection.Session, bool) {
+	return coreconnection.Session{}, false
+}
+func (*sessionStub) FindByUserID(int) (coreconnection.Session, bool) {
+	return coreconnection.Session{}, false
+}
+func (sessionStub) Touch(string) error                         { return nil }
+func (sessionStub) Remove(string)                              {}
+func (sessionStub) ListAll() ([]coreconnection.Session, error) { return nil, nil }
 
 // broadcastStub provides minimal broadcaster.
 type broadcastStub struct{}

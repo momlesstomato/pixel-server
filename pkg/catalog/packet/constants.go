@@ -38,3 +38,5 @@ const PurchaseNotAllowedPacketID uint16 = 3770
 
 // GiftWrappingConfigResponsePacketID defines packet identifier for catalog.gift_wrapping_config (s2c).
 const GiftWrappingConfigResponsePacketID uint16 = 2234
+// FurniListNotificationPacketID defines packet identifier for inventory item notification.
+const FurniListNotificationPacketID uint16 = 439

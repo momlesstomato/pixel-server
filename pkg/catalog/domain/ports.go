@@ -32,3 +32,22 @@ type RecipientFinder interface {
 	// Returns ErrRecipientNotFound when the username does not exist.
 	FindRecipientByUsername(ctx context.Context, username string) (RecipientInfo, error)
 }
+
+// ItemDeliverer is a secondary port for creating furniture item instances in a
+// user's inventory as part of catalog purchase fulfillment.
+type ItemDeliverer interface {
+	// DeliverItem creates one furniture instance for the given user.
+	// Returns the new item identifier on success.
+	DeliverItem(ctx context.Context, userID int, defID int, extraData string, limitedNumber int, limitedTotal int) (int, error)
+}
+
+// PurchaseResult carries the outcome of a successful catalog purchase.
+type PurchaseResult struct {
+	// Offer stores the purchased offer definition.
+	Offer CatalogOffer
+	// ItemID stores the created furniture item instance identifier.
+	// Zero when no item was created (e.g. badge-only offers).
+	ItemID int
+	// NewCredits stores the buyer's credit balance after deduction.
+	NewCredits int
+}

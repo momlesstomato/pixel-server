@@ -9,6 +9,7 @@ import (
 	"github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 	catalogpacket "github.com/momlesstomato/pixel-server/pkg/catalog/packet"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
+	inventorypkt "github.com/momlesstomato/pixel-server/pkg/inventory/packet"
 )
 
 // repoStub provides deterministic catalog data.
@@ -132,8 +133,8 @@ func TestHandlePurchaseFreeOfferSendsPurchaseOK(t *testing.T) {
 	if err != nil || !handled {
 		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
 	}
-	if len(transport.sent) != 1 || transport.sent[0] != catalogpacket.PurchaseOKPacketID {
-		t.Fatalf("expected purchase_ok packet 869, got %v", transport.sent)
+	if len(transport.sent) < 2 || transport.sent[0] != catalogpacket.PurchaseOKPacketID || transport.sent[1] != inventorypkt.CreditsResponsePacketID {
+		t.Fatalf("expected [%d %d] packets, got %v", catalogpacket.PurchaseOKPacketID, inventorypkt.CreditsResponsePacketID, transport.sent)
 	}
 }
 

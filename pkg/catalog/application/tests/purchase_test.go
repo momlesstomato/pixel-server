@@ -52,12 +52,12 @@ func TestPurchaseOfferNoSpenderError(t *testing.T) {
 func TestPurchaseOfferFreeSucceeds(t *testing.T) {
 	stub := repositoryStub{offer: domain.CatalogOffer{ID: 1, OfferActive: true, CostCredits: 0}}
 	svc, _ := catalogapplication.NewService(stub)
-	offer, err := svc.PurchaseOffer(context.Background(), "conn", 1, 1, "", 1)
+	result, err := svc.PurchaseOffer(context.Background(), "conn", 1, 1, "", 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if offer.ID != 1 {
-		t.Fatalf("expected offer id 1, got %d", offer.ID)
+	if result.Offer.ID != 1 {
+		t.Fatalf("expected offer id 1, got %d", result.Offer.ID)
 	}
 }
 

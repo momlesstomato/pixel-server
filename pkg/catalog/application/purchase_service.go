@@ -8,60 +8,76 @@ import (
 	"github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 )
 
-// PurchaseOffer validates and charges a catalog offer purchase for one user.
+// PurchaseOffer validates, charges and delivers a catalog offer purchase for one user.
 // Credits and activity points are deducted via the configured Spender port.
-// Limited-edition sell counts are incremented atomically.
-// Returns the purchased offer so the caller may notify the client.
-func (service *Service) PurchaseOffer(ctx context.Context, connID string, userID int, offerID int, extraData string, amount int) (domain.CatalogOffer, error) {
+// A furniture item is created via the optional ItemDeliverer port when the offer has a
+// linked item definition.
+// Limited-edition sell counts are incremented atomically after charge.
+func (service *Service) PurchaseOffer(ctx context.Context, connID string, userID int, offerID int, extraData string, amount int) (domain.PurchaseResult, error) {
 	if amount < 1 {
-		return domain.CatalogOffer{}, fmt.Errorf("purchase amount must be positive")
+		return domain.PurchaseResult{}, fmt.Errorf("purchase amount must be positive")
 	}
 	offer, err := service.repository.FindOfferByID(ctx, offerID)
 	if err != nil {
-		return domain.CatalogOffer{}, err
+		return domain.PurchaseResult{}, err
 	}
 	if !offer.OfferActive {
-		return domain.CatalogOffer{}, domain.ErrOfferInactive
+		return domain.PurchaseResult{}, domain.ErrOfferInactive
 	}
 	if err := service.chargePurchase(ctx, userID, offer, amount); err != nil {
-		return domain.CatalogOffer{}, err
+		return domain.PurchaseResult{}, err
+	}
+	var newCredits int
+	if service.spender != nil {
+		newCredits, _ = service.spender.GetCredits(ctx, userID)
 	}
 	if service.fire != nil {
 		ev := &sdkcatalog.OfferPurchased{ConnID: connID, UserID: userID, OfferID: offer.ID, Quantity: amount}
 		service.fire(ev)
 		if ev.Cancelled() {
-			return domain.CatalogOffer{}, fmt.Errorf("purchase cancelled by plugin")
+			return domain.PurchaseResult{}, fmt.Errorf("purchase cancelled by plugin")
 		}
 	}
 	if offer.IsLimited() {
 		ok, incErr := service.repository.IncrementLimitedSells(ctx, offer.ID)
 		if incErr != nil {
-			return domain.CatalogOffer{}, incErr
+			return domain.PurchaseResult{}, incErr
 		}
 		if !ok {
-			return domain.CatalogOffer{}, domain.ErrOfferSoldOut
+			return domain.PurchaseResult{}, domain.ErrOfferSoldOut
 		}
+	}
+	var itemID int
+	if service.itemDeliverer != nil && offer.ItemDefinitionID > 0 {
+		itemID, _ = service.itemDeliverer.DeliverItem(ctx, userID, offer.ItemDefinitionID, extraData, 0, 0)
 	}
 	if service.fire != nil {
 		service.fire(&sdkcatalog.OfferPurchaseConfirmed{ConnID: connID, UserID: userID, OfferID: offer.ID, Quantity: amount})
 	}
-	return offer, nil
+	return domain.PurchaseResult{Offer: offer, ItemID: itemID, NewCredits: newCredits}, nil
 }
 
 // PurchaseGift validates and charges a catalog gift purchase sent to a recipient.
-// The offer is purchased from the actor's balance; delivery is fire-and-forget.
-func (service *Service) PurchaseGift(ctx context.Context, connID string, actorUserID int, offerID int, extraData string, recipientUsername string) (domain.CatalogOffer, error) {
+// The offer is charged from the actor's balance; the item is delivered to the recipient.
+func (service *Service) PurchaseGift(ctx context.Context, connID string, actorUserID int, offerID int, extraData string, recipientUsername string) (domain.PurchaseResult, error) {
 	if service.recipientFinder == nil {
-		return domain.CatalogOffer{}, domain.ErrRecipientNotFound
+		return domain.PurchaseResult{}, domain.ErrRecipientNotFound
 	}
 	recipient, err := service.recipientFinder.FindRecipientByUsername(ctx, recipientUsername)
 	if err != nil {
-		return domain.CatalogOffer{}, domain.ErrRecipientNotFound
+		return domain.PurchaseResult{}, domain.ErrRecipientNotFound
 	}
 	if !recipient.AllowGifts {
-		return domain.CatalogOffer{}, domain.ErrRecipientNotFound
+		return domain.PurchaseResult{}, domain.ErrRecipientNotFound
 	}
-	return service.PurchaseOffer(ctx, connID, actorUserID, offerID, extraData, 1)
+	result, purchaseErr := service.PurchaseOffer(ctx, connID, actorUserID, offerID, extraData, 1)
+	if purchaseErr != nil {
+		return domain.PurchaseResult{}, purchaseErr
+	}
+	if service.itemDeliverer != nil && result.Offer.ItemDefinitionID > 0 && recipient.UserID != actorUserID {
+		result.ItemID, _ = service.itemDeliverer.DeliverItem(ctx, recipient.UserID, result.Offer.ItemDefinitionID, extraData, 0, 0)
+	}
+	return result, nil
 }
 
 // chargePurchase deducts credits and activity points for one offer purchase.

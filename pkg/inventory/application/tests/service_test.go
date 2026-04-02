@@ -144,4 +144,3 @@ func TestServiceAddCurrencyTrackedRejectsCreditsType(t *testing.T) {
 		t.Fatal("expected AddCurrencyTracked to reject CurrencyCredits type")
 	}
 }
-

@@ -102,7 +102,9 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 		func(m *corehttp.Module) error {
 			return managementhttpapi.RegisterSessionRoutes(m, services.registry, closer, services.fireSafe)
 		},
-		func(m *corehttp.Module) error { return managementhttpapi.RegisterHotelRoutes(m, services.hotelStatus, services.fireSafe) },
+		func(m *corehttp.Module) error {
+			return managementhttpapi.RegisterHotelRoutes(m, services.hotelStatus, services.fireSafe)
+		},
 		func(m *corehttp.Module) error { return userhttpapi.RegisterRoutes(m, services.users) },
 		func(m *corehttp.Module) error { return permissionhttpapi.RegisterRoutes(m, services.permissions) },
 		func(m *corehttp.Module) error { return messengerhttpapi.RegisterRoutes(m, services.messenger) },
