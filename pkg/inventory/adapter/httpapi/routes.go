@@ -25,32 +25,6 @@ func RegisterRoutes(module *corehttp.Module, service Service) error {
 	return nil
 }
 
-// registerCurrencyRoutes registers currency balance routes.
-func registerCurrencyRoutes(module *corehttp.Module, service Service) {
-	module.RegisterGET("/api/v1/inventory/:userId/credits", func(ctx *fiber.Ctx) error {
-		userID, err := parsePositiveID(ctx.Params("userId"))
-		if err != nil {
-			return fiber.NewError(http.StatusBadRequest, err.Error())
-		}
-		credits, findErr := service.GetCredits(ctx.UserContext(), userID)
-		if findErr != nil {
-			return mapInventoryError(findErr)
-		}
-		return ctx.JSON(fiber.Map{"credits": credits})
-	})
-	module.RegisterGET("/api/v1/inventory/:userId/currencies", func(ctx *fiber.Ctx) error {
-		userID, err := parsePositiveID(ctx.Params("userId"))
-		if err != nil {
-			return fiber.NewError(http.StatusBadRequest, err.Error())
-		}
-		currencies, findErr := service.ListCurrencies(ctx.UserContext(), userID)
-		if findErr != nil {
-			return mapInventoryError(findErr)
-		}
-		return ctx.JSON(currencies)
-	})
-}
-
 // registerBadgeRoutes registers badge management routes.
 func registerBadgeRoutes(module *corehttp.Module, service Service) {
 	module.RegisterGET("/api/v1/inventory/:userId/badges", func(ctx *fiber.Ctx) error {
@@ -79,6 +53,20 @@ func registerBadgeRoutes(module *corehttp.Module, service Service) {
 		}
 		return ctx.Status(http.StatusCreated).JSON(badge)
 	})
+	module.RegisterDELETE("/api/v1/inventory/:userId/badges/:code", func(ctx *fiber.Ctx) error {
+		userID, err := parsePositiveID(ctx.Params("userId"))
+		if err != nil {
+			return fiber.NewError(http.StatusBadRequest, err.Error())
+		}
+		code := ctx.Params("code")
+		if code == "" {
+			return fiber.NewError(http.StatusBadRequest, "badge code is required")
+		}
+		if revokeErr := service.RevokeBadge(ctx.UserContext(), userID, code); revokeErr != nil {
+			return mapInventoryError(revokeErr)
+		}
+		return ctx.SendStatus(http.StatusNoContent)
+	})
 }
 
 // registerEffectRoutes registers effect listing route.
@@ -101,6 +89,17 @@ func parsePositiveID(value string) (int, error) {
 	id, err := strconv.Atoi(strings.TrimSpace(value))
 	if err != nil || id <= 0 {
 		return 0, fmt.Errorf("id must be a positive integer")
+	}
+	return id, nil
+}
+
+// parseCurrencyTypeID validates and parses an activity-point currency type parameter.
+// Non-negative integers are accepted; negative values are rejected since CurrencyCredits (-1)
+// is not an activity-point type and must be managed via the /credits endpoint.
+func parseCurrencyTypeID(value string) (int, error) {
+	id, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || id < 0 {
+		return 0, fmt.Errorf("currency type must be a non-negative integer")
 	}
 	return id, nil
 }

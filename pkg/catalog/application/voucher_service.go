@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	sdkcatalog "github.com/momlesstomato/pixel-sdk/events/catalog"
 	"github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 )
 
@@ -61,9 +62,19 @@ func (service *Service) RedeemVoucher(ctx context.Context, code string, userID i
 	if redeemed {
 		return domain.Voucher{}, domain.ErrVoucherAlreadyRedeemed
 	}
+	if service.fire != nil {
+		event := &sdkcatalog.VoucherRedeeming{UserID: userID, VoucherCode: code, VoucherID: v.ID}
+		service.fire(event)
+		if event.Cancelled() {
+			return domain.Voucher{}, fmt.Errorf("voucher redemption cancelled by plugin")
+		}
+	}
 	if err := service.repository.RedeemVoucher(ctx, v.ID, userID); err != nil {
 		return domain.Voucher{}, err
 	}
 	v.CurrentUses++
+	if service.fire != nil {
+		service.fire(&sdkcatalog.VoucherRedeemed{UserID: userID, VoucherCode: code})
+	}
 	return v, nil
 }

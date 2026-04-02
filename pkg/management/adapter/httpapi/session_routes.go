@@ -5,11 +5,13 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
+	sdk "github.com/momlesstomato/pixel-sdk"
+	sdkmgmt "github.com/momlesstomato/pixel-sdk/events/management"
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
 )
 
 // RegisterSessionRoutes registers session management API routes.
-func RegisterSessionRoutes(module *corehttp.Module, sessions SessionLister, closer SessionCloser) error {
+func RegisterSessionRoutes(module *corehttp.Module, sessions SessionLister, closer SessionCloser, fire func(sdk.Event)) error {
 	if module == nil {
 		return fmt.Errorf("http module is required")
 	}
@@ -54,6 +56,9 @@ func RegisterSessionRoutes(module *corehttp.Module, sessions SessionLister, clos
 			_ = closer.Close(ctx.UserContext(), connID, 1008, "management disconnect")
 		}
 		sessions.Remove(connID)
+		if fire != nil {
+			fire(&sdkmgmt.SessionKicked{ConnID: connID, Reason: "management disconnect"})
+		}
 		return ctx.JSON(fiber.Map{"disconnected": connID})
 	})
 	return nil

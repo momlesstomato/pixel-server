@@ -14,6 +14,8 @@ type Service interface {
 	AddCredits(context.Context, int, int) (int, error)
 	// ListCurrencies resolves all activity-point balances for one user.
 	ListCurrencies(context.Context, int) ([]domain.Currency, error)
+	// AddCurrencyTracked atomically adds signed amount with transaction audit.
+	AddCurrencyTracked(context.Context, int, domain.CurrencyType, int, domain.TransactionSource, string, string) (int, error)
 	// ListBadges resolves all badge rows for one user.
 	ListBadges(context.Context, int) ([]domain.Badge, error)
 	// AwardBadge grants one badge to a user.

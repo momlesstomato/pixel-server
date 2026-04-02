@@ -18,6 +18,8 @@ type repositoryStub struct {
 	findErr error
 	// deleteErr stores deterministic delete error.
 	deleteErr error
+	// currencies stores optional deterministic currency list; nil uses the default.
+	currencies []domain.Currency
 }
 
 // ListCurrencyTypes returns a deterministic list of standard currency types.
@@ -80,6 +82,9 @@ func (s repositoryStub) GetCurrency(_ context.Context, _ int, _ domain.CurrencyT
 
 // ListCurrencies returns deterministic currency list.
 func (s repositoryStub) ListCurrencies(_ context.Context, _ int) ([]domain.Currency, error) {
+	if s.currencies != nil {
+		return s.currencies, nil
+	}
 	return []domain.Currency{{ID: 1, Type: domain.CurrencyDuckets, Amount: 100}}, nil
 }
 

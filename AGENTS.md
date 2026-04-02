@@ -124,3 +124,14 @@ This document defines mandatory project constraints and success criteria.
 
 - All Markdown files must use uppercase filenames with lowercase `.md` extension.
 - Examples: `AGENTS.md`, `README.md`.
+
+## 11) Event System Rules
+
+- Every HTTP endpoint or service method that performs a state mutation must fire corresponding SDK events.
+- Mutation events must follow the homogeneous cancellable pattern: fire a cancellable "before" event, check `Cancelled()`, abort if true, perform the mutation, then fire a non-cancellable "after" event.
+- Event types must live under `sdk/events/<domain>/` with one event type per file.
+- Cancellable events must embed `sdk.BaseCancellable`; non-cancellable events must embed `sdk.BaseEvent`.
+- Internal server event handlers must register at `sdk.PriorityLowest` so plugins can override at higher priorities.
+- Service structs must expose a `SetEventFirer(func(sdk.Event))` method; the firer must be wired during startup in `core/cli/serve.go`.
+- Event field naming must be consistent across domains (for example, `UserID`, `BadgeCode`, `PageID`).
+- Events must not carry mutable references to domain objects; use value copies or identifiers only.

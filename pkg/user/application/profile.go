@@ -47,6 +47,13 @@ func (service *Service) UpdateProfile(ctx context.Context, userID int, patch dom
 	if patch.HomeRoomID != nil && *patch.HomeRoomID < -1 {
 		return domain.User{}, fmt.Errorf("home room id must be >= -1")
 	}
+	if service.fire != nil {
+		event := &sdkuser.ProfileUpdating{UserID: userID}
+		service.fire(event)
+		if event.Cancelled() {
+			return domain.User{}, fmt.Errorf("profile update cancelled by plugin")
+		}
+	}
 	return service.repository.UpdateProfile(ctx, userID, patch)
 }
 
@@ -65,6 +72,13 @@ func (service *Service) SaveSettings(ctx context.Context, userID int, patch doma
 	}
 	if err := validateSettingsPatch(patch); err != nil {
 		return domain.Settings{}, err
+	}
+	if service.fire != nil {
+		event := &sdkuser.SettingsUpdating{UserID: userID}
+		service.fire(event)
+		if event.Cancelled() {
+			return domain.Settings{}, fmt.Errorf("settings update cancelled by plugin")
+		}
 	}
 	return service.repository.SaveSettings(ctx, userID, patch)
 }

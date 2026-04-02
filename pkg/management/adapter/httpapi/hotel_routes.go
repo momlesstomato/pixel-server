@@ -5,11 +5,13 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
+	sdk "github.com/momlesstomato/pixel-sdk"
+	sdkmgmt "github.com/momlesstomato/pixel-sdk/events/management"
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
 )
 
 // RegisterHotelRoutes registers hotel status management API routes.
-func RegisterHotelRoutes(module *corehttp.Module, hotel HotelManager) error {
+func RegisterHotelRoutes(module *corehttp.Module, hotel HotelManager, fire func(sdk.Event)) error {
 	if module == nil {
 		return fmt.Errorf("http module is required")
 	}
@@ -28,6 +30,13 @@ func RegisterHotelRoutes(module *corehttp.Module, hotel HotelManager) error {
 		if err := ctx.BodyParser(&payload); err != nil {
 			return fiber.NewError(http.StatusBadRequest, "invalid request body")
 		}
+		if fire != nil {
+			event := &sdkmgmt.HotelClosing{MinutesUntilClose: payload.MinutesUntilClose, DurationMinutes: payload.DurationMinutes, ThrowUsers: payload.ThrowUsers}
+			fire(event)
+			if event.Cancelled() {
+				return fiber.NewError(http.StatusConflict, "hotel close cancelled by plugin")
+			}
+		}
 		status, err := hotel.ScheduleClose(ctx.UserContext(), payload.MinutesUntilClose, payload.DurationMinutes, payload.ThrowUsers)
 		if err != nil {
 			return fiber.NewError(http.StatusConflict, err.Error())
@@ -35,6 +44,13 @@ func RegisterHotelRoutes(module *corehttp.Module, hotel HotelManager) error {
 		return ctx.JSON(mapHotelStatus(status))
 	})
 	module.RegisterPOST("/api/v1/hotel/reopen", func(ctx *fiber.Ctx) error {
+		if fire != nil {
+			event := &sdkmgmt.HotelReopening{}
+			fire(event)
+			if event.Cancelled() {
+				return fiber.NewError(http.StatusConflict, "hotel reopen cancelled by plugin")
+			}
+		}
 		status, err := hotel.Reopen(ctx.UserContext())
 		if err != nil {
 			return fiber.NewError(http.StatusConflict, err.Error())

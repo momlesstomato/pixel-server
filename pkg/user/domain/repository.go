@@ -71,4 +71,6 @@ type Repository interface {
 	IsUsernameAvailable(context.Context, string, int) (bool, error)
 	// ChangeUsername updates one user's username and rename flag.
 	ChangeUsername(context.Context, int, string, bool) (User, error)
+	// FindByUsername resolves one user by exact username.
+	FindByUsername(context.Context, string) (User, error)
 }

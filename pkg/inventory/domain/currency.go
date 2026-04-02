@@ -9,6 +9,9 @@ import "time"
 type CurrencyType int
 
 const (
+	// CurrencyCredits is the reserved type ID for Habbo gold credits stored in user_currencies.
+	// Type -1 is used to distinguish credits from all activity-point types, which start at 0.
+	CurrencyCredits CurrencyType = -1
 	// CurrencyDuckets is the ID for duckets (pixel coins); seeded as the default scroll currency.
 	CurrencyDuckets CurrencyType = 0
 	// CurrencyDiamonds is the ID for premium diamonds; seeded as the premium activity currency.

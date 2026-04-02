@@ -109,3 +109,44 @@ func (s repositoryStub) RedeemVoucher(_ context.Context, _ int, _ int) error {
 func (s repositoryStub) HasUserRedeemedVoucher(_ context.Context, _ int, _ int) (bool, error) {
 	return s.redeemed, nil
 }
+
+// spenderStub implements domain.Spender with configurable balances and errors.
+type spenderStub struct {
+	// credits stores stubbed credit balance.
+	credits int
+	// currency stores stubbed activity-point balance.
+	currency int
+	// err stores optional error to return.
+	err error
+}
+
+// GetCredits returns stubbed credit balance.
+func (s spenderStub) GetCredits(_ context.Context, _ int) (int, error) { return s.credits, s.err }
+
+// AddCredits adjusts stubbed credit balance.
+func (s spenderStub) AddCredits(_ context.Context, _ int, delta int) (int, error) {
+	return s.credits + delta, s.err
+}
+
+// GetCurrencyBalance returns stubbed activity-point balance.
+func (s spenderStub) GetCurrencyBalance(_ context.Context, _ int, _ int) (int, error) {
+	return s.currency, s.err
+}
+
+// AddCurrencyBalance adjusts stubbed activity-point balance.
+func (s spenderStub) AddCurrencyBalance(_ context.Context, _ int, _ int, delta int) (int, error) {
+	return s.currency + delta, s.err
+}
+
+// recipientFinderStub implements domain.RecipientFinder with configurable results.
+type recipientFinderStub struct {
+	// info stores the recipient info to return.
+	info domain.RecipientInfo
+	// err stores optional error to return.
+	err error
+}
+
+// FindRecipientByUsername returns stubbed recipient info.
+func (s recipientFinderStub) FindRecipientByUsername(_ context.Context, _ string) (domain.RecipientInfo, error) {
+	return s.info, s.err
+}

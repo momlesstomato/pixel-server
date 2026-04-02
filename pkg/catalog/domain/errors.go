@@ -37,3 +37,15 @@ var ErrRecipientNotFound = errors.New("gift recipient not found")
 
 // ErrPurchaseCooldown defines purchase rate limit behavior.
 var ErrPurchaseCooldown = errors.New("purchase on cooldown")
+
+// ErrInsufficientCredits defines insufficient credit balance behavior.
+var ErrInsufficientCredits = errors.New("insufficient credits")
+
+// ErrInsufficientActivityPoints defines insufficient activity point balance behavior.
+var ErrInsufficientActivityPoints = errors.New("insufficient activity points")
+
+// ErrOfferSoldOut defines sold-out limited edition offer behavior.
+var ErrOfferSoldOut = errors.New("offer is sold out")
+
+// ErrNoSpender defines missing spender port behavior.
+var ErrNoSpender = errors.New("spender not configured")

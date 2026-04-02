@@ -113,6 +113,11 @@ func (stub coreRepositoryStub) UnignoreUserByID(_ context.Context, _ int, _ int)
 	return nil
 }
 
+// FindByUsername returns deterministic user payload by username.
+func (stub coreRepositoryStub) FindByUsername(_ context.Context, _ string) (domain.User, error) {
+	return stub.saved, nil
+}
+
 // LoadProfile returns deterministic profile payload.
 func (stub coreRepositoryStub) LoadProfile(_ context.Context, _ int, userID int, openProfileWindow bool) (domain.Profile, error) {
 	return domain.Profile{UserID: userID, OpenProfileWindow: openProfileWindow}, nil

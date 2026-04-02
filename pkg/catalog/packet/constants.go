@@ -26,3 +26,15 @@ const CheckGiftablePacketID uint16 = 1347
 
 // GetGiftWrappingConfigPacketID defines packet identifier for catalog.get_gift_wrapping_config.
 const GetGiftWrappingConfigPacketID uint16 = 418
+
+// PurchaseOKPacketID defines packet identifier for catalog.purchase_ok (s2c).
+const PurchaseOKPacketID uint16 = 869
+
+// PurchaseErrorPacketID defines packet identifier for catalog.purchase_error (s2c).
+const PurchaseErrorPacketID uint16 = 1404
+
+// PurchaseNotAllowedPacketID defines packet identifier for catalog.purchase_not_allowed (s2c).
+const PurchaseNotAllowedPacketID uint16 = 3770
+
+// GiftWrappingConfigResponsePacketID defines packet identifier for catalog.gift_wrapping_config (s2c).
+const GiftWrappingConfigResponsePacketID uint16 = 2234

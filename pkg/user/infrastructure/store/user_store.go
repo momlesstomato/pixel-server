@@ -28,6 +28,19 @@ func (repository *Repository) FindByID(ctx context.Context, id int) (domain.User
 	return mapUser(record), nil
 }
 
+// FindByUsername loads one user row by exact username.
+func (repository *Repository) FindByUsername(ctx context.Context, username string) (domain.User, error) {
+	var record usermodel.Record
+	err := repository.database.WithContext(ctx).Where("username = ?", username).First(&record).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return domain.User{}, domain.ErrUserNotFound
+	}
+	if err != nil {
+		return domain.User{}, err
+	}
+	return mapUser(record), nil
+}
+
 // DeleteByID soft-deletes one user row by identifier.
 func (repository *Repository) DeleteByID(ctx context.Context, id int) error {
 	result := repository.database.WithContext(ctx).Delete(&usermodel.Record{}, id)

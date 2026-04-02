@@ -41,7 +41,11 @@ func (service *Service) AddFriendship(ctx context.Context, userOneID, userTwoID 
 	if userOneID == userTwoID {
 		return fmt.Errorf("user ids must be different")
 	}
-	return service.repository.AddFriendship(ctx, userOneID, userTwoID)
+	err := service.repository.AddFriendship(ctx, userOneID, userTwoID)
+	if err == nil && service.fire != nil {
+		service.fire(&sdkmessenger.FriendAdded{UserOneID: userOneID, UserTwoID: userTwoID})
+	}
+	return err
 }
 
 // RemoveFriendship removes a friendship between two users.

@@ -108,6 +108,11 @@ func (stub repositoryStub) SaveWardrobeSlot(context.Context, int, domain.Wardrob
 	return nil
 }
 
+// FindByUsername returns deterministic user payload by username.
+func (stub repositoryStub) FindByUsername(_ context.Context, _ string) (domain.User, error) {
+	return domain.User{ID: 1}, nil
+}
+
 // ListIgnoredUsernames returns deterministic ignore list.
 func (stub repositoryStub) ListIgnoredUsernames(context.Context, int) ([]string, error) {
 	return []string{}, nil

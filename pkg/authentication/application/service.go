@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
+	sdkauth "github.com/momlesstomato/pixel-sdk/events/authentication"
 	"github.com/momlesstomato/pixel-server/pkg/authentication/domain"
 )
 
@@ -22,11 +24,18 @@ type Service struct {
 	now func() time.Time
 	// random provides bytes for ticket generation.
 	random io.Reader
+	// fire stores optional plugin event dispatch behavior.
+	fire func(sdk.Event)
 }
 
 // NewService creates an SSO service instance.
 func NewService(store domain.Store, config domain.Config) *Service {
 	return &Service{store: store, config: config, now: time.Now, random: rand.Reader}
+}
+
+// SetEventFirer configures optional plugin event dispatch behavior.
+func (service *Service) SetEventFirer(fire func(sdk.Event)) {
+	service.fire = fire
 }
 
 // Issue generates and stores one single-use ticket.
@@ -45,6 +54,9 @@ func (service *Service) Issue(ctx context.Context, request domain.IssueRequest) 
 	ticket := hex.EncodeToString(token)
 	if err := service.store.Store(ctx, ticket, request.UserID, ttl); err != nil {
 		return domain.IssueResult{}, err
+	}
+	if service.fire != nil {
+		service.fire(&sdkauth.SSOGenerated{UserID: request.UserID, Ticket: ticket})
 	}
 	return domain.IssueResult{Ticket: ticket, ExpiresAt: service.now().Add(ttl), TTL: ttl}, nil
 }

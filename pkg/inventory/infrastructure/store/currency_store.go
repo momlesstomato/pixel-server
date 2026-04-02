@@ -12,23 +12,17 @@ import (
 
 // GetCredits resolves credit balance for one user.
 func (store *Store) GetCredits(ctx context.Context, userID int) (int, error) {
-	var credits int
-	err := store.database.WithContext(ctx).Raw("SELECT COALESCE(credits, 0) FROM users WHERE id = ?", userID).Scan(&credits).Error
-	return credits, err
+	return store.GetCurrency(ctx, userID, domain.CurrencyCredits)
 }
 
 // SetCredits updates credit balance for one user.
 func (store *Store) SetCredits(ctx context.Context, userID int, credits int) error {
-	return store.database.WithContext(ctx).Exec("UPDATE users SET credits = ? WHERE id = ?", credits, userID).Error
+	return store.SetCurrency(ctx, userID, domain.CurrencyCredits, credits)
 }
 
 // AddCredits atomically adds a signed credit amount and returns new balance.
 func (store *Store) AddCredits(ctx context.Context, userID int, amount int) (int, error) {
-	var newBalance int
-	err := store.database.WithContext(ctx).Raw(
-		"UPDATE users SET credits = credits + ? WHERE id = ? RETURNING credits", amount, userID,
-	).Scan(&newBalance).Error
-	return newBalance, err
+	return store.AddCurrency(ctx, userID, domain.CurrencyCredits, amount)
 }
 
 // GetCurrency resolves one activity-point balance for one user and type.

@@ -7,6 +7,7 @@ import (
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/core/initializer"
+	sdk "github.com/momlesstomato/pixel-sdk"
 	authenticationapplication "github.com/momlesstomato/pixel-server/pkg/authentication/application"
 	authenticationredisstore "github.com/momlesstomato/pixel-server/pkg/authentication/infrastructure/redisstore"
 	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"
@@ -43,6 +44,7 @@ type serveServices struct {
 	subscription  *subscriptionapplication.Service
 	economyBundle *economyServiceBundle
 	handler       *handshakerealtime.Handler
+	fire          func(sdk.Event)
 }
 
 // buildServeServices constructs shared application dependencies.
@@ -120,4 +122,11 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		catalog: economyServices.catalog, economy: economyServices.economy,
 		subscription: economyServices.subscription, economyBundle: economyServices,
 	}, nil
+}
+
+// fireSafe dispatches one event when the plugin dispatcher is available.
+func (s *serveServices) fireSafe(event sdk.Event) {
+	if s.fire != nil {
+		s.fire(event)
+	}
 }

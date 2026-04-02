@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	sdk "github.com/momlesstomato/pixel-sdk"
+	sdkfurniture "github.com/momlesstomato/pixel-sdk/events/furniture"
 	"github.com/momlesstomato/pixel-server/pkg/furniture/domain"
 )
 
@@ -47,7 +48,18 @@ func (service *Service) CreateDefinition(ctx context.Context, def domain.Definit
 	if def.ItemName == "" {
 		return domain.Definition{}, fmt.Errorf("item name is required")
 	}
-	return service.repository.CreateDefinition(ctx, def)
+	if service.fire != nil {
+		event := &sdkfurniture.DefinitionCreating{ItemName: def.ItemName}
+		service.fire(event)
+		if event.Cancelled() {
+			return domain.Definition{}, fmt.Errorf("definition creation cancelled by plugin")
+		}
+	}
+	result, err := service.repository.CreateDefinition(ctx, def)
+	if err == nil && service.fire != nil {
+		service.fire(&sdkfurniture.DefinitionCreated{DefinitionID: result.ID})
+	}
+	return result, err
 }
 
 // UpdateDefinition applies partial definition update.
@@ -63,7 +75,18 @@ func (service *Service) DeleteDefinition(ctx context.Context, id int) error {
 	if id <= 0 {
 		return fmt.Errorf("definition id must be positive")
 	}
-	return service.repository.DeleteDefinition(ctx, id)
+	if service.fire != nil {
+		event := &sdkfurniture.DefinitionDeleting{DefinitionID: id}
+		service.fire(event)
+		if event.Cancelled() {
+			return fmt.Errorf("definition deletion cancelled by plugin")
+		}
+	}
+	err := service.repository.DeleteDefinition(ctx, id)
+	if err == nil && service.fire != nil {
+		service.fire(&sdkfurniture.DefinitionDeleted{DefinitionID: id})
+	}
+	return err
 }
 
 // FindItemByID resolves one item instance by identifier.

@@ -107,3 +107,41 @@ func TestServicePropagatesErrors(t *testing.T) {
 		t.Fatalf("expected currency error propagation")
 	}
 }
+
+// TestServiceListCurrenciesFiltersCredits verifies credits are excluded from ListCurrencies.
+func TestServiceListCurrenciesFiltersCredits(t *testing.T) {
+	stub := repositoryStub{
+		currencies: []domain.Currency{
+			{ID: 1, Type: domain.CurrencyCredits, Amount: 200},
+			{ID: 2, Type: domain.CurrencyDuckets, Amount: 100},
+		},
+	}
+	service, _ := inventoryapplication.NewService(stub)
+	currencies, err := service.ListCurrencies(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(currencies) != 1 {
+		t.Fatalf("expected 1 activity-point currency (credits filtered), got %d", len(currencies))
+	}
+	if currencies[0].Type == domain.CurrencyCredits {
+		t.Fatal("credits must not appear in ListCurrencies result")
+	}
+}
+
+// TestServiceGetCurrencyRejectsCreditsType verifies GetCurrency rejects CurrencyCredits.
+func TestServiceGetCurrencyRejectsCreditsType(t *testing.T) {
+	service, _ := inventoryapplication.NewService(repositoryStub{})
+	if _, err := service.GetCurrency(context.Background(), 1, domain.CurrencyCredits); err == nil {
+		t.Fatal("expected GetCurrency to reject CurrencyCredits type")
+	}
+}
+
+// TestServiceAddCurrencyTrackedRejectsCreditsType verifies AddCurrencyTracked rejects CurrencyCredits.
+func TestServiceAddCurrencyTrackedRejectsCreditsType(t *testing.T) {
+	service, _ := inventoryapplication.NewService(repositoryStub{})
+	if _, err := service.AddCurrencyTracked(context.Background(), 1, domain.CurrencyCredits, 50, domain.SourceAdmin, "", ""); err == nil {
+		t.Fatal("expected AddCurrencyTracked to reject CurrencyCredits type")
+	}
+}
+

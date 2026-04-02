@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
+	sdkauth "github.com/momlesstomato/pixel-sdk/events/authentication"
 	"github.com/momlesstomato/pixel-server/pkg/authentication/domain"
 )
 
@@ -58,4 +60,22 @@ func (store *stubStore) Store(_ context.Context, _ string, userID int, ttl time.
 // Validate returns one static user identifier.
 func (store *stubStore) Validate(_ context.Context, _ string) (int, error) {
 	return 1, nil
+}
+
+// TestServiceIssueFiresSSOGeneratedEvent verifies SSOGenerated event fires after successful issue.
+func TestServiceIssueFiresSSOGeneratedEvent(t *testing.T) {
+	var afterFired bool
+	store := &stubStore{}
+	service := NewService(store, domain.Config{DefaultTTLSeconds: 300, MaxTTLSeconds: 1800})
+	service.SetEventFirer(func(event sdk.Event) {
+		if _, ok := event.(*sdkauth.SSOGenerated); ok {
+			afterFired = true
+		}
+	})
+	if _, err := service.Issue(context.Background(), domain.IssueRequest{UserID: 1}); err != nil {
+		t.Fatalf("expected issue success, got %v", err)
+	}
+	if !afterFired {
+		t.Fatalf("expected SSOGenerated event to fire")
+	}
 }

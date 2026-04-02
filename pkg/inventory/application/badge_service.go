@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	sdkinventory "github.com/momlesstomato/pixel-sdk/events/inventory"
 	"github.com/momlesstomato/pixel-server/pkg/inventory/domain"
 )
 
@@ -23,7 +24,18 @@ func (service *Service) AwardBadge(ctx context.Context, userID int, badgeCode st
 	if badgeCode == "" {
 		return domain.Badge{}, fmt.Errorf("badge code is required")
 	}
-	return service.repository.AwardBadge(ctx, userID, badgeCode)
+	if service.fire != nil {
+		event := &sdkinventory.BadgeAwarding{UserID: userID, BadgeCode: badgeCode}
+		service.fire(event)
+		if event.Cancelled() {
+			return domain.Badge{}, fmt.Errorf("badge award cancelled by plugin")
+		}
+	}
+	badge, err := service.repository.AwardBadge(ctx, userID, badgeCode)
+	if err == nil && service.fire != nil {
+		service.fire(&sdkinventory.BadgeAwarded{UserID: userID, BadgeCode: badgeCode})
+	}
+	return badge, err
 }
 
 // RevokeBadge removes one badge from a user.
@@ -34,7 +46,18 @@ func (service *Service) RevokeBadge(ctx context.Context, userID int, badgeCode s
 	if badgeCode == "" {
 		return fmt.Errorf("badge code is required")
 	}
-	return service.repository.RevokeBadge(ctx, userID, badgeCode)
+	if service.fire != nil {
+		event := &sdkinventory.BadgeRevoking{UserID: userID, BadgeCode: badgeCode}
+		service.fire(event)
+		if event.Cancelled() {
+			return fmt.Errorf("badge revoke cancelled by plugin")
+		}
+	}
+	err := service.repository.RevokeBadge(ctx, userID, badgeCode)
+	if err == nil && service.fire != nil {
+		service.fire(&sdkinventory.BadgeRevoked{UserID: userID, BadgeCode: badgeCode})
+	}
+	return err
 }
 
 // UpdateBadgeSlots replaces equipped badge slot assignments for one user.
