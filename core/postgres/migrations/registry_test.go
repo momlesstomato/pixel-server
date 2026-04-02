@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSteps verifies migration step registry contents.
 func TestRegistryReturnsOrderedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 35 {
-		t.Fatalf("expected 35 migration steps, got %d", len(steps))
+	if len(steps) != 38 {
+		t.Fatalf("expected 38 migration steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260314_01_permission_groups" {
 		t.Fatalf("unexpected migration step metadata")
@@ -50,16 +50,25 @@ func TestRegistryReturnsOrderedSteps(t *testing.T) {
 	if steps[13] == nil || steps[13].ID != "20260315_04_normalize_messenger_friendships" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[28] == nil || steps[28].ID != "20260324_09_drop_cost_primary_type" {
+	if steps[14] == nil || steps[14].ID != "20260315_05_messenger_message_log" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[29] == nil || steps[29].ID != "20260324_10_rename_cost_columns" {
+	if steps[17] == nil || steps[17].ID != "20260401_01_drop_revision" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[33] == nil || steps[33].ID != "20260320_13_subscriptions" {
+	if steps[18] == nil || steps[18].ID != "20260401_02_restore_sprite_id" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[34] == nil || steps[34].ID != "20260325_14_club_offers" {
+	if steps[31] == nil || steps[31].ID != "20260324_09_drop_cost_primary_type" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[32] == nil || steps[32].ID != "20260324_10_rename_cost_columns" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[36] == nil || steps[36].ID != "20260320_13_subscriptions" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[37] == nil || steps[37].ID != "20260325_14_club_offers" {
 		t.Fatalf("unexpected migration step metadata")
 	}
 }

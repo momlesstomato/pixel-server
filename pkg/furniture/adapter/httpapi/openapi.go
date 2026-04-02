@@ -51,7 +51,6 @@ func definitionSchema() map[string]any {
 		"allow_gift":            map[string]any{"type": "boolean"},
 		"allow_inventory_stack": map[string]any{"type": "boolean"},
 		"interaction_type":      map[string]any{"type": "string"},
-		"revision":              map[string]any{"type": "integer"},
 	}}
 }
 
@@ -74,7 +73,6 @@ func definitionRequestSchema() map[string]any {
 			"allow_gift":            map[string]any{"type": "boolean"},
 			"allow_inventory_stack": map[string]any{"type": "boolean"},
 			"interaction_type":      map[string]any{"type": "string"},
-			"revision":              map[string]any{"type": "integer"},
 		}}
 }
 

@@ -46,6 +46,4 @@ type DefinitionPatch struct {
 	AllowGift *bool
 	// InteractionType stores optional interaction type update.
 	InteractionType *string
-	// Revision stores optional revision counter update.
-	Revision *int
 }

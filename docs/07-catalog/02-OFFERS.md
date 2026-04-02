@@ -70,14 +70,14 @@ determines the binary layout of the product record.
 
 | Type code | Meaning | Wire fields |
 |-----------|---------|-------------|
-| `"i"` | Floor furniture | `spriteId` (int32), `extraParam` (string), `amount` (int32), `isLimited` (bool), and if limited: `seriesSize` (int32) + `remaining` (int32) |
-| `"s"` | Wall furniture | Same structure as `"i"` |
-| `"e"` | Avatar effect | Same structure as `"i"` |
+| `"s"` | Floor furniture (roomitemtypes) | `spriteId` (int32), `extraParam` (string), `amount` (int32), `isLimited` (bool), and if limited: `seriesSize` (int32) + `remaining` (int32) |
+| `"i"` | Wall furniture (wallitemtypes) | Same structure as `"s"` |
+| `"e"` | Avatar effect | Same structure as `"s"` |
 | `"b"` | Badge | `extraParam` (string = badge code) only — no spriteId, amount, or limited fields |
 
 When an offer includes both a badge and a regular furniture item, two product
 records are written: the badge record first (`"b"`), then the item record
-(`"i"` or `"s"`).
+(`"s"` or `"i"`).
 
 ### Special case: Deal / Room bundle
 

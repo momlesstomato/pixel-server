@@ -42,8 +42,6 @@ type Definition struct {
 	InteractionModesCount int16 `gorm:"not null;default:1"`
 	// EffectID stores associated avatar effect identifier.
 	EffectID int `gorm:"not null;default:0"`
-	// Revision stores sprite revision counter.
-	Revision int `gorm:"not null;default:1"`
 	// CreatedAt stores row creation timestamp.
 	CreatedAt time.Time
 	// UpdatedAt stores row update timestamp.

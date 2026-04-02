@@ -62,6 +62,4 @@ type Definition struct {
 	AllowInventoryStack bool
 	// InteractionType stores the behavior handler key.
 	InteractionType InteractionType
-	// Revision stores sprite revision counter.
-	Revision int
 }

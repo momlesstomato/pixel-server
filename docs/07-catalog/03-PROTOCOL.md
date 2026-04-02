@@ -171,9 +171,9 @@ string previewImage     (e.g. "catalogue/pet_lion.png", empty if none)
 
 **Product encoding** by type:
 
-*Floor / wall item (`"i"` / `"s"`) and avatar effect (`"e"`):*
+*Floor / wall item (`"s"` / `"i"`) and avatar effect (`"e"`):*
 ```
-string "i" | "s" | "e"
+string "s" | "i" | "e"
 int32  spriteId
 string extraParam       (colour preset, variant string, or empty)
 int32  amount

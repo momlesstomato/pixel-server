@@ -56,7 +56,7 @@ func (store *Store) CreateDefinition(ctx context.Context, def domain.Definition)
 		AllowRecycle: def.AllowRecycle, AllowTrade: def.AllowTrade,
 		AllowMarketplaceSell: def.AllowMarketplaceSell, AllowGift: def.AllowGift,
 		AllowInventoryStack: def.AllowInventoryStack,
-		InteractionType: string(def.InteractionType), Revision: def.Revision,
+		InteractionType: string(def.InteractionType),
 	}
 	if err := store.database.WithContext(ctx).Create(&row).Error; err != nil {
 		return domain.Definition{}, err
@@ -87,9 +87,6 @@ func (store *Store) UpdateDefinition(ctx context.Context, id int, patch domain.D
 	}
 	if patch.InteractionType != nil {
 		updates["interaction_type"] = *patch.InteractionType
-	}
-	if patch.Revision != nil {
-		updates["revision"] = *patch.Revision
 	}
 	if len(updates) > 0 {
 		result := store.database.WithContext(ctx).Model(&furnituremodel.Definition{}).Where("id = ?", id).Updates(updates)

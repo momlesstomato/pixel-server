@@ -45,6 +45,7 @@ func setupE2E(t *testing.T) (*messengerapplication.Service, int, int) {
 		`CREATE TABLE IF NOT EXISTS messenger_friendships (user_one_id INTEGER NOT NULL, user_two_id INTEGER NOT NULL, relationship INTEGER NOT NULL DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_one_id, user_two_id))`,
 		`CREATE TABLE IF NOT EXISTS friend_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, from_user_id INTEGER NOT NULL, to_user_id INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE (from_user_id, to_user_id))`,
 		`CREATE TABLE IF NOT EXISTS offline_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, from_user_id INTEGER NOT NULL, to_user_id INTEGER NOT NULL, message TEXT NOT NULL DEFAULT '', sent_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
+		`CREATE TABLE IF NOT EXISTS messenger_message_log (id INTEGER PRIMARY KEY AUTOINCREMENT, from_user_id INTEGER NOT NULL, to_user_id INTEGER NOT NULL, message TEXT NOT NULL DEFAULT '', sent_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
 	}
 	for _, s := range sqls {
 		if err = db.Exec(s).Error; err != nil { t.Fatalf("create table: %v", err) }
