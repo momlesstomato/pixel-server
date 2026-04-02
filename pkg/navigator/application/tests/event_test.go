@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	sdk "github.com/momlesstomato/pixel-sdk"
+	sdknavigator "github.com/momlesstomato/pixel-sdk/events/navigator"
 	navigatorapplication "github.com/momlesstomato/pixel-server/pkg/navigator/application"
 	"github.com/momlesstomato/pixel-server/pkg/navigator/domain"
-	sdknavigator "github.com/momlesstomato/pixel-sdk/events/navigator"
 )
 
 // TestRoomCreateFiresEvents verifies event dispatch on room creation.

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/momlesstomato/pixel-server/pkg/navigator/domain"
 	sdknavigator "github.com/momlesstomato/pixel-sdk/events/navigator"
+	"github.com/momlesstomato/pixel-server/pkg/navigator/domain"
 )
 
 // ListSavedSearches resolves all saved searches for one user.

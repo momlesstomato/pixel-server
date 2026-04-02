@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/momlesstomato/pixel-server/pkg/navigator/domain"
 	sdknavigator "github.com/momlesstomato/pixel-sdk/events/navigator"
+	"github.com/momlesstomato/pixel-server/pkg/navigator/domain"
 )
 
 // ListRooms resolves paginated rooms with optional filter.

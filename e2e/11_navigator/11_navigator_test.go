@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"testing"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
 	navigatorapplication "github.com/momlesstomato/pixel-server/pkg/navigator/application"
 	"github.com/momlesstomato/pixel-server/pkg/navigator/domain"
 	navigatormodel "github.com/momlesstomato/pixel-server/pkg/navigator/infrastructure/model"
 	navigatorstore "github.com/momlesstomato/pixel-server/pkg/navigator/infrastructure/store"
-	sdk "github.com/momlesstomato/pixel-sdk"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

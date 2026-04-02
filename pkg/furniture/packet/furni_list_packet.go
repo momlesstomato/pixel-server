@@ -103,4 +103,3 @@ func encodeItem(w *codec.Writer, item FurniListItem) error {
 	}
 	return nil
 }
-
