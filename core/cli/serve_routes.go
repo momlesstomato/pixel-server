@@ -20,6 +20,7 @@ import (
 	messengerrealtime "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/realtime"
 	navigatorhttpapi "github.com/momlesstomato/pixel-server/pkg/navigator/adapter/httpapi"
 	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
+	roomdomain "github.com/momlesstomato/pixel-server/pkg/room/domain"
 	roomrealtime "github.com/momlesstomato/pixel-server/pkg/room/adapter/realtime"
 	subscriptionhttpapi "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
@@ -82,12 +83,25 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			return nil, err
 		}
 		runtimes := []handshakerealtime.UserRuntime{userRT, msgRT}
-		furnitureRT, ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, runtime.Logger)
+		liveRoomCount := func(roomID int) int {
+			inst, ok := services.room.Manager().Get(roomID)
+			if !ok {
+				return 0
+			}
+			count := 0
+			for _, e := range inst.Entities() {
+				if e.Type == roomdomain.EntityPlayer {
+					count++
+				}
+			}
+			return count
+		}
+		furnitureRT, ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, runtime.Logger, liveRoomCount)
 		if err != nil {
 			return nil, err
 		}
 		runtimes = append(runtimes, ecoRTs...)
-		roomRT, err := roomrealtime.NewRuntime(services.room, services.entityService, services.chatService, services.registry, transport, runtime.Logger)
+		roomRT, err := roomrealtime.NewRuntime(services.room, services.entityService, services.chatService, services.registry, transport, services.broadcaster, runtime.Logger)
 		if err != nil {
 			return nil, err
 		}

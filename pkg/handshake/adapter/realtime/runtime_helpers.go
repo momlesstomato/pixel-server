@@ -9,8 +9,8 @@ import (
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/sessionflow"
-	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
 	packetdisconnect "github.com/momlesstomato/pixel-server/pkg/handshake/packet/authentication"
+	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
 )

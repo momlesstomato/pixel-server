@@ -54,6 +54,17 @@ func (sessionStub) ListAll() ([]coreconnection.Session, error) { return nil, nil
 
 func noopBroadcaster(_ int, _ []domain.RoomEntity, _ []byte) {}
 
+// broadcasterStub discards all publish calls.
+type broadcasterStub struct{}
+
+// Publish is a no-op stub.
+func (broadcasterStub) Publish(_ context.Context, _ string, _ []byte) error { return nil }
+
+// Subscribe is a no-op stub.
+func (broadcasterStub) Subscribe(_ context.Context, _ string) (<-chan []byte, coreconnection.Disposable, error) {
+	return nil, nil, nil
+}
+
 func newRuntime(t *testing.T) (*realtime.Runtime, *transportStub) {
 	t.Helper()
 	models := &modelRepoStub{models: map[string]domain.RoomModel{
@@ -68,7 +79,7 @@ func newRuntime(t *testing.T) (*realtime.Runtime, *transportStub) {
 	require.NoError(t, err)
 	chatSvc, err := roomapp.NewChatService(zap.NewNop())
 	require.NoError(t, err)
-	rt, err := realtime.NewRuntime(svc, entitySvc, chatSvc, sessionStub{}, tp, zap.NewNop())
+	rt, err := realtime.NewRuntime(svc, entitySvc, chatSvc, sessionStub{}, tp, broadcasterStub{}, zap.NewNop())
 	require.NoError(t, err)
 	t.Cleanup(func() { mgr.StopAll() })
 	return rt, tp

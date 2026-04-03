@@ -3,10 +3,12 @@ package realtime
 import (
 	"context"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/engine"
 	"github.com/momlesstomato/pixel-server/pkg/room/heightmap"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
 	"go.uber.org/zap"
 )
 
@@ -166,6 +168,7 @@ func (rt *Runtime) sendRoomData(connID string, userID int, inst *engine.Instance
 func (rt *Runtime) sendEntryEntities(connID string, userID int, inst *engine.Instance) error {
 	_, existing := rt.findEntityByConnID(connID, userID)
 	if existing == nil {
+		existingEntities := inst.Entities()
 		username, look, motto, gender := "", "", "", "M"
 		if rt.profileResolver != nil {
 			if u, l, m, g, err := rt.profileResolver(context.Background(), userID); err == nil {
@@ -176,6 +179,26 @@ func (rt *Runtime) sendEntryEntities(connID string, userID int, inst *engine.Ins
 			domain.Tile{X: inst.Layout.DoorX, Y: inst.Layout.DoorY, Z: inst.Layout.DoorZ, State: domain.TileOpen})
 		if err := rt.service.EnterRoom(context.Background(), inst, &entity, inst.RoomID, userID); err != nil {
 			return err
+		}
+		ctx := context.Background()
+		newEntities := []domain.RoomEntity{entity}
+		usersBody, usersErr := packet.UsersComposer{Entities: newEntities}.Encode()
+		if usersErr == nil {
+			frame := codec.EncodeFrame(packet.UsersComposerID, usersBody)
+			for _, e := range existingEntities {
+				if e.Type == domain.EntityPlayer && e.UserID != 0 && e.UserID != userID {
+					_ = rt.broadcaster.Publish(ctx, sessionnotification.UserChannel(e.UserID), frame)
+				}
+			}
+		}
+		updateBody, updateErr := packet.UserUpdateComposer{Entities: newEntities}.Encode()
+		if updateErr == nil {
+			frame := codec.EncodeFrame(packet.UserUpdateComposerID, updateBody)
+			for _, e := range existingEntities {
+				if e.Type == domain.EntityPlayer && e.UserID != 0 && e.UserID != userID {
+					_ = rt.broadcaster.Publish(ctx, sessionnotification.UserChannel(e.UserID), frame)
+				}
+			}
 		}
 	}
 	entities := inst.Entities()

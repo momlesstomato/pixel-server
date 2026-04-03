@@ -82,6 +82,11 @@ func (runtime *Runtime) handleSearch(ctx context.Context, connID string, userID 
 		runtime.logger.Error("search rooms failed", zap.String("code", searchCode), zap.Error(err))
 		return nil
 	}
+	if runtime.liveRoomCount != nil {
+		for i := range rooms {
+			rooms[i].CurrentUsers = runtime.liveRoomCount(rooms[i].ID)
+		}
+	}
 	block := packet.SearchResultBlock{SearchCode: searchCode, Text: searchCode, Rooms: rooms}
 	return runtime.sendPacket(connID, packet.NavigatorSearchResultsPacket{
 		SearchCode: searchCode, Filter: filter, Results: []packet.SearchResultBlock{block},

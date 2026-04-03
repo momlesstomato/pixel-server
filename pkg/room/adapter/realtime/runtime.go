@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/momlesstomato/pixel-server/core/broadcast"
+	"github.com/momlesstomato/pixel-server/core/codec"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	roomapplication "github.com/momlesstomato/pixel-server/pkg/room/application"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/engine"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
 	"go.uber.org/zap"
 )
 
@@ -34,8 +37,10 @@ type Runtime struct {
 	chatSvc *roomapplication.ChatService
 	// sessions stores authenticated connection lookup.
 	sessions coreconnection.SessionRegistry
-	// transport stores packet write behavior.
+	// transport stores packet write behavior for the local connection only.
 	transport Transport
+	// broadcaster publishes packet frames to distributed per-user channels.
+	broadcaster broadcast.Broadcaster
 	// logger stores runtime logging behavior.
 	logger *zap.Logger
 	// connRooms tracks which room each connection is in.
@@ -59,7 +64,7 @@ type doorbellEntry struct {
 }
 
 // NewRuntime creates one room realtime runtime instance.
-func NewRuntime(service *roomapplication.Service, entitySvc *roomapplication.EntityService, chatSvc *roomapplication.ChatService, sessions coreconnection.SessionRegistry, transport Transport, logger *zap.Logger) (*Runtime, error) {
+func NewRuntime(service *roomapplication.Service, entitySvc *roomapplication.EntityService, chatSvc *roomapplication.ChatService, sessions coreconnection.SessionRegistry, transport Transport, broadcaster broadcast.Broadcaster, logger *zap.Logger) (*Runtime, error) {
 	if service == nil {
 		return nil, fmt.Errorf("room service is required")
 	}
@@ -69,12 +74,15 @@ func NewRuntime(service *roomapplication.Service, entitySvc *roomapplication.Ent
 	if transport == nil {
 		return nil, fmt.Errorf("transport is required")
 	}
+	if broadcaster == nil {
+		return nil, fmt.Errorf("broadcaster is required")
+	}
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	return &Runtime{
 		service: service, entitySvc: entitySvc, chatSvc: chatSvc,
-		sessions: sessions, transport: transport,
+		sessions: sessions, transport: transport, broadcaster: broadcaster,
 		logger: logger, connRooms: make(map[string]int),
 		pendingDoorbell: make(map[string]doorbellEntry),
 	}, nil
@@ -135,9 +143,11 @@ func (rt *Runtime) leaveCurrentRoom(connID string) {
 			<-reply
 			body, encErr := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
 			if encErr == nil {
+				frame := codec.EncodeFrame(packet.UserRemoveComposerID, body)
+				ctx := context.Background()
 				for _, e := range inst.Entities() {
-					if e.Type == domain.EntityPlayer && e.ConnID != "" {
-						_ = rt.transport.Send(e.ConnID, packet.UserRemoveComposerID, body)
+					if e.Type == domain.EntityPlayer && e.UserID != 0 {
+						_ = rt.broadcaster.Publish(ctx, sessionnotification.UserChannel(e.UserID), frame)
 					}
 				}
 			}

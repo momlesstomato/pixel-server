@@ -1,30 +1,41 @@
 package realtime
 
 import (
+	"context"
+
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
 	"go.uber.org/zap"
 )
 
-// Broadcast implements engine.EntityBroadcaster and sends dirty entity updates to all room players.
-func (rt *Runtime) Broadcast(roomID int, updates []domain.RoomEntity, _ []byte) {
+// publishToRoomEntities publishes one pre-encoded frame to every player entity in a room.
+func (rt *Runtime) publishToRoomEntities(roomID int, frame []byte) {
 	inst, ok := rt.service.Manager().Get(roomID)
 	if !ok {
 		return
 	}
+	ctx := context.Background()
+	for _, entity := range inst.Entities() {
+		if entity.Type != domain.EntityPlayer || entity.UserID == 0 {
+			continue
+		}
+		ch := sessionnotification.UserChannel(entity.UserID)
+		if err := rt.broadcaster.Publish(ctx, ch, frame); err != nil {
+			rt.logger.Warn("publish to room entity failed", zap.Int("user_id", entity.UserID), zap.Error(err))
+		}
+	}
+}
+
+// Broadcast implements engine.EntityBroadcaster and sends dirty entity updates to all room players.
+func (rt *Runtime) Broadcast(roomID int, updates []domain.RoomEntity, _ []byte) {
 	body, err := packet.UserUpdateComposer{Entities: updates}.Encode()
 	if err != nil {
 		rt.logger.Warn("encode entity update failed", zap.Error(err))
 		return
 	}
-	for _, entity := range inst.Entities() {
-		if entity.Type != domain.EntityPlayer || entity.ConnID == "" {
-			continue
-		}
-		if err := rt.transport.Send(entity.ConnID, packet.UserUpdateComposerID, body); err != nil {
-			rt.logger.Warn("send entity update failed", zap.String("conn_id", entity.ConnID), zap.Error(err))
-		}
-	}
+	rt.publishToRoomEntities(roomID, codec.EncodeFrame(packet.UserUpdateComposerID, body))
 }
 
 // broadcastToRoom sends one packet to all player entities currently in a room.
@@ -32,23 +43,12 @@ func (rt *Runtime) broadcastToRoom(roomID int, pkt interface {
 	PacketID() uint16
 	Encode() ([]byte, error)
 }) {
-	inst, ok := rt.service.Manager().Get(roomID)
-	if !ok {
-		return
-	}
 	body, err := pkt.Encode()
 	if err != nil {
 		rt.logger.Warn("encode broadcast packet failed", zap.Error(err))
 		return
 	}
-	for _, entity := range inst.Entities() {
-		if entity.Type != domain.EntityPlayer || entity.ConnID == "" {
-			continue
-		}
-		if err := rt.transport.Send(entity.ConnID, pkt.PacketID(), body); err != nil {
-			rt.logger.Warn("send broadcast packet failed", zap.String("conn_id", entity.ConnID), zap.Error(err))
-		}
-	}
+	rt.publishToRoomEntities(roomID, codec.EncodeFrame(pkt.PacketID(), body))
 }
 
 // OnSleep broadcasts a sleep state change for one entity to all room players.
@@ -58,18 +58,7 @@ func (rt *Runtime) OnSleep(roomID int, virtualID int, sleeping bool) {
 
 // BroadcastRawToRoom sends an already-encoded payload to all player entities in a room.
 func (rt *Runtime) BroadcastRawToRoom(roomID int, packetID uint16, body []byte) {
-	inst, ok := rt.service.Manager().Get(roomID)
-	if !ok {
-		return
-	}
-	for _, entity := range inst.Entities() {
-		if entity.Type != domain.EntityPlayer || entity.ConnID == "" {
-			continue
-		}
-		if err := rt.transport.Send(entity.ConnID, packetID, body); err != nil {
-			rt.logger.Warn("broadcast raw to room failed", zap.String("conn_id", entity.ConnID), zap.Error(err))
-		}
-	}
+	rt.publishToRoomEntities(roomID, codec.EncodeFrame(packetID, body))
 }
 
 // EjectSittingEntitiesInRoom clears the auto-sit state for entities at a tile, walks them
@@ -107,22 +96,11 @@ func (rt *Runtime) ConnRoomID(connID string) (int, bool) {
 
 // OnKick broadcasts entity removal for one auto-kicked entity and removes connection tracking.
 func (rt *Runtime) OnKick(roomID int, entity domain.RoomEntity) {
-	inst, ok := rt.service.Manager().Get(roomID)
-	if !ok {
-		return
-	}
 	body, err := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
 	if err != nil {
 		rt.logger.Warn("encode kick packet failed", zap.Error(err))
 		return
 	}
-	for _, e := range inst.Entities() {
-		if e.Type != domain.EntityPlayer || e.ConnID == "" {
-			continue
-		}
-		if err := rt.transport.Send(e.ConnID, packet.UserRemoveComposerID, body); err != nil {
-			rt.logger.Warn("send kick packet failed", zap.String("conn_id", e.ConnID), zap.Error(err))
-		}
-	}
+	rt.publishToRoomEntities(roomID, codec.EncodeFrame(packet.UserRemoveComposerID, body))
 	delete(rt.connRooms, entity.ConnID)
 }

@@ -24,6 +24,8 @@ type Runtime struct {
 	transport Transport
 	// logger stores runtime logging behavior.
 	logger *zap.Logger
+	// liveRoomCount provides live player count from room engine for navigator display.
+	liveRoomCount func(roomID int) int
 }
 
 // NewRuntime creates one navigator realtime runtime instance.
@@ -54,6 +56,11 @@ func (runtime *Runtime) userID(connID string) (int, bool) {
 
 // Dispose releases per-connection resources.
 func (runtime *Runtime) Dispose(_ string) {}
+
+// SetLiveRoomCountProvider configures the callback used to overlay live player counts in navigator results.
+func (runtime *Runtime) SetLiveRoomCountProvider(fn func(roomID int) int) {
+	runtime.liveRoomCount = fn
+}
 
 // sendPacket encodes and transmits one outgoing packet.
 func (runtime *Runtime) sendPacket(connID string, pkt interface {
