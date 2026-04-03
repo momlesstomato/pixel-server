@@ -64,6 +64,8 @@ type Module struct {
 	webSocketPaths map[string]struct{}
 	// webSocketConnections stores active websocket connections.
 	webSocketConnections map[*websocket.Conn]struct{}
+	// webSocketClosers stores per-connection graceful close functions.
+	webSocketClosers map[*websocket.Conn]func()
 	// webSocketMutex guards websocket routes and connection tracking.
 	webSocketMutex sync.RWMutex
 	// disposeOnce guarantees disposal executes exactly once.
@@ -98,6 +100,7 @@ func New(options Options) *Module {
 		app:                  app,
 		webSocketPaths:       map[string]struct{}{},
 		webSocketConnections: map[*websocket.Conn]struct{}{},
+		webSocketClosers:     map[*websocket.Conn]func(){},
 	}
 }
 
@@ -124,6 +127,22 @@ func buildErrorHandler(logger *zap.Logger) fiber.ErrorHandler {
 // App returns the underlying Fiber application.
 func (module *Module) App() *fiber.App {
 	return module.app
+}
+
+// RegisterWebSocketCloser stores a graceful close function for one active connection.
+// The function is called instead of a raw write when the server shuts down, ensuring
+// the disconnect reason packet is sent through the encrypted transport.
+func (module *Module) RegisterWebSocketCloser(conn *websocket.Conn, fn func()) {
+	module.webSocketMutex.Lock()
+	module.webSocketClosers[conn] = fn
+	module.webSocketMutex.Unlock()
+}
+
+// UnregisterWebSocketCloser removes the graceful close function for one connection.
+func (module *Module) UnregisterWebSocketCloser(conn *websocket.Conn) {
+	module.webSocketMutex.Lock()
+	delete(module.webSocketClosers, conn)
+	module.webSocketMutex.Unlock()
 }
 
 // RegisterGET registers an HTTP GET endpoint on the Fiber application.

@@ -97,6 +97,9 @@ func TestMilestone6DuplicateLoginKick(t *testing.T) {
 	sendPacket(t, second, packetsecurity.SSOTicketPacket{Ticket: "ticket-b"})
 	_ = readFrame(t, second)
 	_ = readFrame(t, second)
+	if frame := readFrame(t, first); frame.PacketID != 4000 {
+		t.Fatalf("expected disconnect_reason packet on first connection, got %d", frame.PacketID)
+	}
 	first.SetReadDeadline(time.Now().Add(time.Second))
 	_, _, err := first.ReadMessage()
 	if err == nil {

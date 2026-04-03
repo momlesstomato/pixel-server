@@ -72,6 +72,20 @@ func (rt *Runtime) BroadcastRawToRoom(roomID int, packetID uint16, body []byte) 
 	}
 }
 
+// EjectSittingEntitiesInRoom clears the auto-sit state for entities at a tile, walks them
+// toward the door, and broadcasts the update to all room players.
+func (rt *Runtime) EjectSittingEntitiesInRoom(roomID, x, y int) {
+	inst, ok := rt.service.Manager().Get(roomID)
+	if !ok {
+		return
+	}
+	updated := inst.EjectSittingEntitiesAt(x, y)
+	if len(updated) == 0 {
+		return
+	}
+	rt.Broadcast(roomID, updated, nil)
+}
+
 // RotateSittingEntitiesInRoom rotates auto-sitting entities at a tile to match the new furniture direction and broadcasts the update.
 func (rt *Runtime) RotateSittingEntitiesInRoom(roomID, x, y, dir int) {
 	inst, ok := rt.service.Manager().Get(roomID)

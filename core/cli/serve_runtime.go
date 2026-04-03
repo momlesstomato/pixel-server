@@ -98,8 +98,13 @@ func isIgnorableSyncError(err error) bool {
 	if errors.Is(err, syscall.EBADF) {
 		return true
 	}
+	if errors.Is(err, syscall.ENOTTY) {
+		return true
+	}
 	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "invalid argument") || strings.Contains(message, "bad file descriptor")
+	return strings.Contains(message, "invalid argument") ||
+		strings.Contains(message, "bad file descriptor") ||
+		strings.Contains(message, "inappropriate ioctl")
 }
 
 // EchoWebSocketHandler mirrors inbound messages to the same connection.

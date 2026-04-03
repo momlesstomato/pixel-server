@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/gofiber/contrib/websocket"
 	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
@@ -40,6 +41,15 @@ func (handler *Handler) ConfigurePluginEvents(fire func(sdk.Event)) {
 // ConfigureUserFinder wires real user identity resolution for identity account packets.
 func (handler *Handler) ConfigureUserFinder(finder authflow.UserFinder) {
 	handler.userFinder = finder
+}
+
+// SetShutdownRegistrar wires per-connection graceful close registration with the HTTP module.
+// The register function is called after a transport is created so that server shutdown
+// sends the disconnect reason packet through the encrypted transport instead of raw bytes.
+// The unregister function is deferred to clean up when the connection closes normally.
+func (handler *Handler) SetShutdownRegistrar(register func(*websocket.Conn, func()), unregister func(*websocket.Conn)) {
+	handler.shutdownRegistrar = register
+	handler.shutdownUnregistrar = unregister
 }
 
 // ConfigureUserRuntime wires authenticated user packet runtime behavior.

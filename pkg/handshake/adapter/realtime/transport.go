@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/momlesstomato/pixel-server/core/codec"
+	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/authentication"
 	"go.uber.org/zap"
 )
 
@@ -123,14 +124,29 @@ func (transport *Transport) Close(connID string, code int, reason string) error 
 	return transport.bus.Publish(context.Background(), connID, CloseSignal{Code: code, Reason: reason})
 }
 
+// CloseWithProtocolReason sends a protocol disconnect reason packet and then closes one connection.
+// For local connections it writes the packet directly; for remote connections it encodes the reason
+// inside the bus close signal so the receiving watcher can write it before the WS close frame.
+func (transport *Transport) CloseWithProtocolReason(connID string, protocolReason int32, code int, reason string) error {
+	if connID == transport.connID {
+		if protocolReason != 0 {
+			pkt := packetauth.DisconnectReasonPacket{Reason: protocolReason}
+			if body, err := pkt.Encode(); err == nil {
+				_ = transport.writeFrame(pkt.PacketID(), body)
+			}
+		}
+		return transport.closeLocal(code, reason)
+	}
+	transport.logger.Debug("websocket close signal published", zap.String("conn_id", connID), zap.Int("code", code), zap.String("reason", reason))
+	return transport.bus.Publish(context.Background(), connID, CloseSignal{ProtocolReason: protocolReason, Code: code, Reason: reason})
+}
+
 // closeLocal closes the local websocket connection with one close control frame.
+// The close frame write error is swallowed so the underlying socket is always closed.
 func (transport *Transport) closeLocal(code int, reason string) error {
 	transport.mutex.Lock()
-	err := transport.connection.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason), time.Now().Add(time.Second))
+	_ = transport.connection.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason), time.Now().Add(time.Second))
 	transport.mutex.Unlock()
-	if err != nil {
-		return err
-	}
 	transport.logger.Debug("websocket connection closed", zap.String("conn_id", transport.connID), zap.Int("code", code), zap.String("reason", reason))
 	return transport.connection.Close()
 }

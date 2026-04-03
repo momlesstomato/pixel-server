@@ -24,6 +24,9 @@ const DisconnectReasonStillBanned int32 = 10
 // DisconnectReasonHotelClosed identifies hotel closed disconnect reason.
 const DisconnectReasonHotelClosed int32 = 12
 
+// DisconnectReasonHotelClosing identifies server-initiated shutdown disconnect reason.
+const DisconnectReasonHotelClosing int32 = 19
+
 // DisconnectReasonInvalidLoginTicket identifies invalid login ticket disconnect reason.
 const DisconnectReasonInvalidLoginTicket int32 = 22
 

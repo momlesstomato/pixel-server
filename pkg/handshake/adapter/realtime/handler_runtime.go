@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	sdk "github.com/momlesstomato/pixel-sdk"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
+	packetdisconnect "github.com/momlesstomato/pixel-server/pkg/handshake/packet/authentication"
 	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
@@ -30,6 +31,16 @@ func (handler *Handler) Handle(connection *websocket.Conn) {
 	if handler.fire != nil {
 		transport.SetEventFirer(handler.fire)
 		handler.fire(&sdk.ConnectionOpened{ConnID: connID})
+	}
+	if handler.shutdownRegistrar != nil {
+		handler.shutdownRegistrar(connection, func() {
+			_ = transport.CloseWithProtocolReason(connID, packetdisconnect.DisconnectReasonHotelClosing, websocket.CloseGoingAway, "server shutdown")
+		})
+		defer func() {
+			if handler.shutdownUnregistrar != nil {
+				handler.shutdownUnregistrar(connection)
+			}
+		}()
 	}
 	useCases, err := handler.newRuntimeUseCases(transport)
 	if err != nil {

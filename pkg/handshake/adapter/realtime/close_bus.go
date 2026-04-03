@@ -17,6 +17,8 @@ type CloseSignal struct {
 	Code int `json:"code"`
 	// Reason stores websocket close reason phrase.
 	Reason string `json:"reason"`
+	// ProtocolReason stores the protocol-level disconnect reason code to send before the WS close frame.
+	ProtocolReason int32 `json:"protocol_reason,omitempty"`
 }
 
 // CloseSignalBus defines close-signal publish/subscribe behavior.

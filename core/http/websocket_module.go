@@ -83,25 +83,30 @@ func (module *Module) closeWebSocketConnections() error {
 	for connection := range module.webSocketConnections {
 		connections = append(connections, connection)
 	}
+	closers := make(map[*websocket.Conn]func(), len(module.webSocketClosers))
+	for conn, fn := range module.webSocketClosers {
+		closers[conn] = fn
+	}
 	module.webSocketConnections = map[*websocket.Conn]struct{}{}
+	module.webSocketClosers = map[*websocket.Conn]func(){}
 	module.webSocketMutex.Unlock()
 	var closeErrors []error
 	for _, connection := range connections {
 		if connection == nil {
 			continue
 		}
+		if fn, ok := closers[connection]; ok {
+			fn()
+			continue
+		}
 		writer := codec.NewWriter()
 		writer.WriteInt32(DefaultShutdownDisconnectReasonCode)
-		if err := connection.WriteMessage(websocket.BinaryMessage, codec.EncodeFrame(DefaultDisconnectReasonPacketID, writer.Bytes())); err != nil {
-			closeErrors = append(closeErrors, err)
-		}
-		if err := connection.WriteControl(
+		_ = connection.WriteMessage(websocket.BinaryMessage, codec.EncodeFrame(DefaultDisconnectReasonPacketID, writer.Bytes()))
+		_ = connection.WriteControl(
 			websocket.CloseMessage,
 			websocket.FormatCloseMessage(DefaultShutdownWebSocketCloseCode, "server shutdown"),
 			time.Now().Add(DefaultWebSocketCloseTimeout),
-		); err != nil {
-			closeErrors = append(closeErrors, err)
-		}
+		)
 		if err := connection.Close(); err != nil {
 			closeErrors = append(closeErrors, err)
 		}

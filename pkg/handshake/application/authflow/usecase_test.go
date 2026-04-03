@@ -45,6 +45,15 @@ func (stub *transportStub) Close(connID string, _ int, _ string) error {
 	return nil
 }
 
+// CloseWithProtocolReason captures the disconnect reason and closed connection identifier.
+func (stub *transportStub) CloseWithProtocolReason(connID string, protocolReason int32, _ int, _ string) error {
+	if protocolReason != 0 {
+		stub.sent = append(stub.sent, packetauth.DisconnectReasonPacketID)
+	}
+	stub.closed = append(stub.closed, connID)
+	return nil
+}
+
 // sessionStub defines in-memory session registry behavior.
 type sessionStub struct {
 	// byConn stores session records by connection id.

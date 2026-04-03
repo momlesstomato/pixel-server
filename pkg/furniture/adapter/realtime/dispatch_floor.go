@@ -41,6 +41,9 @@ func (runtime *Runtime) handlePickup(ctx context.Context, connID string, body []
 		return err
 	}
 	runtime.roomBroadcaster(roomID, furnipacket.FloorItemRemovePacketID, encoded)
+	if runtime.entityEvictor != nil {
+		runtime.entityEvictor(roomID, item.X, item.Y)
+	}
 	runtime.removeSeatEntry(roomID, item.ID)
 	return runtime.sendPacket(connID, furnipacket.InventoryAddPacket{
 		ItemID: item.ID, SpriteID: def.SpriteID, ExtraData: item.ExtraData,
@@ -97,8 +100,13 @@ func (runtime *Runtime) handleFloorUpdate(ctx context.Context, connID string, bo
 	}
 	runtime.roomBroadcaster(roomID, furnipacket.FloorItemUpdatePacketID, encoded)
 	if def.CanSit {
+		old, hadOld := runtime.seatEntryFor(roomID, item.ID)
 		runtime.addSeatEntry(roomID, item.ID, item.X, item.Y, item.Dir, def.StackHeight, true)
-		if runtime.entityRotator != nil {
+		if hadOld && (old.x != item.X || old.y != item.Y) {
+			if runtime.entityEvictor != nil {
+				runtime.entityEvictor(roomID, old.x, old.y)
+			}
+		} else if runtime.entityRotator != nil {
 			runtime.entityRotator(roomID, item.X, item.Y, item.Dir)
 		}
 	} else {

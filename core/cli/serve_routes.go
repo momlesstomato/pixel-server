@@ -58,6 +58,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		return err
 	}
 	handler.ConfigureBroadcaster(services.broadcaster)
+	handler.SetShutdownRegistrar(module.RegisterWebSocketCloser, module.UnregisterWebSocketCloser)
 	handler.ConfigureUserFinder(&userFinderAdapter{service: services.users})
 	handler.ConfigurePostAuth(services.hotelStatus, services.users, services.users, services.permissions, runtime.Config.App.Name)
 	handler.ConfigureUserRuntime(func(transport *handshakerealtime.Transport) (handshakerealtime.UserRuntime, error) {
@@ -96,6 +97,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		furnitureRT.SetRoomFinder(roomRT.ConnRoomID)
 		furnitureRT.SetRoomBroadcaster(roomRT.BroadcastRawToRoom)
 		furnitureRT.SetRoomEntityRotator(roomRT.RotateSittingEntitiesInRoom)
+		furnitureRT.SetRoomEntityEvictor(roomRT.EjectSittingEntitiesInRoom)
 		furnitureRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
 			user, err := services.users.FindByID(ctx, userID)
 			if err != nil {

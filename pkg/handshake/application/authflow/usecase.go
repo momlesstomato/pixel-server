@@ -145,10 +145,5 @@ func (useCase *AuthenticateUseCase) resolveUsername(ctx context.Context, connID 
 
 // closeWithReason sends one disconnect reason packet and closes the connection.
 func (useCase *AuthenticateUseCase) closeWithReason(connID string, reason int32, closeCode int, closeReason string) {
-	packet := packetauth.DisconnectReasonPacket{Reason: reason}
-	body, err := packet.Encode()
-	if err == nil {
-		_ = useCase.transport.Send(connID, packet.PacketID(), body)
-	}
-	_ = useCase.transport.Close(connID, closeCode, closeReason)
+	_ = useCase.transport.CloseWithProtocolReason(connID, reason, closeCode, closeReason)
 }

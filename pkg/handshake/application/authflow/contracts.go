@@ -44,6 +44,8 @@ type Transport interface {
 	Send(string, uint16, []byte) error
 	// Close closes one connection with code and reason.
 	Close(string, int, string) error
+	// CloseWithProtocolReason sends a protocol disconnect reason packet and then closes one connection.
+	CloseWithProtocolReason(connID string, protocolReason int32, code int, reason string) error
 }
 
 // AuthenticateRequest defines one authentication attempt payload.

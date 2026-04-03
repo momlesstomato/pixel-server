@@ -222,8 +222,11 @@ func (inst *Instance) handleSit(msg Message) error {
 		entity.IsSitting = true
 		entity.IsSittingAuto = false
 	} else {
-		entity.Position.Z += 0.35
+		if !entity.IsSittingAuto {
+			entity.Position.Z += 0.35
+		}
 		delete(entity.Statuses, "sit")
+		delete(entity.Statuses, "lay")
 		entity.IsSitting = false
 		entity.IsSittingAuto = false
 	}

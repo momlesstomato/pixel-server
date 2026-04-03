@@ -10,6 +10,7 @@ import (
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/sessionflow"
 	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
+	packetdisconnect "github.com/momlesstomato/pixel-server/pkg/handshake/packet/authentication"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
 )
@@ -21,7 +22,9 @@ const protocolErrorWrongState int32 = 3
 const protocolErrorLimitPerMinute = 10
 
 // abortConnection closes one websocket connection after startup failure.
+// A close frame is sent before closing so the client receives a clean disconnect signal.
 func (handler *Handler) abortConnection(connection *websocket.Conn) {
+	_ = connection.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, ""), time.Now().Add(time.Second))
 	_ = connection.Close()
 }
 
@@ -155,6 +158,12 @@ func (handler *Handler) startRuntimeWatchers(ctx context.Context, useCases *runt
 		select {
 		case signal, open := <-signals:
 			if open {
+				if signal.ProtocolReason != 0 {
+					pkt := packetdisconnect.DisconnectReasonPacket{Reason: signal.ProtocolReason}
+					if body, err := pkt.Encode(); err == nil {
+						_ = transport.writeFrame(pkt.PacketID(), body)
+					}
+				}
 				_ = transport.closeLocal(signal.Code, signal.Reason)
 			}
 			cancel()

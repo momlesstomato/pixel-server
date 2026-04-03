@@ -8,6 +8,7 @@ import (
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	coreplugin "github.com/momlesstomato/pixel-server/core/plugin"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
+	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/authentication"
 )
 
 // validatorStub defines deterministic ticket validation behavior.
@@ -34,6 +35,15 @@ func (stub *transportStub) Send(_ string, packetID uint16, _ []byte) error {
 
 // Close captures connection identifier.
 func (stub *transportStub) Close(connID string, _ int, _ string) error {
+	stub.closed = append(stub.closed, connID)
+	return nil
+}
+
+// CloseWithProtocolReason captures the disconnect reason and closed connection identifier.
+func (stub *transportStub) CloseWithProtocolReason(connID string, protocolReason int32, _ int, _ string) error {
+	if protocolReason != 0 {
+		stub.sent = append(stub.sent, packetauth.DisconnectReasonPacketID)
+	}
 	stub.closed = append(stub.closed, connID)
 	return nil
 }

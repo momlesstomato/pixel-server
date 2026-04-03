@@ -7,6 +7,7 @@ import (
 	"time"
 
 	sdk "github.com/momlesstomato/pixel-sdk"
+	"github.com/gofiber/contrib/websocket"
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
@@ -58,6 +59,10 @@ type Handler struct {
 	userRuntimeFactory func(*Transport) (UserRuntime, error)
 	// userFinder resolves real usernames for identity account packets.
 	userFinder authflow.UserFinder
+	// shutdownRegistrar registers per-connection graceful close functions with the HTTP module.
+	shutdownRegistrar func(*websocket.Conn, func())
+	// shutdownUnregistrar removes per-connection graceful close functions on disconnect.
+	shutdownUnregistrar func(*websocket.Conn)
 }
 
 // runtimeUseCases defines handshake runtime use-case wiring behavior.

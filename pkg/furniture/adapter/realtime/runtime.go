@@ -39,6 +39,9 @@ type seatEntry struct {
 // RoomEntityRotator updates seated entities at a tile to face a new furniture direction.
 type RoomEntityRotator func(roomID, x, y, dir int)
 
+// RoomEntityEvictor clears sit/lay state for entities at a tile and walks them to the door.
+type RoomEntityEvictor func(roomID, x, y int)
+
 // Runtime defines furniture realm websocket packet behavior.
 type Runtime struct {
 	// service stores furniture application behavior.
@@ -57,6 +60,8 @@ type Runtime struct {
 	usernameResolver UsernameResolver
 	// entityRotator rotates seated entities on a tile to match new furniture direction.
 	entityRotator RoomEntityRotator
+	// entityEvictor ejects seated entities from a tile when furniture is moved or removed.
+	entityEvictor RoomEntityEvictor
 	// seatCache maps room identifier to its list of sittable item entries.
 	seatCache map[int][]seatEntry
 	// seatMu protects seatCache from concurrent access.
@@ -115,6 +120,11 @@ func (runtime *Runtime) SetRoomEntityRotator(fn RoomEntityRotator) {
 	runtime.entityRotator = fn
 }
 
+// SetRoomEntityEvictor configures the callback that ejects seated entities when furniture is moved or removed.
+func (runtime *Runtime) SetRoomEntityEvictor(fn RoomEntityEvictor) {
+	runtime.entityEvictor = fn
+}
+
 // sendPacket encodes and transmits one outgoing packet.
 func (runtime *Runtime) sendPacket(connID string, pkt interface {
 	PacketID() uint16
@@ -125,6 +135,18 @@ func (runtime *Runtime) sendPacket(connID string, pkt interface {
 		return err
 	}
 	return runtime.transport.Send(connID, pkt.PacketID(), body)
+}
+
+// seatEntryFor returns the cached seat entry for one placed item, if present.
+func (runtime *Runtime) seatEntryFor(roomID, itemID int) (seatEntry, bool) {
+	runtime.seatMu.RLock()
+	defer runtime.seatMu.RUnlock()
+	for _, e := range runtime.seatCache[roomID] {
+		if e.itemID == itemID {
+			return e, true
+		}
+	}
+	return seatEntry{}, false
 }
 
 // TileSeatCheckerFor returns seat properties for the topmost sittable item at a tile.
