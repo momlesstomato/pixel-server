@@ -45,7 +45,7 @@ func (runtime *Runtime) handlePickup(ctx context.Context, connID string, body []
 	return runtime.sendPacket(connID, furnipacket.InventoryAddPacket{
 		ItemID: item.ID, SpriteID: def.SpriteID, ExtraData: item.ExtraData,
 		AllowRecycle: def.AllowRecycle, AllowTrade: def.AllowTrade,
-		AllowInventoryStack: def.AllowInventoryStack,
+		AllowInventoryStack:  def.AllowInventoryStack,
 		AllowMarketplaceSell: def.AllowMarketplaceSell,
 	})
 }
@@ -98,6 +98,9 @@ func (runtime *Runtime) handleFloorUpdate(ctx context.Context, connID string, bo
 	runtime.roomBroadcaster(roomID, furnipacket.FloorItemUpdatePacketID, encoded)
 	if def.CanSit {
 		runtime.addSeatEntry(roomID, item.ID, item.X, item.Y, item.Dir, def.StackHeight, true)
+		if runtime.entityRotator != nil {
+			runtime.entityRotator(roomID, item.X, item.Y, item.Dir)
+		}
 	} else {
 		runtime.removeSeatEntry(roomID, item.ID)
 	}

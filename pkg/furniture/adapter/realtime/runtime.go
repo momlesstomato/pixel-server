@@ -36,6 +36,9 @@ type seatEntry struct {
 	canSit bool
 }
 
+// RoomEntityRotator updates seated entities at a tile to face a new furniture direction.
+type RoomEntityRotator func(roomID, x, y, dir int)
+
 // Runtime defines furniture realm websocket packet behavior.
 type Runtime struct {
 	// service stores furniture application behavior.
@@ -52,6 +55,8 @@ type Runtime struct {
 	roomBroadcaster func(roomID int, packetID uint16, body []byte)
 	// usernameResolver resolves display names for item owner identifiers.
 	usernameResolver UsernameResolver
+	// entityRotator rotates seated entities on a tile to match new furniture direction.
+	entityRotator RoomEntityRotator
 	// seatCache maps room identifier to its list of sittable item entries.
 	seatCache map[int][]seatEntry
 	// seatMu protects seatCache from concurrent access.
@@ -103,6 +108,11 @@ func (runtime *Runtime) SetRoomBroadcaster(fn func(roomID int, packetID uint16, 
 // SetUsernameResolver configures the display name lookup function for item owners.
 func (runtime *Runtime) SetUsernameResolver(fn UsernameResolver) {
 	runtime.usernameResolver = fn
+}
+
+// SetRoomEntityRotator configures the callback that rotates seated entities when furniture rotates.
+func (runtime *Runtime) SetRoomEntityRotator(fn RoomEntityRotator) {
+	runtime.entityRotator = fn
 }
 
 // sendPacket encodes and transmits one outgoing packet.

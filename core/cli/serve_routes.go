@@ -95,6 +95,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		services.room.Manager().SetKickNotifier(roomRT.OnKick)
 		furnitureRT.SetRoomFinder(roomRT.ConnRoomID)
 		furnitureRT.SetRoomBroadcaster(roomRT.BroadcastRawToRoom)
+		furnitureRT.SetRoomEntityRotator(roomRT.RotateSittingEntitiesInRoom)
 		furnitureRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
 			user, err := services.users.FindByID(ctx, userID)
 			if err != nil {

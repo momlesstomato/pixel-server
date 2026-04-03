@@ -72,6 +72,19 @@ func (rt *Runtime) BroadcastRawToRoom(roomID int, packetID uint16, body []byte) 
 	}
 }
 
+// RotateSittingEntitiesInRoom rotates auto-sitting entities at a tile to match the new furniture direction and broadcasts the update.
+func (rt *Runtime) RotateSittingEntitiesInRoom(roomID, x, y, dir int) {
+	inst, ok := rt.service.Manager().Get(roomID)
+	if !ok {
+		return
+	}
+	updated := inst.RotateSittingEntitiesAt(x, y, dir)
+	if len(updated) == 0 {
+		return
+	}
+	rt.Broadcast(roomID, updated, nil)
+}
+
 // ConnRoomID returns the room identifier for a given connection, if present.
 func (rt *Runtime) ConnRoomID(connID string) (int, bool) {
 	id, ok := rt.connRooms[connID]

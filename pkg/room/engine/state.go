@@ -42,3 +42,24 @@ func (inst *Instance) Entity(virtualID int) (domain.RoomEntity, bool) {
 func (inst *Instance) Done() <-chan struct{} {
 	return inst.done
 }
+
+// RotateSittingEntitiesAt updates the body and head rotation of every entity
+// that is auto-sitting at tile (x, y) to match the new furniture direction.
+// It returns the updated entity snapshots so callers can broadcast the change.
+func (inst *Instance) RotateSittingEntitiesAt(x, y, dir int) []domain.RoomEntity {
+	if dir%2 != 0 {
+		dir--
+	}
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	var updated []domain.RoomEntity
+	for _, e := range inst.entities {
+		if e.IsSittingAuto && e.Position.X == x && e.Position.Y == y {
+			e.BodyRotation = dir
+			e.HeadRotation = dir
+			e.UpdateNeeded = true
+			updated = append(updated, *e)
+		}
+	}
+	return updated
+}
