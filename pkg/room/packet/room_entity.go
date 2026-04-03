@@ -1,0 +1,137 @@
+package packet
+
+import (
+	"fmt"
+
+	"github.com/momlesstomato/pixel-server/core/codec"
+	"github.com/momlesstomato/pixel-server/pkg/room/domain"
+)
+
+// UsersComposer sends entity list to client (s2c 3857).
+type UsersComposer struct {
+	// Entities stores all room entities to serialize.
+	Entities []domain.RoomEntity
+}
+
+// PacketID returns the protocol packet identifier.
+func (p UsersComposer) PacketID() uint16 { return UsersComposerID }
+
+// Encode serializes room entity list.
+func (p UsersComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(int32(len(p.Entities)))
+	for _, e := range p.Entities {
+		if err := encodeEntity(w, e); err != nil {
+			return nil, err
+		}
+	}
+	return w.Bytes(), nil
+}
+
+// encodeEntity writes one entity to the writer.
+func encodeEntity(w *codec.Writer, e domain.RoomEntity) error {
+	w.WriteInt32(int32(e.UserID))
+	if err := w.WriteString(e.Username); err != nil {
+		return err
+	}
+	if err := w.WriteString(e.Motto); err != nil {
+		return err
+	}
+	if err := w.WriteString(e.Look); err != nil {
+		return err
+	}
+	w.WriteInt32(int32(e.VirtualID))
+	w.WriteInt32(int32(e.Position.X))
+	w.WriteInt32(int32(e.Position.Y))
+	if err := w.WriteString(fmt.Sprintf("%g", e.Position.Z)); err != nil {
+		return err
+	}
+	w.WriteInt32(int32(e.BodyRotation))
+	w.WriteInt32(1)
+	if err := w.WriteString(e.Gender); err != nil {
+		return err
+	}
+	w.WriteInt32(-1)
+	w.WriteInt32(-1)
+	if err := w.WriteString(""); err != nil {
+		return err
+	}
+	if err := w.WriteString(""); err != nil {
+		return err
+	}
+	w.WriteInt32(0)
+	w.WriteBool(false)
+	return nil
+}
+
+// UserUpdateComposer sends entity status updates (s2c 3559).
+type UserUpdateComposer struct {
+	// Entities stores entities with updated state.
+	Entities []domain.RoomEntity
+}
+
+// PacketID returns the protocol packet identifier.
+func (p UserUpdateComposer) PacketID() uint16 { return UserUpdateComposerID }
+
+// Encode serializes entity status updates.
+func (p UserUpdateComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(int32(len(p.Entities)))
+	for _, e := range p.Entities {
+		w.WriteInt32(int32(e.VirtualID))
+		w.WriteInt32(int32(e.Position.X))
+		w.WriteInt32(int32(e.Position.Y))
+		if err := w.WriteString(fmt.Sprintf("%g", e.Position.Z)); err != nil {
+			return nil, err
+		}
+		w.WriteInt32(int32(e.HeadRotation))
+		w.WriteInt32(int32(e.BodyRotation))
+		status := encodeStatuses(e)
+		if err := w.WriteString(status); err != nil {
+			return nil, err
+		}
+	}
+	return w.Bytes(), nil
+}
+
+// encodeStatuses formats entity status map to protocol string.
+func encodeStatuses(e domain.RoomEntity) string {
+	result := "/"
+	for k, v := range e.Statuses {
+		result += k + " " + v + "/"
+	}
+	return result
+}
+
+// UserRemoveComposer notifies entity removal (s2c 3839).
+type UserRemoveComposer struct {
+	// VirtualID stores the removed entity virtual identifier.
+	VirtualID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p UserRemoveComposer) PacketID() uint16 { return UserRemoveComposerID }
+
+// Encode serializes the entity removal.
+func (p UserRemoveComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	if err := w.WriteString(fmt.Sprintf("%d", p.VirtualID)); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+
+// DecodeMoveAvatar extracts walk destination from packet body.
+func DecodeMoveAvatar(body []byte) []int {
+	r := codec.NewReader(body)
+	x, err := r.ReadInt32()
+	if err != nil {
+		return nil
+	}
+	y, err := r.ReadInt32()
+	if err != nil {
+		return nil
+	}
+	return []int{int(x), int(y)}
+}

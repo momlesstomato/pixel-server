@@ -641,7 +641,7 @@ Following the cancellable mutation event pattern:
 
 ### Milestone 10.1 — Room Domain & Heightmap
 
-**Status:** NOT STARTED
+**Status:** ✅ COMPLETED
 **Packages:** `pkg/room/domain/`, `pkg/room/heightmap/`, `pkg/room/infrastructure/model/`,
 `pkg/room/infrastructure/store/`, `pkg/room/infrastructure/migration/`, `pkg/room/infrastructure/seed/`
 
@@ -657,7 +657,7 @@ Following the cancellable mutation event pattern:
 
 ### Milestone 10.2 — Pathfinding Engine
 
-**Status:** NOT STARTED
+**Status:** ✅ COMPLETED
 **Packages:** `pkg/room/pathfinding/`
 
 | Task | Details |
@@ -671,7 +671,7 @@ Following the cancellable mutation event pattern:
 
 ### Milestone 10.3 — Room Engine (Goroutine Isolation)
 
-**Status:** NOT STARTED
+**Status:** ✅ COMPLETED
 **Packages:** `pkg/room/engine/`
 
 | Task | Details |
@@ -684,7 +684,7 @@ Following the cancellable mutation event pattern:
 
 ### Milestone 10.4 — Room Entry & Access Control
 
-**Status:** NOT STARTED
+**Status:** ✅ COMPLETED
 **Packages:** `pkg/room/application/`, `pkg/room/packet/`, `pkg/room/adapter/`
 
 | Task | Details |
@@ -699,32 +699,33 @@ Following the cancellable mutation event pattern:
 
 ### Milestone 10.5 — Entities, Walking & Chat
 
-**Status:** NOT STARTED
+**Status:** ✅ COMPLETED (sitting/laying and idle system deferred)
 **Packages:** `pkg/room/application/`, `pkg/room/packet/`, SDK events
 
-| Task | Details |
-|------|---------|
-| Entity service | Add/remove entities, position tracking, status management |
-| Walking | C2S walk → pathfind → step-per-tick → broadcast |
-| Sitting/laying | Auto-sit on seat furniture, status management |
-| Chat service | Talk (proximity), shout (room-wide), whisper (targeted) |
-| Chat flood | Counter per entity, mute penalty |
-| Actions | Dance, wave, sign, carry, typing indicator |
-| Idle system | Timer → sleep animation → kick after extended idle |
-| SDK events | EntityMoving/Moved, ChatSending/ChatSent |
+| Task | Details | Status |
+|------|---------|--------|
+| Entity service | Add/remove entities, position tracking, status management | ✅ Done |
+| Walking | C2S walk → pathfind → step-per-tick → broadcast | ✅ Done |
+| Sitting/laying | Auto-sit on seat furniture, status management | ⏳ Deferred |
+| Chat service | Talk (proximity), shout (room-wide), whisper (targeted) | ✅ Done |
+| Chat flood | Counter per entity, mute penalty | ✅ Done |
+| Actions | Dance, wave, sign, carry, typing indicator | ✅ Done (carry deferred) |
+| Idle system | Timer → sleep animation → kick after extended idle | ⏳ Deferred |
+| SDK events | EntityMoving/Moved, ChatSending/ChatSent | ✅ Done |
 
 ### Milestone 10.6 — E2E Tests & Integration
 
-**Status:** NOT STARTED
-**Packages:** `e2e/12_room/`
+**Status:** ✅ COMPLETED
+**Packages:** `e2e/13_room/`
 
-| Task | Details |
-|------|---------|
-| Room loading E2E | Load model, parse heightmap, verify grid |
-| Room entry E2E | Open room, password, doorbell, ban |
-| Walking E2E | Walk to tile, obstacle avoidance |
-| Chat E2E | Talk proximity, shout, whisper |
-| Lifecycle E2E | Load, idle, unload, re-enter |
+| Task | Details | Status |
+|------|---------|--------|
+| Room loading E2E | Load model, parse heightmap, verify grid | ✅ Done |
+| Room entry E2E | Open room, enter entity | ✅ Done |
+| Walking E2E | Walk to tile | ✅ Done |
+| Chat E2E | Talk proximity, shout | ✅ Done |
+| Lifecycle E2E | Enter, leave, verify empty | ✅ Done |
+| Password/doorbell E2E | Locked room access flows | ⏳ Deferred |
 
 ---
 
@@ -732,50 +733,54 @@ Following the cancellable mutation event pattern:
 
 ### Room Loading & Management
 
-| # | Packet | ID (est.) | Dir | Milestone |
-|---|--------|-----------|-----|-----------|
-| 1 | `OpenFlatConnection` | 2312 | C2S | 10.4 |
-| 2 | `RoomReady` | 2031 | S2C | 10.4 |
-| 3 | `FloorHeightMap` | 1301 | S2C | 10.1 |
-| 4 | `RoomHeightMap` | 2753 | S2C | 10.1 |
-| 5 | `RoomHeightMapUpdate` | — | S2C | 10.5 |
-| 6 | `RoomEntryTile` | 1664 | S2C | 10.4 |
-| 7 | `RoomVisualizationSettings` | — | S2C | 10.4 |
-| 8 | `CloseConnection` | — | S2C | 10.4 |
-| 9 | `GetRoomSettings` | — | C2S | 10.4 |
-| 10 | `RoomSettings` | — | S2C | 10.4 |
-| 11 | `SaveRoomSettings` | — | C2S | 10.4 |
+| # | Packet | ID (est.) | Dir | Milestone | Status |
+|---|--------|-----------|-----|-----------|--------|
+| 1 | `OpenFlatConnection` | 2312 | C2S | 10.4 | ✅ |
+| 2 | `RoomReady` | 2031 | S2C | 10.4 | ✅ |
+| 3 | `FloorHeightMap` | 1301 | S2C | 10.1 | ✅ |
+| 4 | `RoomHeightMap` | 2088 | S2C | 10.1 | ✅ |
+| 5 | `RoomHeightMapUpdate` | 1301 | S2C | 10.5 | ✅ |
+| 6 | `RoomEntryTile` | 1664 | S2C | 10.4 | ✅ |
+| 7 | `RoomVisualizationSettings` | — | S2C | 10.4 | ⏳ Deferred |
+| 8 | `CloseConnection` | 726 | S2C | 10.4 | ✅ |
+| 9 | `GetRoomSettings` | — | C2S | 10.4 | ⏳ Deferred |
+| 10 | `RoomSettings` | — | S2C | 10.4 | ⏳ Deferred |
+| 11 | `SaveRoomSettings` | — | C2S | 10.4 | ⏳ Deferred |
 
 ### Room Access
 
-| # | Packet | ID (est.) | Dir | Milestone |
-|---|--------|-----------|-----|-----------|
-| 12 | `DoorbellRinging` | — | S2C | 10.4 |
-| 13 | `DoorbellAddUser` | — | S2C | 10.4 |
-| 14 | `LetUserIn` | — | C2S | 10.4 |
-| 15 | `FlatAccessDenied` | — | S2C | 10.4 |
-| 16 | `RoomEnterError` | — | S2C | 10.4 |
+| # | Packet | ID (est.) | Dir | Milestone | Status |
+|---|--------|-----------|-----|-----------|--------|
+| 12 | `DoorbellRinging` | 2068 | S2C | 10.4 | ✅ |
+| 13 | `DoorbellAddUser` | — | S2C | 10.4 | ⏳ Deferred |
+| 14 | `LetUserIn` | — | C2S | 10.4 | ⏳ Deferred |
+| 15 | `FlatAccessDenied` | 735 | S2C | 10.4 | ✅ |
+| 16 | `RoomEnterError` | 200 | S2C | 10.4 | ✅ |
 
 ### Room Entities
 
-| # | Packet | ID (est.) | Dir | Milestone |
-|---|--------|-----------|-----|-----------|
-| 17 | `RoomUnit` | — | S2C | 10.5 |
-| 18 | `AvatarUpdate` | — | S2C | 10.5 |
-| 19 | `RoomUnitWalk` | — | C2S | 10.5 |
-| 20 | `RoomUnitChat` | — | C2S | 10.5 |
-| 21 | `RoomUnitChatEvent` | — | S2C | 10.5 |
-| 22 | `RoomUnitShout` | — | C2S | 10.5 |
-| 23 | `RoomUnitChatShout` | — | S2C | 10.5 |
-| 24 | `RoomUnitWhisper` | — | C2S | 10.5 |
-| 25 | `RoomUnitChatWhisper` | — | S2C | 10.5 |
-| 26 | `RoomUnitDance` | — | C2S | 10.5 |
-| 27 | `RoomUnitAction` | — | C2S | 10.5 |
-| 28 | `RoomUnitSign` | — | C2S | 10.5 |
-| 29 | `RoomUnitTyping` | — | C2S | 10.5 |
-| 30 | `RoomUnitLookTo` | — | C2S | 10.5 |
-| 31 | `RoomUnitRemove` | — | S2C | 10.5 |
-| 32 | `RoomUnitIdle` | — | S2C | 10.5 |
+| # | Packet | ID (est.) | Dir | Milestone | Status |
+|---|--------|-----------|-----|-----------|--------|
+| 17 | `RoomUnit` (UsersComposer) | 3508 | S2C | 10.5 | ✅ |
+| 18 | `AvatarUpdate` (UserUpdateComposer) | 3559 | S2C | 10.5 | ✅ |
+| 19 | `RoomUnitWalk` (MoveAvatar) | 3320 | C2S | 10.5 | ✅ |
+| 20 | `RoomUnitChat` | 744 | C2S | 10.5 | ✅ |
+| 21 | `RoomUnitChatEvent` (ChatComposer) | 2785 | S2C | 10.5 | ✅ |
+| 22 | `RoomUnitShout` | 697 | C2S | 10.5 | ✅ |
+| 23 | `RoomUnitChatShout` (ShoutComposer) | 2888 | S2C | 10.5 | ✅ |
+| 24 | `RoomUnitWhisper` | 3003 | C2S | 10.5 | ✅ |
+| 25 | `RoomUnitChatWhisper` (WhisperComposer) | 1400 | S2C | 10.5 | ✅ |
+| 26 | `RoomUnitDance` | 1225 | C2S | 10.5 | ✅ |
+| 27 | `RoomUnitAction` | 3268 | C2S | 10.5 | ✅ |
+| 28 | `RoomUnitSign` | 3555 | C2S | 10.5 | ✅ |
+| 29 | `RoomUnitTyping` (StartTyping) | 2139 | C2S | 10.5 | ✅ |
+| 29b | `RoomUnitTyping` (CancelTyping) | 1771 | C2S | 10.5 | ✅ |
+| 30 | `RoomUnitLookTo` | 1142 | C2S | 10.5 | ✅ |
+| 31 | `RoomUnitRemove` (UserRemoveComposer) | 3839 | S2C | 10.5 | ✅ |
+| 32 | `RoomUnitIdle` (SleepComposer) | 2306 | S2C | 10.5 | ✅ |
+| 33 | `UserTypingComposer` | 1727 | S2C | 10.5 | ✅ |
+| 34 | `DanceComposer` | 130 | S2C | 10.5 | ✅ |
+| 35 | `FloodControlComposer` | 803 | S2C | 10.5 | ✅ |
 
 ---
 

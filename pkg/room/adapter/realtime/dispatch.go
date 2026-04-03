@@ -1,0 +1,149 @@
+package realtime
+
+import (
+	"context"
+
+	"github.com/momlesstomato/pixel-server/pkg/room/domain"
+	"github.com/momlesstomato/pixel-server/pkg/room/engine"
+	"github.com/momlesstomato/pixel-server/pkg/room/heightmap"
+	"github.com/momlesstomato/pixel-server/pkg/room/packet"
+	"go.uber.org/zap"
+)
+
+// Handle dispatches one authenticated room packet payload.
+func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, body []byte) (bool, error) {
+	userID, ok := rt.userID(connID)
+	if !ok {
+		return false, nil
+	}
+	switch packetID {
+	case packet.OpenFlatConnectionPacketID:
+		return true, rt.handleOpenFlat(ctx, connID, userID, body)
+	case packet.GetRoomEntryDataPacketID:
+		return true, rt.handleGetEntryData(ctx, connID, userID)
+	case packet.MoveAvatarPacketID:
+		return true, rt.handleMoveAvatar(connID, userID, body)
+	case packet.ChatPacketID:
+		return true, rt.handleChat(ctx, connID, userID, body)
+	case packet.ShoutPacketID:
+		return true, rt.handleShout(ctx, connID, userID, body)
+	case packet.WhisperPacketID:
+		return true, rt.handleWhisper(ctx, connID, userID, body)
+	case packet.DancePacketID:
+		return true, rt.handleDance(connID, userID, body)
+	case packet.ActionPacketID:
+		return true, rt.handleAction(connID, userID, body)
+	case packet.SignPacketID:
+		return true, rt.handleSign(connID, userID, body)
+	case packet.StartTypingPacketID:
+		return true, rt.handleStartTyping(connID, userID)
+	case packet.CancelTypingPacketID:
+		return true, rt.handleStopTyping(connID, userID)
+	case packet.LookToPacketID:
+		return true, rt.handleLookTo(connID, userID, body)
+	default:
+		return false, nil
+	}
+}
+
+// handleOpenFlat processes room entry request.
+func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.OpenFlatConnectionPacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	room := domain.Room{ID: int(pkt.RoomID), ModelSlug: "model_a"}
+	if rt.service.CheckBan(ctx, room.ID, userID) {
+		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 4})
+	}
+	inst, err := rt.service.LoadRoom(ctx, room)
+	if err != nil {
+		rt.logger.Warn("room load failed", zap.Int("room_id", room.ID), zap.Error(err))
+		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
+	}
+	if err := rt.sendPacket(connID, packet.OpenConnectionComposer{}); err != nil {
+		return err
+	}
+	rt.connRooms[connID] = room.ID
+	return rt.sendRoomData(connID, userID, inst, room)
+}
+
+// handleGetEntryData sends room geometry and entity data.
+func (rt *Runtime) handleGetEntryData(ctx context.Context, connID string, userID int) error {
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	inst, ok := rt.service.Manager().Get(roomID)
+	if !ok {
+		return nil
+	}
+	return rt.sendEntryEntities(connID, userID, inst)
+}
+
+// handleMoveAvatar processes walk request.
+func (rt *Runtime) handleMoveAvatar(connID string, userID int, body []byte) error {
+	inst, entity := rt.findEntityByConnID(connID, userID)
+	if inst == nil {
+		return nil
+	}
+	r := packet.DecodeMoveAvatar(body)
+	if r == nil {
+		return nil
+	}
+	if rt.entitySvc != nil {
+		_ = rt.entitySvc.Walk(context.Background(), inst, entity, r[0], r[1])
+		return nil
+	}
+	reply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: r[0], TargetY: r[1], Reply: reply})
+	<-reply
+	return nil
+}
+
+// sendRoomData transmits room loading geometry and settings.
+func (rt *Runtime) sendRoomData(connID string, userID int, inst *engine.Instance, room domain.Room) error {
+	if err := rt.sendPacket(connID, packet.RoomReadyComposer{
+		ModelSlug: inst.Layout.Slug, RoomID: int32(room.ID),
+	}); err != nil {
+		return err
+	}
+	hm := heightmap.EncodeFloorMap(inst.Layout.Grid)
+	if err := rt.sendPacket(connID, packet.FloorHeightMapComposer{
+		Scale: true, WallHeight: int32(inst.Layout.WallHeight), Heightmap: hm,
+	}); err != nil {
+		return err
+	}
+	stacking := heightmap.EncodeStackingMap(inst.Layout.Grid)
+	w := inst.Layout.Width()
+	if err := rt.sendPacket(connID, packet.HeightMapComposer{
+		Width: int32(w), TotalTiles: int32(len(stacking)), Heights: stacking,
+	}); err != nil {
+		return err
+	}
+	if err := rt.sendPacket(connID, packet.RoomEntryInfoComposer{
+		RoomID: int32(room.ID), IsOwner: room.OwnerID == userID,
+	}); err != nil {
+		return err
+	}
+	if err := rt.sendPacket(connID, packet.RoomVisualizationComposer{
+		WallThickness: int32(room.WallThickness), FloorThickness: int32(room.FloorThickness),
+	}); err != nil {
+		return err
+	}
+	return rt.sendPacket(connID, packet.FurnitureAliasesComposer{})
+}
+
+// sendEntryEntities transmits entity list and enters the user.
+func (rt *Runtime) sendEntryEntities(connID string, userID int, inst *engine.Instance) error {
+	entity := domain.NewPlayerEntity(0, userID, connID, "", "", "", "M",
+		domain.Tile{X: inst.Layout.DoorX, Y: inst.Layout.DoorY, Z: inst.Layout.DoorZ, State: domain.TileOpen})
+	if err := rt.service.EnterRoom(context.Background(), inst, &entity, inst.RoomID, userID); err != nil {
+		return err
+	}
+	entities := inst.Entities()
+	if err := rt.sendPacket(connID, packet.UsersComposer{Entities: entities}); err != nil {
+		return err
+	}
+	return rt.sendPacket(connID, packet.UserUpdateComposer{Entities: entities})
+}

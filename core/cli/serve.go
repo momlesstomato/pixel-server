@@ -111,6 +111,7 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	svc.catalog.SetEventFirer(fire)
 	svc.economy.SetEventFirer(fire)
 	svc.navigator.SetEventFirer(fire)
+	svc.room.SetEventFirer(fire)
 	address := fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port)
 	runtime.Logger.Info("http server starting", zap.String("address", address))
 	return runServeLifecycle(runtime, runtime.HTTP, address, listen)

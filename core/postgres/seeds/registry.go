@@ -6,6 +6,7 @@ import (
 	inventoryseed "github.com/momlesstomato/pixel-server/pkg/inventory/infrastructure/seed"
 	navigatorseed "github.com/momlesstomato/pixel-server/pkg/navigator/infrastructure/seed"
 	permissionseed "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/seed"
+	roomseed "github.com/momlesstomato/pixel-server/pkg/room/infrastructure/seed"
 	subscriptionseed "github.com/momlesstomato/pixel-server/pkg/subscription/infrastructure/seed"
 )
 
@@ -25,5 +26,6 @@ func Registry() []*gormigrate.Migration {
 		subscriptionseed.Step01DefaultClubOffers(),
 		navigatorseed.Step01DefaultCategories(),
 		navigatorseed.Step02DemoRooms(),
+		roomseed.Step01StandardModels(),
 	}
 }

@@ -9,6 +9,7 @@ import (
 	messengermigration "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/migration"
 	navigatormigration "github.com/momlesstomato/pixel-server/pkg/navigator/infrastructure/migration"
 	permissionmigration "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/migration"
+	roommigration "github.com/momlesstomato/pixel-server/pkg/room/infrastructure/migration"
 	subscriptionmigration "github.com/momlesstomato/pixel-server/pkg/subscription/infrastructure/migration"
 )
 
@@ -57,5 +58,9 @@ func Registry() []*gormigrate.Migration {
 		navigatormigration.Step02Rooms(),
 		navigatormigration.Step03SavedSearches(),
 		navigatormigration.Step04Favourites(),
+		roommigration.Step01RoomModels(),
+		roommigration.Step02RoomExtension(),
+		roommigration.Step03RoomBans(),
+		roommigration.Step04RoomRights(),
 	}
 }

@@ -20,6 +20,7 @@ import (
 	messengerrealtime "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/realtime"
 	navigatorhttpapi "github.com/momlesstomato/pixel-server/pkg/navigator/adapter/httpapi"
 	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
+	roomrealtime "github.com/momlesstomato/pixel-server/pkg/room/adapter/realtime"
 	subscriptionhttpapi "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
 	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
@@ -85,6 +86,12 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			return nil, err
 		}
 		runtimes = append(runtimes, ecoRTs...)
+		roomRT, err := roomrealtime.NewRuntime(services.room, services.entityService, services.chatService, services.registry, transport, runtime.Logger)
+		if err != nil {
+			return nil, err
+		}
+		services.room.Manager().SetBroadcaster(roomRT.Broadcast)
+		runtimes = append(runtimes, roomRT)
 		return &compositeRuntime{runtimes: runtimes}, nil
 	})
 	services.handler = handler

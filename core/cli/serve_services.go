@@ -19,6 +19,7 @@ import (
 	messengerapplication "github.com/momlesstomato/pixel-server/pkg/messenger/application"
 	messengerstore "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/store"
 	navigatorapplication "github.com/momlesstomato/pixel-server/pkg/navigator/application"
+	roomapplication "github.com/momlesstomato/pixel-server/pkg/room/application"
 	permissionnotification "github.com/momlesstomato/pixel-server/pkg/permission/adapter/notification"
 	permissionapplication "github.com/momlesstomato/pixel-server/pkg/permission/application"
 	permissionstore "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/store"
@@ -45,6 +46,9 @@ type serveServices struct {
 	economy       *economyapplication.Service
 	subscription  *subscriptionapplication.Service
 	navigator     *navigatorapplication.Service
+	room          *roomapplication.Service
+	entityService *roomapplication.EntityService
+	chatService   *roomapplication.ChatService
 	economyBundle *economyServiceBundle
 	handler       *handshakerealtime.Handler
 	fire          func(sdk.Event)
@@ -117,6 +121,18 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 	if err != nil {
 		return nil, err
 	}
+	roomService, err := buildRoomServices(runtime, noopEntityBroadcaster)
+	if err != nil {
+		return nil, err
+	}
+	entityService, err := roomapplication.NewEntityService(roomService.Manager(), runtime.Logger)
+	if err != nil {
+		return nil, err
+	}
+	chatService, err := roomapplication.NewChatService(runtime.Logger)
+	if err != nil {
+		return nil, err
+	}
 	return &serveServices{
 		sso:      authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
 		registry: registry, bus: bus, broadcaster: broadcaster, hotelStatus: hotelStatus,
@@ -124,6 +140,7 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		furniture: economyServices.furniture, inventory: economyServices.inventory,
 		catalog: economyServices.catalog, economy: economyServices.economy,
 		subscription: economyServices.subscription, navigator: economyServices.navigator,
+		room: roomService, entityService: entityService, chatService: chatService,
 		economyBundle: economyServices,
 	}, nil
 }
