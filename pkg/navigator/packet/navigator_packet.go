@@ -113,3 +113,18 @@ func (p NavigatorSavedSearchesPacket) Encode() ([]byte, error) {
 	}
 	return w.Bytes(), nil
 }
+
+// NavigatorEventCategoriesPacket defines navigator.event_categories (s2c 3244) payload.
+type NavigatorEventCategoriesPacket struct{}
+
+// PacketID returns the wire protocol packet identifier.
+func (p NavigatorEventCategoriesPacket) PacketID() uint16 {
+	return NavigatorEventCategoriesPacketID
+}
+
+// Encode serializes an empty event categories list into packet body.
+func (p NavigatorEventCategoriesPacket) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(0)
+	return w.Bytes(), nil
+}

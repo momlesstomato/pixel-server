@@ -1,12 +1,14 @@
 package realtime
 
 import (
+	"context"
 	"fmt"
 
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	roomapplication "github.com/momlesstomato/pixel-server/pkg/room/application"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/engine"
+	"github.com/momlesstomato/pixel-server/pkg/room/packet"
 	"go.uber.org/zap"
 )
 
@@ -15,6 +17,12 @@ type Transport interface {
 	// Send writes one encoded packet to one connection identifier.
 	Send(string, uint16, []byte) error
 }
+
+// UsernameResolver resolves a display name for one authenticated user identifier.
+type UsernameResolver func(ctx context.Context, userID int) (string, error)
+
+// ProfileResolver resolves the full display profile for one authenticated user identifier.
+type ProfileResolver func(ctx context.Context, userID int) (username, look, motto, gender string, err error)
 
 // Runtime defines room realm websocket packet behavior.
 type Runtime struct {
@@ -32,6 +40,22 @@ type Runtime struct {
 	logger *zap.Logger
 	// connRooms tracks which room each connection is in.
 	connRooms map[string]int
+	// pendingDoorbell tracks visitor connections waiting for doorbell approval.
+	pendingDoorbell map[string]doorbellEntry
+	// usernameResolver resolves display names for user identifiers.
+	usernameResolver UsernameResolver
+	// profileResolver resolves full user profile for entity creation.
+	profileResolver ProfileResolver
+	// floorItemSender sends the room floor item list to one arriving connection.
+	floorItemSender func(ctx context.Context, connID string, roomID int) error
+}
+
+// doorbellEntry tracks a visitor waiting for doorbell approval.
+type doorbellEntry struct {
+	// connID stores the visitor connection identifier.
+	connID string
+	// roomID stores the target room identifier.
+	roomID int
 }
 
 // NewRuntime creates one room realtime runtime instance.
@@ -52,6 +76,7 @@ func NewRuntime(service *roomapplication.Service, entitySvc *roomapplication.Ent
 		service: service, entitySvc: entitySvc, chatSvc: chatSvc,
 		sessions: sessions, transport: transport,
 		logger: logger, connRooms: make(map[string]int),
+		pendingDoorbell: make(map[string]doorbellEntry),
 	}, nil
 }
 
@@ -95,7 +120,60 @@ func (rt *Runtime) findEntityByConnID(connID string, userID int) (*engine.Instan
 	return nil, nil
 }
 
-// Dispose releases per-connection resources.
-func (rt *Runtime) Dispose(connID string) {
+// leaveCurrentRoom removes all entities for connID from its current room and broadcasts each removal.
+// It is safe to call when the connection is not in any room.
+func (rt *Runtime) leaveCurrentRoom(connID string) {
+	userID, ok := rt.userID(connID)
+	if ok {
+		for {
+			inst, entity := rt.findEntityByConnID(connID, userID)
+			if inst == nil || entity == nil {
+				break
+			}
+			reply := make(chan error, 1)
+			inst.Send(engine.Message{Type: engine.MsgLeave, Entity: entity, Reply: reply})
+			<-reply
+			body, encErr := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
+			if encErr == nil {
+				for _, e := range inst.Entities() {
+					if e.Type == domain.EntityPlayer && e.ConnID != "" {
+						_ = rt.transport.Send(e.ConnID, packet.UserRemoveComposerID, body)
+					}
+				}
+			}
+		}
+	}
 	delete(rt.connRooms, connID)
+}
+
+// Dispose releases per-connection resources and removes the entity from its room.
+func (rt *Runtime) Dispose(connID string) {
+	rt.leaveCurrentRoom(connID)
+}
+
+// SetFloorItemSender configures the function used to send floor items on room entry.
+func (rt *Runtime) SetFloorItemSender(fn func(ctx context.Context, connID string, roomID int) error) {
+	rt.floorItemSender = fn
+}
+
+// SetUsernameResolver configures the optional username lookup function.
+func (rt *Runtime) SetUsernameResolver(fn UsernameResolver) {
+	rt.usernameResolver = fn
+}
+
+// SetProfileResolver configures the full user profile lookup function.
+func (rt *Runtime) SetProfileResolver(fn ProfileResolver) {
+	rt.profileResolver = fn
+}
+
+// resolveUsername looks up the display name for a user identifier.
+func (rt *Runtime) resolveUsername(ctx context.Context, userID int) string {
+	if rt.usernameResolver == nil {
+		return fmt.Sprintf("%d", userID)
+	}
+	name, err := rt.usernameResolver(ctx, userID)
+	if err != nil {
+		return fmt.Sprintf("%d", userID)
+	}
+	return name
 }

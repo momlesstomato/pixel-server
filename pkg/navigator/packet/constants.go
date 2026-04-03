@@ -33,6 +33,12 @@ const DeleteSearchPacketID uint16 = 1954
 // SaveSettingsPacketID defines packet identifier for navigator.save_settings (c2s).
 const SaveSettingsPacketID uint16 = 3159
 
+// GetUserEventCatsPacketID defines packet identifier for navigator.get_user_event_cats (c2s).
+const GetUserEventCatsPacketID uint16 = 1782
+
+// NavigatorEventCategoriesPacketID defines packet identifier for navigator.event_categories (s2c).
+const NavigatorEventCategoriesPacketID uint16 = 3244
+
 // NavigatorMetaDataPacketID defines packet identifier for navigator.metadata (s2c).
 const NavigatorMetaDataPacketID uint16 = 3052
 

@@ -1,6 +1,11 @@
 package packet
 
-import "github.com/momlesstomato/pixel-server/core/codec"
+import (
+	"strings"
+
+	"github.com/momlesstomato/pixel-server/core/codec"
+	"github.com/momlesstomato/pixel-server/pkg/room/domain"
+)
 
 // FloorHeightMapComposer sends raw heightmap (s2c 1819).
 type FloorHeightMapComposer struct {
@@ -118,4 +123,168 @@ func (p CantConnectComposer) Encode() ([]byte, error) {
 	w := codec.NewWriter()
 	w.WriteInt32(p.ErrorCode)
 	return w.Bytes(), nil
+}
+
+// GetRoomSettingsPacket decodes client room settings request (c2s 3700).
+type GetRoomSettingsPacket struct {
+	// RoomID stores the room identifier.
+	RoomID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p GetRoomSettingsPacket) PacketID() uint16 { return GetRoomSettingsPacketID }
+
+// Decode parses packet body payload.
+func (p *GetRoomSettingsPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	id, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.RoomID = id
+	return nil
+}
+
+// RoomSettingsSavedComposer confirms room settings were saved (s2c 539).
+type RoomSettingsSavedComposer struct {
+	// RoomID stores the updated room identifier.
+	RoomID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomSettingsSavedComposer) PacketID() uint16 { return RoomSettingsSavedComposerID }
+
+// Encode serializes the save confirmation.
+func (p RoomSettingsSavedComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.RoomID)
+	return w.Bytes(), nil
+}
+
+// RoomSettingsComposer sends full room settings to the owner (s2c 3075).
+type RoomSettingsComposer struct {
+	// Room stores the room aggregate to serialize.
+	Room domain.Room
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomSettingsComposer) PacketID() uint16 { return RoomSettingsComposerID }
+
+// Encode serializes the room settings payload.
+func (p RoomSettingsComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(int32(p.Room.ID))
+	if err := w.WriteString(p.Room.Name); err != nil {
+		return nil, err
+	}
+	if err := w.WriteString(p.Room.Description); err != nil {
+		return nil, err
+	}
+	w.WriteInt32(accessStateToInt(p.Room.State))
+	if err := w.WriteString(p.Room.Password); err != nil {
+		return nil, err
+	}
+	w.WriteInt32(int32(p.Room.MaxUsers))
+	w.WriteInt32(int32(p.Room.CategoryID))
+	if err := w.WriteString(strings.Join(p.Room.Tags, ",")); err != nil {
+		return nil, err
+	}
+	w.WriteInt32(int32(p.Room.TradeMode))
+	w.WriteBool(p.Room.AllowPets)
+	w.WriteBool(p.Room.AllowTrading)
+	w.WriteInt32(int32(p.Room.WallThickness))
+	w.WriteInt32(int32(p.Room.FloorThickness))
+	w.WriteInt32(int32(p.Room.WallHeight))
+	return w.Bytes(), nil
+}
+
+// SaveRoomSettingsPacket decodes client room settings save (c2s 1090).
+type SaveRoomSettingsPacket struct {
+	// RoomID stores the target room identifier.
+	RoomID int32
+	// Name stores the new room display name.
+	Name string
+	// Description stores the new room description.
+	Description string
+	// State stores the new access state integer (0=open, 1=locked, 2=password).
+	State int32
+	// Password stores the new plain-text password (empty when not changing).
+	Password string
+	// MaxUsers stores the new capacity limit.
+	MaxUsers int32
+	// AllowPets stores the new pet permission flag.
+	AllowPets bool
+	// AllowTrading stores the new trading permission flag.
+	AllowTrading bool
+	// TradeMode stores the new trade policy code.
+	TradeMode int32
+	// WallThickness stores new wall thickness value.
+	WallThickness int32
+	// FloorThickness stores new floor thickness value.
+	FloorThickness int32
+	// WallHeight stores new wall height value.
+	WallHeight int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p SaveRoomSettingsPacket) PacketID() uint16 { return SaveRoomSettingsPacketID }
+
+// Decode parses packet body payload.
+func (p *SaveRoomSettingsPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	id, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.RoomID = id
+	if p.Name, err = r.ReadString(); err != nil {
+		return err
+	}
+	if p.Description, err = r.ReadString(); err != nil {
+		return err
+	}
+	if p.State, err = r.ReadInt32(); err != nil {
+		return err
+	}
+	if p.Password, err = r.ReadString(); err != nil {
+		p.Password = ""
+	}
+	if p.MaxUsers, err = r.ReadInt32(); err != nil {
+		p.MaxUsers = 25
+	}
+	p.AllowPets, _ = r.ReadBool()
+	p.AllowTrading, _ = r.ReadBool()
+	p.TradeMode, _ = r.ReadInt32()
+	p.WallThickness, _ = r.ReadInt32()
+	p.FloorThickness, _ = r.ReadInt32()
+	p.WallHeight, _ = r.ReadInt32()
+	return nil
+}
+
+// accessStateToInt converts AccessState to protocol integer representation.
+func accessStateToInt(s domain.AccessState) int32 {
+	switch s {
+	case domain.AccessLocked:
+		return 1
+	case domain.AccessPassword:
+		return 2
+	case domain.AccessInvisible:
+		return 3
+	default:
+		return 0
+	}
+}
+
+// IntToAccessState converts protocol integer to AccessState.
+func IntToAccessState(n int32) domain.AccessState {
+	switch n {
+	case 1:
+		return domain.AccessLocked
+	case 2:
+		return domain.AccessPassword
+	case 3:
+		return domain.AccessInvisible
+	default:
+		return domain.AccessOpen
+	}
 }

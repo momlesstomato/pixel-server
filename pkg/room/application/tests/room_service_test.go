@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func noopBroadcaster(_ int, _ []domain.RoomEntity, _ []byte) {}
@@ -116,4 +117,76 @@ func TestHasRights_Granted(t *testing.T) {
 	svc, _ := application.NewService(newModelRepo(), &banRepoStub{}, rights, mgr, zap.NewNop())
 	assert.True(t, svc.HasRights(context.Background(), 1, 42))
 	assert.False(t, svc.HasRights(context.Background(), 1, 99))
+}
+
+// TestCheckAccess_Open verifies open rooms allow any user entry.
+func TestCheckAccess_Open(t *testing.T) {
+	svc := newService(t)
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessOpen}
+	assert.NoError(t, svc.CheckAccess(context.Background(), room, "", 99))
+}
+
+// TestCheckAccess_OwnerBypass verifies the room owner bypasses all access restrictions.
+func TestCheckAccess_OwnerBypass(t *testing.T) {
+	svc := newService(t)
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessLocked}
+	assert.NoError(t, svc.CheckAccess(context.Background(), room, "", 10))
+}
+
+// TestCheckAccess_Locked_DeniedForNonOwner verifies locked rooms deny non-owners.
+func TestCheckAccess_Locked_DeniedForNonOwner(t *testing.T) {
+	svc := newService(t)
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessLocked}
+	assert.ErrorIs(t, svc.CheckAccess(context.Background(), room, "", 99), domain.ErrAccessDenied)
+}
+
+// TestCheckAccess_Password_Valid verifies valid password admits non-owner entry.
+func TestCheckAccess_Password_Valid(t *testing.T) {
+	svc := newService(t)
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.MinCost)
+	require.NoError(t, err)
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessPassword, Password: string(hash)}
+	assert.NoError(t, svc.CheckAccess(context.Background(), room, "secret", 99))
+}
+
+// TestCheckAccess_Password_Invalid verifies wrong password returns ErrInvalidPassword.
+func TestCheckAccess_Password_Invalid(t *testing.T) {
+	svc := newService(t)
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.MinCost)
+	require.NoError(t, err)
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessPassword, Password: string(hash)}
+	assert.ErrorIs(t, svc.CheckAccess(context.Background(), room, "wrong", 99), domain.ErrInvalidPassword)
+}
+
+// TestFindRoom_NoRepository verifies ErrRoomNotFound when no repository is set.
+func TestFindRoom_NoRepository(t *testing.T) {
+	svc := newService(t)
+	_, err := svc.FindRoom(context.Background(), 1)
+	assert.ErrorIs(t, err, domain.ErrRoomNotFound)
+}
+
+// TestFindRoom_Found verifies room data is returned by the repository.
+func TestFindRoom_Found(t *testing.T) {
+	svc := newService(t)
+	repo := &roomRepoStub{rooms: map[int]domain.Room{1: {ID: 1, Name: "Test"}}}
+	svc.SetRoomRepository(repo)
+	room, err := svc.FindRoom(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Equal(t, "Test", room.Name)
+}
+
+// TestSaveSettings_OwnerCanSave verifies the room owner can update settings.
+func TestSaveSettings_OwnerCanSave(t *testing.T) {
+	svc := newService(t)
+	repo := &roomRepoStub{rooms: map[int]domain.Room{1: {ID: 1, OwnerID: 10}}}
+	svc.SetRoomRepository(repo)
+	assert.NoError(t, svc.SaveSettings(context.Background(), 1, 10, domain.Room{Name: "New"}))
+}
+
+// TestSaveSettings_NonOwnerDenied verifies non-owner cannot update room settings.
+func TestSaveSettings_NonOwnerDenied(t *testing.T) {
+	svc := newService(t)
+	repo := &roomRepoStub{rooms: map[int]domain.Room{1: {ID: 1, OwnerID: 10}}}
+	svc.SetRoomRepository(repo)
+	assert.ErrorIs(t, svc.SaveSettings(context.Background(), 1, 99, domain.Room{Name: "New"}), domain.ErrAccessDenied)
 }

@@ -10,10 +10,13 @@ import (
 	"github.com/momlesstomato/pixel-server/pkg/room/engine"
 	"github.com/momlesstomato/pixel-server/pkg/room/heightmap"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Service defines room application use-cases.
 type Service struct {
+	// rooms stores optional room data persistence.
+	rooms domain.RoomRepository
 	// models stores room model persistence.
 	models domain.ModelRepository
 	// bans stores room ban persistence.
@@ -146,3 +149,48 @@ func (s *Service) HasRights(ctx context.Context, roomID, userID int) bool {
 
 // Manager returns the underlying room instance manager.
 func (s *Service) Manager() *engine.Manager { return s.manager }
+
+// SetRoomRepository configures the optional room data persistence layer.
+func (s *Service) SetRoomRepository(repo domain.RoomRepository) {
+	s.rooms = repo
+}
+
+// FindRoom resolves full room data by identifier.
+func (s *Service) FindRoom(ctx context.Context, roomID int) (domain.Room, error) {
+	if s.rooms == nil {
+		return domain.Room{}, domain.ErrRoomNotFound
+	}
+	return s.rooms.FindByID(ctx, roomID)
+}
+
+// CheckAccess validates whether a requester may enter a room.
+func (s *Service) CheckAccess(_ context.Context, room domain.Room, password string, requesterID int) error {
+	if room.OwnerID == requesterID {
+		return nil
+	}
+	switch room.State {
+	case domain.AccessPassword:
+		if err := bcrypt.CompareHashAndPassword([]byte(room.Password), []byte(password)); err != nil {
+			return domain.ErrInvalidPassword
+		}
+	case domain.AccessLocked:
+		return domain.ErrAccessDenied
+	}
+	return nil
+}
+
+// SaveSettings persists updated room settings after ownership validation.
+func (s *Service) SaveSettings(ctx context.Context, roomID, ownerID int, updated domain.Room) error {
+	if s.rooms == nil {
+		return domain.ErrRoomNotFound
+	}
+	room, err := s.rooms.FindByID(ctx, roomID)
+	if err != nil {
+		return err
+	}
+	if room.OwnerID != ownerID {
+		return domain.ErrAccessDenied
+	}
+	updated.ID = roomID
+	return s.rooms.SaveSettings(ctx, updated)
+}

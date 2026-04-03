@@ -41,30 +41,51 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 		return true, rt.handleStopTyping(connID, userID)
 	case packet.LookToPacketID:
 		return true, rt.handleLookTo(connID, userID, body)
+	case packet.SitPacketID:
+		return true, rt.handleSit(connID, userID)
+	case packet.LetUserInPacketID:
+		return true, rt.handleLetUserIn(ctx, connID, userID, body)
+	case packet.GetRoomSettingsPacketID:
+		return true, rt.handleGetRoomSettings(ctx, connID, userID, body)
+	case packet.SaveRoomSettingsPacketID:
+		return true, rt.handleSaveRoomSettings(ctx, connID, userID, body)
 	default:
 		return false, nil
 	}
 }
 
-// handleOpenFlat processes room entry request.
+// handleOpenFlat processes room entry request, checking access state.
 func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int, body []byte) error {
 	var pkt packet.OpenFlatConnectionPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil
 	}
-	room := domain.Room{ID: int(pkt.RoomID), ModelSlug: "model_a"}
-	if rt.service.CheckBan(ctx, room.ID, userID) {
+	roomID := int(pkt.RoomID)
+	if rt.service.CheckBan(ctx, roomID, userID) {
 		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 4})
+	}
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil {
+		rt.logger.Warn("room lookup failed", zap.Int("room_id", roomID), zap.Error(err))
+		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
+	}
+	if accessErr := rt.service.CheckAccess(ctx, room, pkt.Password, userID); accessErr != nil {
+		if accessErr == domain.ErrInvalidPassword {
+			return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 6})
+		}
+		username := rt.resolveUsername(ctx, userID)
+		return rt.triggerDoorbell(ctx, connID, username, room)
 	}
 	inst, err := rt.service.LoadRoom(ctx, room)
 	if err != nil {
-		rt.logger.Warn("room load failed", zap.Int("room_id", room.ID), zap.Error(err))
+		rt.logger.Warn("room load failed", zap.Int("room_id", roomID), zap.Error(err))
 		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
 	}
 	if err := rt.sendPacket(connID, packet.OpenConnectionComposer{}); err != nil {
 		return err
 	}
-	rt.connRooms[connID] = room.ID
+	rt.leaveCurrentRoom(connID)
+	rt.connRooms[connID] = roomID
 	return rt.sendRoomData(connID, userID, inst, room)
 }
 
@@ -108,7 +129,7 @@ func (rt *Runtime) sendRoomData(connID string, userID int, inst *engine.Instance
 	}); err != nil {
 		return err
 	}
-	hm := heightmap.EncodeFloorMap(inst.Layout.Grid)
+	hm := heightmap.EncodeFloorMapWithDoor(inst.Layout.Grid, inst.Layout.DoorX, inst.Layout.DoorY, inst.Layout.DoorZ)
 	if err := rt.sendPacket(connID, packet.FloorHeightMapComposer{
 		Scale: true, WallHeight: int32(inst.Layout.WallHeight), Heightmap: hm,
 	}); err != nil {
@@ -131,15 +152,31 @@ func (rt *Runtime) sendRoomData(connID string, userID int, inst *engine.Instance
 	}); err != nil {
 		return err
 	}
-	return rt.sendPacket(connID, packet.FurnitureAliasesComposer{})
+	if err := rt.sendPacket(connID, packet.FurnitureAliasesComposer{}); err != nil {
+		return err
+	}
+	if rt.floorItemSender != nil {
+		return rt.floorItemSender(context.Background(), connID, inst.RoomID)
+	}
+	return nil
 }
 
 // sendEntryEntities transmits entity list and enters the user.
+// If the user already has an entity in the room (e.g. duplicate GetRoomEntryData), it skips creation.
 func (rt *Runtime) sendEntryEntities(connID string, userID int, inst *engine.Instance) error {
-	entity := domain.NewPlayerEntity(0, userID, connID, "", "", "", "M",
-		domain.Tile{X: inst.Layout.DoorX, Y: inst.Layout.DoorY, Z: inst.Layout.DoorZ, State: domain.TileOpen})
-	if err := rt.service.EnterRoom(context.Background(), inst, &entity, inst.RoomID, userID); err != nil {
-		return err
+	_, existing := rt.findEntityByConnID(connID, userID)
+	if existing == nil {
+		username, look, motto, gender := "", "", "", "M"
+		if rt.profileResolver != nil {
+			if u, l, m, g, err := rt.profileResolver(context.Background(), userID); err == nil {
+				username, look, motto, gender = u, l, m, g
+			}
+		}
+		entity := domain.NewPlayerEntity(0, userID, connID, username, look, motto, gender,
+			domain.Tile{X: inst.Layout.DoorX, Y: inst.Layout.DoorY, Z: inst.Layout.DoorZ, State: domain.TileOpen})
+		if err := rt.service.EnterRoom(context.Background(), inst, &entity, inst.RoomID, userID); err != nil {
+			return err
+		}
 	}
 	entities := inst.Entities()
 	if err := rt.sendPacket(connID, packet.UsersComposer{Entities: entities}); err != nil {

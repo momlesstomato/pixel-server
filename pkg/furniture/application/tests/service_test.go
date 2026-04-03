@@ -81,3 +81,54 @@ func TestServicePropagatesErrors(t *testing.T) {
 		t.Fatalf("expected delete failure")
 	}
 }
+
+// TestServiceListRoomItemsValidation verifies ListRoomItems rejects non-positive room IDs.
+func TestServiceListRoomItemsValidation(t *testing.T) {
+	service, _ := furnitureapplication.NewService(repositoryStub{})
+	if _, err := service.ListRoomItems(context.Background(), 0); err == nil {
+		t.Fatalf("expected validation failure for zero room id")
+	}
+	if _, err := service.ListRoomItems(context.Background(), -1); err == nil {
+		t.Fatalf("expected validation failure for negative room id")
+	}
+}
+
+// TestServiceListRoomItemsReturnsItems verifies successful room item listing.
+func TestServiceListRoomItemsReturnsItems(t *testing.T) {
+	item := domain.Item{ID: 5, UserID: 1, RoomID: 10, DefinitionID: 1}
+	service, _ := furnitureapplication.NewService(repositoryStub{item: item})
+	items, err := service.ListRoomItems(context.Background(), 10)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("expected one item, got len=%d err=%v", len(items), err)
+	}
+}
+
+// TestServicePickupItemRejectsInvalidID verifies PickupItem rejects non-positive item IDs.
+func TestServicePickupItemRejectsInvalidID(t *testing.T) {
+	service, _ := furnitureapplication.NewService(repositoryStub{})
+	if _, err := service.PickupItem(context.Background(), 0, 1); err == nil {
+		t.Fatalf("expected validation failure for zero item id")
+	}
+}
+
+// TestServicePickupItemRejectsWrongOwner verifies PickupItem rejects non-owner user.
+func TestServicePickupItemRejectsWrongOwner(t *testing.T) {
+	item := domain.Item{ID: 5, UserID: 2, RoomID: 10}
+	service, _ := furnitureapplication.NewService(repositoryStub{item: item})
+	if _, err := service.PickupItem(context.Background(), 5, 1); err == nil {
+		t.Fatalf("expected ownership failure")
+	}
+}
+
+// TestServicePickupItemSuccess verifies PickupItem clears placement for the owner.
+func TestServicePickupItemSuccess(t *testing.T) {
+	item := domain.Item{ID: 5, UserID: 1, RoomID: 10}
+	service, _ := furnitureapplication.NewService(repositoryStub{item: item})
+	result, err := service.PickupItem(context.Background(), 5, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ID != 5 {
+		t.Fatalf("expected item id 5, got %d", result.ID)
+	}
+}

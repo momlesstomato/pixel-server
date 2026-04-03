@@ -24,8 +24,17 @@ func buildRoomServices(runtime *initializer.Runtime, broadcaster engine.EntityBr
 	if err != nil {
 		return nil, err
 	}
+	roomRepo, err := roomstore.NewRoomStore(runtime.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
 	mgr := engine.NewManager(context.Background(), runtime.Logger, broadcaster)
-	return roomapplication.NewService(modelRepo, banRepo, rightsRepo, mgr, runtime.Logger)
+	svc, err := roomapplication.NewService(modelRepo, banRepo, rightsRepo, mgr, runtime.Logger)
+	if err != nil {
+		return nil, err
+	}
+	svc.SetRoomRepository(roomRepo)
+	return svc, nil
 }
 
 // noopEntityBroadcaster is a default no-op broadcaster used before transport wiring.

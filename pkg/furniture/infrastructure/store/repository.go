@@ -46,6 +46,7 @@ func mapItem(row furnituremodel.Item) domain.Item {
 		ID: int(row.ID), UserID: int(row.UserID), RoomID: int(row.RoomID),
 		DefinitionID: int(row.DefinitionID), ExtraData: row.ExtraData,
 		LimitedNumber: row.LimitedNumber, LimitedTotal: row.LimitedTotal,
+		X: row.X, Y: row.Y, Z: row.Z, Dir: row.Dir,
 		CreatedAt: row.CreatedAt,
 	}
 }

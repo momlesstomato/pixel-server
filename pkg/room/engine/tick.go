@@ -11,8 +11,18 @@ import (
 func (inst *Instance) processTick() {
 	inst.processIdleCheck()
 	inst.processEntityMovement()
-	inst.processEntityIdle()
+	newlySlept, kicked := inst.processEntityIdle()
 	inst.broadcastDirtyEntities()
+	for _, e := range newlySlept {
+		if inst.sleepNotifier != nil {
+			inst.sleepNotifier(inst.RoomID, e.VirtualID, true)
+		}
+	}
+	for _, e := range kicked {
+		if inst.kickNotifier != nil {
+			inst.kickNotifier(inst.RoomID, e)
+		}
+	}
 }
 
 // processIdleCheck increments or resets idle counter and triggers unload.
@@ -36,19 +46,35 @@ func (inst *Instance) processEntityMovement() {
 	inst.mu.Lock()
 	defer inst.mu.Unlock()
 	for _, entity := range inst.entities {
-		if !entity.IsWalking || len(entity.Path) == 0 {
-			if entity.IsWalking {
-				entity.IsWalking = false
-				delete(entity.Statuses, "mv")
-				entity.UpdateNeeded = true
+		if !entity.IsWalking && entity.StepFrom != nil {
+			entity.StepFrom = nil
+			delete(entity.Statuses, "mv")
+			if inst.seatChecker != nil && !entity.IsSitting {
+				if h, seatDir, isSit, _ := inst.seatChecker(inst.RoomID, entity.Position.X, entity.Position.Y); isSit {
+					if seatDir%2 != 0 {
+						seatDir--
+					}
+					entity.BodyRotation = seatDir
+					entity.HeadRotation = seatDir
+					entity.Statuses["sit"] = fmt.Sprintf("%.2f", h)
+					entity.IsSitting = true
+					entity.IsSittingAuto = true
+				}
 			}
+			entity.UpdateNeeded = true
+			continue
+		}
+		if !entity.IsWalking || len(entity.Path) == 0 {
 			continue
 		}
 		next := entity.Path[0]
 		entity.Path = entity.Path[1:]
+		prevPos := entity.Position
+		dir := calcRotation(0, 0, next.X, next.Y, prevPos.X, prevPos.Y)
 		entity.Position = next
-		entity.BodyRotation = calcRotation(entity.Position.X-next.X, entity.Position.Y-next.Y, next.X, next.Y, entity.Position.X, entity.Position.Y)
-		entity.HeadRotation = entity.BodyRotation
+		entity.StepFrom = &prevPos
+		entity.BodyRotation = dir
+		entity.HeadRotation = dir
 		entity.Statuses["mv"] = fmt.Sprintf("%d,%d,%g", next.X, next.Y, next.Z)
 		entity.UpdateNeeded = true
 		entity.IsIdle = false
@@ -56,13 +82,13 @@ func (inst *Instance) processEntityMovement() {
 		if len(entity.Path) == 0 {
 			entity.IsWalking = false
 			entity.GoalPosition = nil
-			delete(entity.Statuses, "mv")
 		}
 	}
 }
 
-// processEntityIdle increments idle timers for stationary entities.
-func (inst *Instance) processEntityIdle() {
+// processEntityIdle increments idle timers for stationary entities and returns
+// entities that just fell asleep and entities kicked due to idle timeout.
+func (inst *Instance) processEntityIdle() (newlySlept []domain.RoomEntity, kicked []domain.RoomEntity) {
 	inst.mu.Lock()
 	defer inst.mu.Unlock()
 	for _, entity := range inst.entities {
@@ -70,9 +96,15 @@ func (inst *Instance) processEntityIdle() {
 			continue
 		}
 		entity.IdleTimer++
-		if entity.IdleTimer >= 600 && !entity.IsIdle {
+		if entity.IdleTimer == idleSleepTicks && !entity.IsIdle {
 			entity.IsIdle = true
 			entity.UpdateNeeded = true
+			newlySlept = append(newlySlept, *entity)
+		}
+		if entity.IdleTimer >= idleKickTicks {
+			kicked = append(kicked, *entity)
+			delete(inst.entities, entity.VirtualID)
+			continue
 		}
 		if entity.CarryTimer > 0 {
 			entity.CarryTimer--
@@ -83,6 +115,7 @@ func (inst *Instance) processEntityIdle() {
 			}
 		}
 	}
+	return newlySlept, kicked
 }
 
 // broadcastDirtyEntities sends status updates for changed entities.
@@ -140,6 +173,15 @@ func (inst *Instance) startWalk(entity *domain.RoomEntity, targetX, targetY int)
 	if path == nil {
 		return domain.ErrPathBlocked
 	}
+	if entity.IsSitting {
+		if !entity.IsSittingAuto {
+			entity.Position.Z += 0.35
+		}
+		entity.IsSitting = false
+		entity.IsSittingAuto = false
+		delete(entity.Statuses, "sit")
+	}
+	delete(entity.Statuses, "lay")
 	entity.Path = path
 	entity.GoalPosition = &domain.Tile{X: targetX, Y: targetY}
 	entity.IsWalking = true

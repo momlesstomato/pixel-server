@@ -50,3 +50,52 @@ func (rt *Runtime) broadcastToRoom(roomID int, pkt interface {
 		}
 	}
 }
+
+// OnSleep broadcasts a sleep state change for one entity to all room players.
+func (rt *Runtime) OnSleep(roomID int, virtualID int, sleeping bool) {
+	rt.broadcastToRoom(roomID, packet.SleepComposer{VirtualID: int32(virtualID), IsAsleep: sleeping})
+}
+
+// BroadcastRawToRoom sends an already-encoded payload to all player entities in a room.
+func (rt *Runtime) BroadcastRawToRoom(roomID int, packetID uint16, body []byte) {
+	inst, ok := rt.service.Manager().Get(roomID)
+	if !ok {
+		return
+	}
+	for _, entity := range inst.Entities() {
+		if entity.Type != domain.EntityPlayer || entity.ConnID == "" {
+			continue
+		}
+		if err := rt.transport.Send(entity.ConnID, packetID, body); err != nil {
+			rt.logger.Warn("broadcast raw to room failed", zap.String("conn_id", entity.ConnID), zap.Error(err))
+		}
+	}
+}
+
+// ConnRoomID returns the room identifier for a given connection, if present.
+func (rt *Runtime) ConnRoomID(connID string) (int, bool) {
+	id, ok := rt.connRooms[connID]
+	return id, ok
+}
+
+// OnKick broadcasts entity removal for one auto-kicked entity and removes connection tracking.
+func (rt *Runtime) OnKick(roomID int, entity domain.RoomEntity) {
+	inst, ok := rt.service.Manager().Get(roomID)
+	if !ok {
+		return
+	}
+	body, err := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
+	if err != nil {
+		rt.logger.Warn("encode kick packet failed", zap.Error(err))
+		return
+	}
+	for _, e := range inst.Entities() {
+		if e.Type != domain.EntityPlayer || e.ConnID == "" {
+			continue
+		}
+		if err := rt.transport.Send(e.ConnID, packet.UserRemoveComposerID, body); err != nil {
+			rt.logger.Warn("send kick packet failed", zap.String("conn_id", e.ConnID), zap.Error(err))
+		}
+	}
+	delete(rt.connRooms, entity.ConnID)
+}

@@ -36,6 +36,9 @@ type RoomEntity struct {
 	GoalPosition *Tile
 	// Path stores the remaining walk path steps.
 	Path []Tile
+	// StepFrom stores the tile the entity stepped from in the current movement tick.
+	// It is used as the broadcast position for smooth client-side walk animation.
+	StepFrom *Tile
 	// BodyRotation stores facing direction (0-7).
 	BodyRotation int
 	// HeadRotation stores head facing direction (0-7).
@@ -56,6 +59,10 @@ type RoomEntity struct {
 	CarryItem int
 	// CarryTimer stores remaining carry ticks before drop.
 	CarryTimer int
+	// IsSitting reports whether the entity is currently sitting.
+	IsSitting bool
+	// IsSittingAuto reports whether the current sit was applied automatically by furniture (no Z adjustment).
+	IsSittingAuto bool
 	// UpdateNeeded marks the entity for broadcast this tick.
 	UpdateNeeded bool
 }

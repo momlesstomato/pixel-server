@@ -71,6 +71,16 @@ func (r repoStub) TransferItem(_ context.Context, _ int, _ int) error { return n
 // CountItemsByUserID returns zero.
 func (r repoStub) CountItemsByUserID(_ context.Context, _ int) (int, error) { return 0, nil }
 
+// PlaceItem returns nil (no-op placement for tests).
+func (r repoStub) PlaceItem(_ context.Context, _ int, _ int, _ int, _ int, _ float64, _ int) error {
+	return nil
+}
+
+// ListItemsByRoomID returns deterministic items placed in a room.
+func (r repoStub) ListItemsByRoomID(_ context.Context, _ int) ([]furnituredomain.Item, error) {
+	return r.items, nil
+}
+
 // sessionStub provides deterministic authenticated session lookup.
 type sessionStub struct{}
 

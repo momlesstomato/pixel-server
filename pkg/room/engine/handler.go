@@ -26,6 +26,8 @@ func (inst *Instance) handleMessage(msg Message) {
 		err = inst.handleTyping(msg)
 	case MsgLookTo:
 		err = inst.handleLookTo(msg)
+	case MsgSit:
+		err = inst.handleSit(msg)
 	case MsgStop:
 		inst.handleStop()
 		return
@@ -125,6 +127,7 @@ func (inst *Instance) handleDance(msg Message) error {
 	} else {
 		delete(entity.Statuses, "dance")
 	}
+	resetEntityIdle(entity)
 	entity.UpdateNeeded = true
 	return nil
 }
@@ -143,6 +146,7 @@ func (inst *Instance) handleSign(msg Message) error {
 	entity.CarryItem = msg.IntValue
 	entity.CarryTimer = 5
 	entity.Statuses["sign"] = fmt.Sprintf("%d", msg.IntValue)
+	resetEntityIdle(entity)
 	entity.UpdateNeeded = true
 	return nil
 }
@@ -163,6 +167,7 @@ func (inst *Instance) handleTyping(msg Message) error {
 	} else {
 		delete(entity.Statuses, "trd")
 	}
+	resetEntityIdle(entity)
 	entity.UpdateNeeded = true
 	return nil
 }
@@ -179,6 +184,7 @@ func (inst *Instance) handleLookTo(msg Message) error {
 		return domain.ErrEntityNotFound
 	}
 	entity.HeadRotation = calcRotation(0, 0, msg.TargetX, msg.TargetY, entity.Position.X, entity.Position.Y)
+	resetEntityIdle(entity)
 	entity.UpdateNeeded = true
 	return nil
 }
@@ -191,4 +197,43 @@ func (inst *Instance) handleStop() {
 	if inst.cancel != nil {
 		inst.cancel()
 	}
+}
+
+// handleSit toggles the entity sit posture on or off.
+func (inst *Instance) handleSit(msg Message) error {
+	if msg.Entity == nil {
+		return domain.ErrEntityNotFound
+	}
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	entity, ok := inst.entities[msg.Entity.VirtualID]
+	if !ok {
+		return domain.ErrEntityNotFound
+	}
+	if entity.IsWalking {
+		return nil
+	}
+	if !entity.IsSitting {
+		if entity.BodyRotation%2 != 0 {
+			entity.BodyRotation--
+		}
+		entity.Statuses["sit"] = "1.0"
+		entity.Position.Z -= 0.35
+		entity.IsSitting = true
+		entity.IsSittingAuto = false
+	} else {
+		entity.Position.Z += 0.35
+		delete(entity.Statuses, "sit")
+		entity.IsSitting = false
+		entity.IsSittingAuto = false
+	}
+	resetEntityIdle(entity)
+	entity.UpdateNeeded = true
+	return nil
+}
+
+// resetEntityIdle clears idle and sleep state for an entity that performed an action.
+func resetEntityIdle(entity *domain.RoomEntity) {
+	entity.IdleTimer = 0
+	entity.IsIdle = false
 }

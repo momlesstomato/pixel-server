@@ -67,6 +67,32 @@ func (store *Store) TransferItem(ctx context.Context, itemID int, newUserID int)
 	return nil
 }
 
+// PlaceItem updates item room placement coordinates.
+func (store *Store) PlaceItem(ctx context.Context, itemID int, roomID int, x int, y int, z float64, dir int) error {
+	result := store.database.WithContext(ctx).Model(&furnituremodel.Item{}).Where("id = ?", itemID).
+		Updates(map[string]interface{}{"room_id": roomID, "x": x, "y": y, "z": z, "dir": dir})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrItemNotFound
+	}
+	return nil
+}
+
+// ListItemsByRoomID resolves all placed items in one room.
+func (store *Store) ListItemsByRoomID(ctx context.Context, roomID int) ([]domain.Item, error) {
+	var rows []furnituremodel.Item
+	if err := store.database.WithContext(ctx).Where("room_id = ? AND room_id > 0", roomID).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	result := make([]domain.Item, len(rows))
+	for i, row := range rows {
+		result[i] = mapItem(row)
+	}
+	return result, nil
+}
+
 // CountItemsByUserID returns item count for one user inventory.
 func (store *Store) CountItemsByUserID(ctx context.Context, userID int) (int, error) {
 	var count int64

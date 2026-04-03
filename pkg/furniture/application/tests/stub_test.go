@@ -81,3 +81,13 @@ func (s repositoryStub) TransferItem(_ context.Context, _ int, _ int) error {
 func (s repositoryStub) CountItemsByUserID(_ context.Context, _ int) (int, error) {
 	return 5, nil
 }
+
+// PlaceItem returns nil (no-op placement for tests).
+func (s repositoryStub) PlaceItem(_ context.Context, _ int, _ int, _ int, _ int, _ float64, _ int) error {
+	return nil
+}
+
+// ListItemsByRoomID returns deterministic items placed in a room.
+func (s repositoryStub) ListItemsByRoomID(_ context.Context, _ int) ([]domain.Item, error) {
+	return []domain.Item{s.item}, s.findErr
+}

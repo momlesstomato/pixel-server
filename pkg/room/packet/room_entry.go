@@ -69,3 +69,69 @@ func (p RoomReadyComposer) Encode() ([]byte, error) {
 	w.WriteInt32(p.RoomID)
 	return w.Bytes(), nil
 }
+
+// DoorbellComposer notifies room owner of a visitor at the door (s2c 2068).
+type DoorbellComposer struct {
+	// Username stores the visitor display name.
+	Username string
+}
+
+// PacketID returns the protocol packet identifier.
+func (p DoorbellComposer) PacketID() uint16 { return DoorbellComposerID }
+
+// Encode serializes the doorbell notification.
+func (p DoorbellComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	if err := w.WriteString(p.Username); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+// FlatAccessibleComposer informs a visitor of entry approval result (s2c 735).
+type FlatAccessibleComposer struct {
+	// Username stores the approved visitor display name.
+	Username string
+	// Accessible reports whether entry was approved.
+	Accessible bool
+}
+
+// PacketID returns the protocol packet identifier.
+func (p FlatAccessibleComposer) PacketID() uint16 { return FlatAccessibleComposerID }
+
+// Encode serializes the flat access result.
+func (p FlatAccessibleComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	if err := w.WriteString(p.Username); err != nil {
+		return nil, err
+	}
+	w.WriteBool(p.Accessible)
+	return w.Bytes(), nil
+}
+
+// LetUserInPacket decodes room owner doorbell approval (c2s 1781).
+type LetUserInPacket struct {
+	// Username stores the visitor display name to approve or deny.
+	Username string
+	// Let reports whether the visitor is approved.
+	Let bool
+}
+
+// PacketID returns the protocol packet identifier.
+func (p LetUserInPacket) PacketID() uint16 { return LetUserInPacketID }
+
+// Decode parses packet body payload.
+func (p *LetUserInPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	name, err := r.ReadString()
+	if err != nil {
+		return err
+	}
+	p.Username = name
+	let, err := r.ReadBool()
+	if err != nil {
+		return err
+	}
+	p.Let = let
+	return nil
+}

@@ -20,6 +20,12 @@ type Manager struct {
 	logger *zap.Logger
 	// broadcaster stores the entity broadcast callback.
 	broadcaster EntityBroadcaster
+	// sleepNotifier stores the callback for entity sleep transitions.
+	sleepNotifier SleepNotifier
+	// kickNotifier stores the callback for entity idle kick events.
+	kickNotifier KickNotifier
+	// seatChecker stores the furniture seat lookup callback.
+	seatChecker TileSeatChecker
 }
 
 // NewManager creates a room instance manager.
@@ -42,6 +48,9 @@ func (m *Manager) Load(roomID int, layout domain.Layout) *Instance {
 		}
 	}
 	inst := NewInstance(roomID, layout, m.logger, m.broadcaster)
+	inst.SetSleepNotifier(m.sleepNotifier)
+	inst.SetKickNotifier(m.kickNotifier)
+	inst.SetTileSeatChecker(m.seatChecker)
 	inst.Start(m.ctx)
 	m.rooms[roomID] = inst
 	m.logger.Info("room loaded", zap.Int("room_id", roomID))
@@ -102,6 +111,27 @@ func (m *Manager) SetBroadcaster(bc EntityBroadcaster) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.broadcaster = bc
+}
+
+// SetSleepNotifier configures the sleep transition callback for all new instances.
+func (m *Manager) SetSleepNotifier(n SleepNotifier) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sleepNotifier = n
+}
+
+// SetKickNotifier configures the idle kick callback for all new instances.
+func (m *Manager) SetKickNotifier(n KickNotifier) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.kickNotifier = n
+}
+
+// SetTileSeatChecker configures the furniture seat checker for all new instances.
+func (m *Manager) SetTileSeatChecker(fn TileSeatChecker) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.seatChecker = fn
 }
 
 // Cleanup removes stopped instances from the registry.

@@ -20,7 +20,7 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 	case packet.InitNavigatorPacketID:
 		return true, runtime.handleInit(ctx, connID, userID)
 	case packet.SearchRoomsPacketID:
-		return true, runtime.handleSearch(ctx, connID, body)
+		return true, runtime.handleSearch(ctx, connID, userID, body)
 	case packet.GetGuestRoomPacketID:
 		return true, runtime.handleGetGuestRoom(ctx, connID, body)
 	case packet.GetFlatCategoriesPacketID:
@@ -37,6 +37,8 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 		return true, runtime.handleSaveSearch(ctx, connID, userID, body)
 	case packet.DeleteSearchPacketID:
 		return true, runtime.handleDeleteSearch(ctx, connID, userID, body)
+	case packet.GetUserEventCatsPacketID:
+		return true, runtime.handleGetEventCats(connID)
 	case packet.SaveSettingsPacketID:
 		return true, nil
 	default:
@@ -69,9 +71,13 @@ func (runtime *Runtime) handleInit(ctx context.Context, connID string, userID in
 }
 
 // handleSearch responds with room search results.
-func (runtime *Runtime) handleSearch(ctx context.Context, connID string, body []byte) error {
+func (runtime *Runtime) handleSearch(ctx context.Context, connID string, userID int, body []byte) error {
 	searchCode, filter := parseSearchParams(body)
-	rooms, _, err := runtime.service.ListRooms(ctx, domain.RoomFilter{SearchQuery: filter, Limit: 50})
+	roomFilter := domain.RoomFilter{SearchQuery: filter, Limit: 50}
+	if searchCode == "myworld_view" {
+		roomFilter.OwnerID = &userID
+	}
+	rooms, _, err := runtime.service.ListRooms(ctx, roomFilter)
 	if err != nil {
 		runtime.logger.Error("search rooms failed", zap.String("code", searchCode), zap.Error(err))
 		return nil
@@ -80,6 +86,11 @@ func (runtime *Runtime) handleSearch(ctx context.Context, connID string, body []
 	return runtime.sendPacket(connID, packet.NavigatorSearchResultsPacket{
 		SearchCode: searchCode, Filter: filter, Results: []packet.SearchResultBlock{block},
 	})
+}
+
+// handleGetEventCats responds with an empty event categories list.
+func (runtime *Runtime) handleGetEventCats(connID string) error {
+	return runtime.sendPacket(connID, packet.NavigatorEventCategoriesPacket{})
 }
 
 // handleGetFlatCategories responds with room category list.

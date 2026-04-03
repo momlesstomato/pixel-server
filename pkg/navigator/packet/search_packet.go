@@ -67,7 +67,7 @@ func encodeSearchBlock(w *codec.Writer, block SearchResultBlock) error {
 	w.WriteInt32(block.ViewMode)
 	w.WriteInt32(int32(len(block.Rooms)))
 	for _, room := range block.Rooms {
-		if err := EncodeRoomData(w, room, false); err != nil {
+		if err := EncodeRoomData(w, room); err != nil {
 			return err
 		}
 	}
@@ -88,15 +88,28 @@ func (p GuestRoomDataPacket) PacketID() uint16 { return GuestRoomDataPacketID }
 // Encode serializes guest room data into packet body.
 func (p GuestRoomDataPacket) Encode() ([]byte, error) {
 	w := codec.NewWriter()
-	if err := EncodeRoomData(w, p.Room, true); err != nil {
+	w.WriteBool(false)
+	if err := EncodeRoomData(w, p.Room); err != nil {
 		return nil, err
 	}
 	w.WriteBool(p.Forward)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteInt32(0)
+	w.WriteInt32(1)
+	w.WriteInt32(1)
+	w.WriteBool(false)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(1)
+	w.WriteInt32(14)
+	w.WriteInt32(1)
 	return w.Bytes(), nil
 }
 
 // EncodeRoomData writes room fields to a codec writer.
-func EncodeRoomData(w *codec.Writer, room domain.Room, extended bool) error {
+func EncodeRoomData(w *codec.Writer, room domain.Room) error {
 	w.WriteInt32(int32(room.ID))
 	if err := w.WriteString(room.Name); err != nil {
 		return err
@@ -121,9 +134,7 @@ func EncodeRoomData(w *codec.Writer, room domain.Room, extended bool) error {
 			return err
 		}
 	}
-	if extended {
-		encodeRoomExtended(w, room)
-	}
+	w.WriteInt32(8)
 	return nil
 }
 
@@ -139,18 +150,4 @@ func stateToInt(state string) int32 {
 	default:
 		return 0
 	}
-}
-
-// encodeRoomExtended writes additional room fields for extended view.
-func encodeRoomExtended(w *codec.Writer, room domain.Room) {
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteBool(false)
-	w.WriteBool(false)
-	w.WriteBool(false)
-	w.WriteBool(false)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
 }

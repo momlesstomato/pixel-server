@@ -603,10 +603,10 @@ Following the cancellable mutation event pattern:
 | `RoomEntered` | After user enters | No | `sdk/events/room/room_entered.go` |
 | `RoomLeaving` | Before user leaves | Yes | `sdk/events/room/room_leaving.go` |
 | `RoomLeft` | After user leaves | No | `sdk/events/room/room_left.go` |
-| `EntityMoving` | Before walk step | Yes | `sdk/events/room/entity_moving.go` |
-| `EntityMoved` | After walk step | No | `sdk/events/room/entity_moved.go` |
-| `ChatSending` | Before chat | Yes | `sdk/events/room/chat_sending.go` |
-| `ChatSent` | After chat | No | `sdk/events/room/chat_sent.go` |
+| `EntityMoving` | Before walk step | Yes | `sdk/events/room/entity/entity_moving.go` |
+| `EntityMoved` | After walk step | No | `sdk/events/room/entity/entity_moved.go` |
+| `ChatSending` | Before chat | Yes | `sdk/events/room/chat/chat_sending.go` |
+| `ChatSent` | After chat | No | `sdk/events/room/chat/chat_sent.go` |
 
 ---
 
@@ -699,7 +699,7 @@ Following the cancellable mutation event pattern:
 
 ### Milestone 10.5 — Entities, Walking & Chat
 
-**Status:** ✅ COMPLETED (sitting/laying and idle system deferred)
+**Status:** ✅ COMPLETED (sitting/laying and carry item deferred)
 **Packages:** `pkg/room/application/`, `pkg/room/packet/`, SDK events
 
 | Task | Details | Status |
@@ -710,7 +710,7 @@ Following the cancellable mutation event pattern:
 | Chat service | Talk (proximity), shout (room-wide), whisper (targeted) | ✅ Done |
 | Chat flood | Counter per entity, mute penalty | ✅ Done |
 | Actions | Dance, wave, sign, carry, typing indicator | ✅ Done (carry deferred) |
-| Idle system | Timer → sleep animation → kick after extended idle | ⏳ Deferred |
+| Idle system | Timer → sleep animation → kick after extended idle | ✅ Done |
 | SDK events | EntityMoving/Moved, ChatSending/ChatSent | ✅ Done |
 
 ### Milestone 10.6 — E2E Tests & Integration
@@ -725,7 +725,7 @@ Following the cancellable mutation event pattern:
 | Walking E2E | Walk to tile | ✅ Done |
 | Chat E2E | Talk proximity, shout | ✅ Done |
 | Lifecycle E2E | Enter, leave, verify empty | ✅ Done |
-| Password/doorbell E2E | Locked room access flows | ⏳ Deferred |
+| Password/doorbell E2E | Locked room access flows | ✅ Done |
 
 ---
 
@@ -743,17 +743,17 @@ Following the cancellable mutation event pattern:
 | 6 | `RoomEntryTile` | 1664 | S2C | 10.4 | ✅ |
 | 7 | `RoomVisualizationSettings` | — | S2C | 10.4 | ⏳ Deferred |
 | 8 | `CloseConnection` | 726 | S2C | 10.4 | ✅ |
-| 9 | `GetRoomSettings` | — | C2S | 10.4 | ⏳ Deferred |
-| 10 | `RoomSettings` | — | S2C | 10.4 | ⏳ Deferred |
-| 11 | `SaveRoomSettings` | — | C2S | 10.4 | ⏳ Deferred |
+| 9 | `GetRoomSettings` | 3700 | C2S | 10.4 | ✅ |
+| 10 | `RoomSettings` | 3075 | S2C | 10.4 | ✅ |
+| 11 | `SaveRoomSettings` | 1090 | C2S | 10.4 | ✅ |
 
 ### Room Access
 
 | # | Packet | ID (est.) | Dir | Milestone | Status |
 |---|--------|-----------|-----|-----------|--------|
 | 12 | `DoorbellRinging` | 2068 | S2C | 10.4 | ✅ |
-| 13 | `DoorbellAddUser` | — | S2C | 10.4 | ⏳ Deferred |
-| 14 | `LetUserIn` | — | C2S | 10.4 | ⏳ Deferred |
+| 13 | `DoorbellAddUser` | — | S2C | 10.4 | ✅ |
+| 14 | `LetUserIn` | — | C2S | 10.4 | ✅ |
 | 15 | `FlatAccessDenied` | 735 | S2C | 10.4 | ✅ |
 | 16 | `RoomEnterError` | 200 | S2C | 10.4 | ✅ |
 

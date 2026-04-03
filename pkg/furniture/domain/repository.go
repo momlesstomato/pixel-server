@@ -26,6 +26,10 @@ type Repository interface {
 	DeleteItem(context.Context, int) error
 	// TransferItem changes item ownership atomically.
 	TransferItem(ctx context.Context, itemID int, newUserID int) error
+	// PlaceItem updates item room placement coordinates.
+	PlaceItem(ctx context.Context, itemID int, roomID int, x int, y int, z float64, dir int) error
+	// ListItemsByRoomID resolves all placed items in one room.
+	ListItemsByRoomID(context.Context, int) ([]Item, error)
 	// CountItemsByUserID returns item count for one user inventory.
 	CountItemsByUserID(context.Context, int) (int, error)
 }

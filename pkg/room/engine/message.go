@@ -24,6 +24,8 @@ const (
 	MsgTyping
 	// MsgLookTo rotates entity head toward a coordinate.
 	MsgLookTo
+	// MsgSit toggles entity sit posture.
+	MsgSit
 	// MsgStop forces a graceful room shutdown.
 	MsgStop
 )

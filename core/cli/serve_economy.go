@@ -106,32 +106,32 @@ func buildEconomyServices(runtime *initializer.Runtime) (*economyServiceBundle, 
 }
 
 // buildEconomyRuntimes creates economy-realm realtime runtimes for packet dispatch.
-func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.SessionRegistry, transport *handshakerealtime.Transport, logger *zap.Logger) ([]handshakerealtime.UserRuntime, error) {
+func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.SessionRegistry, transport *handshakerealtime.Transport, logger *zap.Logger) (*furniturerealtime.Runtime, []handshakerealtime.UserRuntime, error) {
 	frt, err := furniturerealtime.NewRuntime(bundle.furniture, sessions, transport, logger)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	irt, err := inventoryrealtime.NewRuntime(bundle.inventory, sessions, transport, logger)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	crt, err := catalogrealtime.NewRuntime(bundle.catalog, sessions, transport, logger)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ert, err := economyrealtime.NewRuntime(bundle.economy, sessions, transport, logger)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	srt, err := subscriptionrealtime.NewRuntime(bundle.subscription, sessions, transport, logger)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	nrt, err := navigatorrealtime.NewRuntime(bundle.navigator, sessions, transport, logger)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return []handshakerealtime.UserRuntime{frt, irt, crt, ert, srt, nrt}, nil
+	return frt, []handshakerealtime.UserRuntime{frt, irt, crt, ert, srt, nrt}, nil
 }
 
 // mergeOpenAPIPaths combines multiple OpenAPI path maps.

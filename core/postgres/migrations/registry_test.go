@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSteps verifies migration step registry contents.
 func TestRegistryReturnsOrderedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 38 {
-		t.Fatalf("expected 38 migration steps, got %d", len(steps))
+	if len(steps) != 47 {
+		t.Fatalf("expected 47 migration steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260314_01_permission_groups" {
 		t.Fatalf("unexpected migration step metadata")
@@ -69,6 +69,30 @@ func TestRegistryReturnsOrderedSteps(t *testing.T) {
 		t.Fatalf("unexpected migration step metadata")
 	}
 	if steps[37] == nil || steps[37].ID != "20260325_14_club_offers" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[38] == nil || steps[38].ID != "20260325_13_navigator_categories" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[39] == nil || steps[39].ID != "20260325_14_rooms" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[40] == nil || steps[40].ID != "20260325_15_navigator_saved_searches" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[41] == nil || steps[41].ID != "20260325_16_navigator_favourites" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[42] == nil || steps[42].ID != "20260401_01_room_models" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[43] == nil || steps[43].ID != "20260401_02_room_extension" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[44] == nil || steps[44].ID != "20260401_03_room_bans" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[45] == nil || steps[45].ID != "20260401_04_room_rights" {
 		t.Fatalf("unexpected migration step metadata")
 	}
 }

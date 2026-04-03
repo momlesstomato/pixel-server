@@ -18,6 +18,14 @@ type Item struct {
 	LimitedNumber int `gorm:"not null;default:0"`
 	// LimitedTotal stores the limited edition total print run.
 	LimitedTotal int `gorm:"not null;default:0"`
+	// X stores the placed tile horizontal coordinate.
+	X int `gorm:"not null;default:0"`
+	// Y stores the placed tile vertical coordinate.
+	Y int `gorm:"not null;default:0"`
+	// Z stores the placed tile height offset.
+	Z float64 `gorm:"type:numeric(6,3);not null;default:0"`
+	// Dir stores the placed rotation direction (0-7).
+	Dir int `gorm:"not null;default:0"`
 	// CreatedAt stores row creation timestamp.
 	CreatedAt time.Time
 	// UpdatedAt stores row update timestamp.

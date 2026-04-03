@@ -81,7 +81,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			return nil, err
 		}
 		runtimes := []handshakerealtime.UserRuntime{userRT, msgRT}
-		ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, runtime.Logger)
+		furnitureRT, ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, runtime.Logger)
 		if err != nil {
 			return nil, err
 		}
@@ -91,6 +91,33 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			return nil, err
 		}
 		services.room.Manager().SetBroadcaster(roomRT.Broadcast)
+		services.room.Manager().SetSleepNotifier(roomRT.OnSleep)
+		services.room.Manager().SetKickNotifier(roomRT.OnKick)
+		furnitureRT.SetRoomFinder(roomRT.ConnRoomID)
+		furnitureRT.SetRoomBroadcaster(roomRT.BroadcastRawToRoom)
+		furnitureRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
+			user, err := services.users.FindByID(ctx, userID)
+			if err != nil {
+				return "", err
+			}
+			return user.Username, nil
+		})
+		roomRT.SetFloorItemSender(furnitureRT.SendRoomFloorItems)
+		services.room.Manager().SetTileSeatChecker(furnitureRT.TileSeatCheckerFor)
+		roomRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
+			user, err := services.users.FindByID(ctx, userID)
+			if err != nil {
+				return "", err
+			}
+			return user.Username, nil
+		})
+		roomRT.SetProfileResolver(func(ctx context.Context, userID int) (string, string, string, string, error) {
+			user, err := services.users.FindByID(ctx, userID)
+			if err != nil {
+				return "", "", "", "M", err
+			}
+			return user.Username, user.Figure, user.Motto, user.Gender, nil
+		})
 		runtimes = append(runtimes, roomRT)
 		return &compositeRuntime{runtimes: runtimes}, nil
 	})

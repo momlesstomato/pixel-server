@@ -73,3 +73,18 @@ func (m *rightsRepoStub) ListRightsByRoom(_ context.Context, _ int) ([]int, erro
 
 // RevokeAllRights removes all rights for one room.
 func (m *rightsRepoStub) RevokeAllRights(_ context.Context, _ int) error { return nil }
+
+// roomRepoStub provides deterministic room data persistence for tests.
+type roomRepoStub struct{ rooms map[int]domain.Room }
+
+// FindByID resolves one room record by identifier.
+func (s *roomRepoStub) FindByID(_ context.Context, id int) (domain.Room, error) {
+	r, ok := s.rooms[id]
+	if !ok {
+		return domain.Room{}, domain.ErrRoomNotFound
+	}
+	return r, nil
+}
+
+// SaveSettings persists updated room settings.
+func (s *roomRepoStub) SaveSettings(_ context.Context, _ domain.Room) error { return nil }

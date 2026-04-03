@@ -71,3 +71,19 @@ func Step02Items() *gormigrate.Migration {
 		},
 	}
 }
+
+// Step05AddItemPlacement returns the migration that adds placement columns to the items table.
+func Step05AddItemPlacement() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260403_01_add_item_placement",
+		Migrate: func(database *gorm.DB) error {
+			return database.AutoMigrate(&furnituremodel.Item{})
+		},
+		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
+			return database.Exec(`ALTER TABLE items DROP COLUMN IF EXISTS x, DROP COLUMN IF EXISTS y, DROP COLUMN IF EXISTS z, DROP COLUMN IF EXISTS dir`).Error
+		},
+	}
+}

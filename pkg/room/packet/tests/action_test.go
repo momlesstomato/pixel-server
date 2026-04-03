@@ -97,3 +97,17 @@ func TestSleepComposer_Encode(t *testing.T) {
 	assert.NotEmpty(t, body)
 	assert.Equal(t, packet.SleepComposerID, pkt.PacketID())
 }
+
+// TestActionComposer_Encode verifies action composer serialization.
+func TestActionComposer_Encode(t *testing.T) {
+	pkt := packet.ActionComposer{VirtualID: 5, ActionID: 1}
+	body, err := pkt.Encode()
+	require.NoError(t, err)
+	assert.NotEmpty(t, body)
+	assert.Equal(t, packet.ActionComposerID, pkt.PacketID())
+}
+
+// TestActionComposerID verifies the protocol constant.
+func TestActionComposerID(t *testing.T) {
+	assert.Equal(t, uint16(1631), packet.ActionComposerID)
+}

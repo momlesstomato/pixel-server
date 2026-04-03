@@ -134,3 +134,49 @@ func (service *Service) DeleteItem(ctx context.Context, id int) error {
 	}
 	return service.repository.DeleteItem(ctx, id)
 }
+
+// PlaceFloorItem moves an owned inventory item into a room at the given coordinates.
+// It validates ownership and returns the updated item after placement.
+func (service *Service) PlaceFloorItem(ctx context.Context, itemID int, userID int, roomID int, x int, y int, dir int) (domain.Item, error) {
+	if itemID <= 0 {
+		return domain.Item{}, fmt.Errorf("item id must be positive")
+	}
+	item, err := service.repository.FindItemByID(ctx, itemID)
+	if err != nil {
+		return domain.Item{}, err
+	}
+	if item.UserID != userID {
+		return domain.Item{}, domain.ErrItemNotFound
+	}
+	if err := service.repository.PlaceItem(ctx, itemID, roomID, x, y, 0, dir); err != nil {
+		return domain.Item{}, err
+	}
+	return service.repository.FindItemByID(ctx, itemID)
+}
+
+// ListRoomItems resolves all placed items in one room.
+func (service *Service) ListRoomItems(ctx context.Context, roomID int) ([]domain.Item, error) {
+	if roomID <= 0 {
+		return nil, fmt.Errorf("room id must be positive")
+	}
+	return service.repository.ListItemsByRoomID(ctx, roomID)
+}
+
+// PickupItem removes an owned placed item from a room and returns it to inventory.
+// It validates ownership and clears all placement coordinates.
+func (service *Service) PickupItem(ctx context.Context, itemID int, userID int) (domain.Item, error) {
+	if itemID <= 0 {
+		return domain.Item{}, fmt.Errorf("item id must be positive")
+	}
+	item, err := service.repository.FindItemByID(ctx, itemID)
+	if err != nil {
+		return domain.Item{}, err
+	}
+	if item.UserID != userID {
+		return domain.Item{}, domain.ErrItemNotFound
+	}
+	if err := service.repository.PlaceItem(ctx, itemID, 0, 0, 0, 0, 0); err != nil {
+		return domain.Item{}, err
+	}
+	return service.repository.FindItemByID(ctx, itemID)
+}

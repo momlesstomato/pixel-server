@@ -14,6 +14,22 @@ const channelBuffer = 256
 const idleUnloadTicks = 120
 const lagThreshold = 30
 
+// idleSleepTicks is the number of ticks before an entity enters sleep state (300s).
+const idleSleepTicks = 600
+
+// idleKickTicks is the number of ticks before an idle entity is auto-kicked (1800s).
+const idleKickTicks = 1800
+
+// SleepNotifier is called when an entity enters or exits sleep state.
+type SleepNotifier func(roomID int, virtualID int, sleeping bool)
+
+// KickNotifier is called when an entity is auto-kicked due to idle timeout.
+type KickNotifier func(roomID int, entity domain.RoomEntity)
+
+// TileSeatChecker checks whether a tile has sittable or layable furniture.
+// Returns the seat height, furniture direction, whether sitting and whether laying are possible.
+type TileSeatChecker func(roomID, x, y int) (height float64, dir int, canSit, canLay bool)
+
 // RoomState identifies the lifecycle phase of a room instance.
 type RoomState int
 
@@ -57,6 +73,12 @@ type Instance struct {
 	logger *zap.Logger
 	// broadcaster sends updates to connected clients.
 	broadcaster EntityBroadcaster
+	// sleepNotifier is called when an entity transitions to or from sleep.
+	sleepNotifier SleepNotifier
+	// kickNotifier is called when an entity is auto-kicked due to idle timeout.
+	kickNotifier KickNotifier
+	// seatChecker checks whether a tile has sittable or layable furniture.
+	seatChecker TileSeatChecker
 }
 
 // NewInstance creates one room instance ready to start.
@@ -93,6 +115,21 @@ func (inst *Instance) Send(msg Message) bool {
 // Stop requests a graceful room shutdown.
 func (inst *Instance) Stop() {
 	inst.Send(Message{Type: MsgStop})
+}
+
+// SetSleepNotifier configures the callback invoked when an entity sleeps or wakes.
+func (inst *Instance) SetSleepNotifier(n SleepNotifier) {
+	inst.sleepNotifier = n
+}
+
+// SetKickNotifier configures the callback invoked when an entity is auto-kicked.
+func (inst *Instance) SetKickNotifier(n KickNotifier) {
+	inst.kickNotifier = n
+}
+
+// SetTileSeatChecker configures the furniture seat lookup callback for this instance.
+func (inst *Instance) SetTileSeatChecker(fn TileSeatChecker) {
+	inst.seatChecker = fn
 }
 
 // run is the main goroutine loop processing ticks and messages.

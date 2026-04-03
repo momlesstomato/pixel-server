@@ -98,3 +98,10 @@ func (s *EntityService) LookTo(_ context.Context, inst *engine.Instance, entity 
 	inst.Send(engine.Message{Type: engine.MsgLookTo, Entity: entity, TargetX: x, TargetY: y, Reply: reply})
 	return <-reply
 }
+
+// Sit toggles entity sit posture on or off.
+func (s *EntityService) Sit(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity) error {
+	reply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgSit, Entity: entity, Reply: reply})
+	return <-reply
+}

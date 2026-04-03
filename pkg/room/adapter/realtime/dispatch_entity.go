@@ -39,7 +39,11 @@ func (rt *Runtime) handleAction(connID string, userID int, body []byte) error {
 	if rt.entitySvc == nil {
 		return nil
 	}
-	return rt.entitySvc.Action(context.Background(), inst, entity, int(pkt.ActionID))
+	if err := rt.entitySvc.Action(context.Background(), inst, entity, int(pkt.ActionID)); err != nil {
+		return nil
+	}
+	rt.broadcastToRoom(inst.RoomID, packet.ActionComposer{VirtualID: int32(entity.VirtualID), ActionID: pkt.ActionID})
+	return nil
 }
 
 // handleSign processes entity sign display request.
@@ -104,4 +108,16 @@ func (rt *Runtime) handleLookTo(connID string, userID int, body []byte) error {
 		return nil
 	}
 	return rt.entitySvc.LookTo(context.Background(), inst, entity, int(pkt.X), int(pkt.Y))
+}
+
+// handleSit toggles entity sit posture on or off.
+func (rt *Runtime) handleSit(connID string, userID int) error {
+	inst, entity := rt.findEntityByConnID(connID, userID)
+	if inst == nil {
+		return nil
+	}
+	if rt.entitySvc == nil {
+		return nil
+	}
+	return rt.entitySvc.Sit(context.Background(), inst, entity)
 }

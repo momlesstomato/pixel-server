@@ -1,6 +1,7 @@
 package heightmap
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
@@ -68,4 +69,39 @@ func TestEncodeStackingMap_BlockedBit(t *testing.T) {
 	}
 	result := heightmap.EncodeStackingMap(grid)
 	assert.Equal(t, int16(0x4000), result[0])
+}
+
+// TestEncodeFloorMapWithDoor_OpensDoorTile verifies the door tile is rendered open.
+func TestEncodeFloorMapWithDoor_OpensDoorTile(t *testing.T) {
+	grid := [][]domain.Tile{
+		{{Z: 0, State: domain.TileBlocked}, {Z: 0, State: domain.TileBlocked}, {Z: 0, State: domain.TileBlocked}},
+		{{Z: 0, State: domain.TileBlocked}, {Z: 0, State: domain.TileBlocked}, {Z: 0, State: domain.TileOpen}},
+		{{Z: 0, State: domain.TileBlocked}, {Z: 0, State: domain.TileBlocked}, {Z: 0, State: domain.TileBlocked}},
+	}
+	result := heightmap.EncodeFloorMapWithDoor(grid, 1, 1, 0)
+	rows := strings.Split(result, "\r")
+	require.Len(t, rows, 3)
+	assert.Equal(t, "xxx", rows[0])
+	assert.Equal(t, "x00", rows[1])
+	assert.Equal(t, "xxx", rows[2])
+}
+
+// TestEncodeFloorMapWithDoor_HighDoorZ verifies door tile uses correct base-36 char.
+func TestEncodeFloorMapWithDoor_HighDoorZ(t *testing.T) {
+	grid := [][]domain.Tile{
+		{{Z: 0, State: domain.TileBlocked}, {Z: 0, State: domain.TileBlocked}},
+		{{Z: 0, State: domain.TileBlocked}, {Z: 0, State: domain.TileBlocked}},
+	}
+	result := heightmap.EncodeFloorMapWithDoor(grid, 0, 1, 10)
+	rows := strings.Split(result, "\r")
+	require.Len(t, rows, 2)
+	assert.Equal(t, "ax", rows[1])
+}
+
+// TestEncodeFloorMapWithDoor_NoDoor verifies fallback to EncodeFloorMap behavior.
+func TestEncodeFloorMapWithDoor_NoDoor(t *testing.T) {
+	grid := [][]domain.Tile{
+		{{Z: 0, State: domain.TileOpen}, {Z: 0, State: domain.TileBlocked}},
+	}
+	assert.Equal(t, heightmap.EncodeFloorMap(grid), heightmap.EncodeFloorMapWithDoor(grid, -1, -1, 0))
 }

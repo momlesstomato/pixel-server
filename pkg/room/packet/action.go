@@ -107,6 +107,25 @@ func (p DanceComposer) Encode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
+// ActionComposer sends expression/action update to all room entities (s2c 1631).
+type ActionComposer struct {
+	// VirtualID stores the entity performing the action.
+	VirtualID int32
+	// ActionID stores the expression/action identifier.
+	ActionID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p ActionComposer) PacketID() uint16 { return ActionComposerID }
+
+// Encode serializes the action update.
+func (p ActionComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.VirtualID)
+	w.WriteInt32(p.ActionID)
+	return w.Bytes(), nil
+}
+
 // UserTypingComposer sends typing indicator update to all entities (s2c 1727).
 type UserTypingComposer struct {
 	// VirtualID stores the typing entity virtual identifier.

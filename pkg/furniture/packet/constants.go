@@ -32,3 +32,21 @@ const ActivateDicePacketID uint16 = 1990
 
 // DeactivateDicePacketID defines packet identifier for furniture.deactivate_dice.
 const DeactivateDicePacketID uint16 = 1533
+
+// FloorItemAddPacketID defines packet identifier for furniture.floor_item_add (s2c 1534).
+const FloorItemAddPacketID uint16 = 1534
+
+// FloorItemRemovePacketID defines packet identifier for furniture.floor_item_remove (s2c 2703).
+const FloorItemRemovePacketID uint16 = 2703
+
+// InventoryRemovePacketID defines packet identifier for inventory.furni_remove (s2c 159).
+const InventoryRemovePacketID uint16 = 159
+
+// InventoryAddPacketID defines packet identifier for inventory.furni_add (s2c 104).
+const InventoryAddPacketID uint16 = 104
+
+// FurnitureFloorPacketID defines packet identifier for furniture.floor (s2c 1778).
+const FurnitureFloorPacketID uint16 = 1778
+
+// FloorItemUpdatePacketID defines packet identifier for furniture.floor_item_update (s2c 3776).
+const FloorItemUpdatePacketID uint16 = 3776

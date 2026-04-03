@@ -109,8 +109,15 @@ func TestHandle_MoveAvatar_NoRoom(t *testing.T) {
 	assert.True(t, handled)
 }
 
-// TestDispose verifies connection cleanup.
+// TestDispose verifies connection cleanup for a connection not in any room.
 func TestDispose(t *testing.T) {
 	rt, _ := newRuntime(t)
+	rt.Dispose("conn1")
+}
+
+// TestDisposeIsIdempotent verifies repeated Dispose calls do not panic.
+func TestDisposeIsIdempotent(t *testing.T) {
+	rt, _ := newRuntime(t)
+	rt.Dispose("conn1")
 	rt.Dispose("conn1")
 }

@@ -78,10 +78,14 @@ func (p UserUpdateComposer) Encode() ([]byte, error) {
 	w := codec.NewWriter()
 	w.WriteInt32(int32(len(p.Entities)))
 	for _, e := range p.Entities {
+		pos := e.Position
+		if e.StepFrom != nil {
+			pos = *e.StepFrom
+		}
 		w.WriteInt32(int32(e.VirtualID))
-		w.WriteInt32(int32(e.Position.X))
-		w.WriteInt32(int32(e.Position.Y))
-		if err := w.WriteString(fmt.Sprintf("%g", e.Position.Z)); err != nil {
+		w.WriteInt32(int32(pos.X))
+		w.WriteInt32(int32(pos.Y))
+		if err := w.WriteString(fmt.Sprintf("%g", pos.Z)); err != nil {
 			return nil, err
 		}
 		w.WriteInt32(int32(e.HeadRotation))

@@ -62,3 +62,11 @@ type RoomRight struct {
 	// UserID stores the rights holder identifier.
 	UserID int
 }
+
+// RoomRepository defines persistence operations for room aggregate data.
+type RoomRepository interface {
+	// FindByID resolves one full room record by stable identifier.
+	FindByID(ctx context.Context, roomID int) (Room, error)
+	// SaveSettings persists updated room settings for one room.
+	SaveSettings(ctx context.Context, room Room) error
+}

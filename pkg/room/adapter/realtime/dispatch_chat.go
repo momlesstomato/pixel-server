@@ -107,4 +107,3 @@ func (rt *Runtime) sendToRecipients(recipients []domain.RoomEntity, pkt interfac
 		}
 	}
 }
-
