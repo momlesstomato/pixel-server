@@ -104,3 +104,21 @@ func (rt *Runtime) OnKick(roomID int, entity domain.RoomEntity) {
 	rt.publishToRoomEntities(roomID, codec.EncodeFrame(packet.UserRemoveComposerID, body))
 	delete(rt.connRooms, entity.ConnID)
 }
+
+// OnDoorExit broadcasts entity removal when an entity walks out through the door tile,
+// then publishes the hotel view redirect to the exiting user's broadcast channel.
+func (rt *Runtime) OnDoorExit(roomID int, entity domain.RoomEntity) {
+	body, err := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
+	if err != nil {
+		rt.logger.Warn("encode door exit packet failed", zap.Error(err))
+		return
+	}
+	rt.publishToRoomEntities(roomID, codec.EncodeFrame(packet.UserRemoveComposerID, body))
+	if entity.UserID > 0 {
+		dvBody, dvErr := packet.DesktopViewComposer{}.Encode()
+		if dvErr == nil {
+			_ = rt.broadcaster.Publish(context.Background(), sessionnotification.UserChannel(entity.UserID), codec.EncodeFrame(packet.DesktopViewComposerID, dvBody))
+		}
+	}
+	delete(rt.connRooms, entity.ConnID)
+}

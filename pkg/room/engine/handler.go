@@ -184,6 +184,8 @@ func (inst *Instance) handleTyping(msg Message) error {
 }
 
 // handleLookTo rotates entity head toward a target coordinate.
+// When standing (not sitting, not laying, not walking), body rotation matches head rotation.
+// When the target equals the entity's own tile, the entity faces frontward (direction 2).
 func (inst *Instance) handleLookTo(msg Message) error {
 	if msg.Entity == nil {
 		return domain.ErrEntityNotFound
@@ -194,7 +196,20 @@ func (inst *Instance) handleLookTo(msg Message) error {
 	if !ok {
 		return domain.ErrEntityNotFound
 	}
-	entity.HeadRotation = calcRotation(0, 0, msg.TargetX, msg.TargetY, entity.Position.X, entity.Position.Y)
+	_, isLaying := entity.Statuses["lay"]
+	if entity.IsSitting || isLaying || entity.IsWalking {
+		resetEntityIdle(entity)
+		entity.UpdateNeeded = true
+		return nil
+	}
+	var dir int
+	if msg.TargetX == entity.Position.X && msg.TargetY == entity.Position.Y {
+		dir = 2
+	} else {
+		dir = calcRotation(0, 0, msg.TargetX, msg.TargetY, entity.Position.X, entity.Position.Y)
+	}
+	entity.BodyRotation = dir
+	entity.HeadRotation = dir
 	resetEntityIdle(entity)
 	entity.UpdateNeeded = true
 	return nil

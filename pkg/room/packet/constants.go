@@ -48,6 +48,15 @@ const KickUserPacketID uint16 = 1320
 // BanUserPacketID defines client room.ban_user (c2s 1477).
 const BanUserPacketID uint16 = 1477
 
+// CloseConnectionPacketID defines client flat close request (c2s 3997).
+const CloseConnectionPacketID uint16 = 3997
+
+// DesktopViewPacketID defines client hotel view request (c2s 105).
+const DesktopViewPacketID uint16 = 105
+
+// DesktopViewComposerID defines server hotel view redirect (s2c 122).
+const DesktopViewComposerID uint16 = 122
+
 // RoomReadyComposerID defines server room.ready (s2c 2031).
 const RoomReadyComposerID uint16 = 2031
 

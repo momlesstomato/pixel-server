@@ -111,3 +111,10 @@ func (rt *Runtime) handleSaveRoomSettings(ctx context.Context, connID string, us
 	}
 	return rt.sendPacket(connID, packet.RoomSettingsSavedComposer{RoomID: pkt.RoomID})
 }
+
+// handleLeaveRoom removes the connection from the current room.
+// Client-initiated departures (hotel view button, close flat) handle their own navigation.
+func (rt *Runtime) handleLeaveRoom(connID string) error {
+	rt.leaveCurrentRoom(connID)
+	return nil
+}

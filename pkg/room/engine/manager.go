@@ -24,6 +24,8 @@ type Manager struct {
 	sleepNotifier SleepNotifier
 	// kickNotifier stores the callback for entity idle kick events.
 	kickNotifier KickNotifier
+	// doorExitNotifier stores the callback for entity door exit events.
+	doorExitNotifier DoorExitNotifier
 	// seatChecker stores the furniture seat lookup callback.
 	seatChecker TileSeatChecker
 }
@@ -50,6 +52,7 @@ func (m *Manager) Load(roomID int, layout domain.Layout) *Instance {
 	inst := NewInstance(roomID, layout, m.logger, m.broadcaster)
 	inst.SetSleepNotifier(m.sleepNotifier)
 	inst.SetKickNotifier(m.kickNotifier)
+	inst.SetDoorExitNotifier(m.doorExitNotifier)
 	inst.SetTileSeatChecker(m.seatChecker)
 	inst.Start(m.ctx)
 	m.rooms[roomID] = inst
@@ -125,6 +128,13 @@ func (m *Manager) SetKickNotifier(n KickNotifier) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.kickNotifier = n
+}
+
+// SetDoorExitNotifier configures the door exit callback for all new instances.
+func (m *Manager) SetDoorExitNotifier(n DoorExitNotifier) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.doorExitNotifier = n
 }
 
 // SetTileSeatChecker configures the furniture seat checker for all new instances.

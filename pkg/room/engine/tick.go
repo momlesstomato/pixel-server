@@ -10,9 +10,10 @@ import (
 // processTick advances the room state by one tick cycle.
 func (inst *Instance) processTick() {
 	inst.processIdleCheck()
-	inst.processEntityMovement()
+	doorExits := inst.processEntityMovement()
 	newlySlept, kicked := inst.processEntityIdle()
 	inst.broadcastDirtyEntities()
+	inst.removeDoorExits(doorExits)
 	for _, e := range newlySlept {
 		if inst.sleepNotifier != nil {
 			inst.sleepNotifier(inst.RoomID, e.VirtualID, true)
@@ -21,6 +22,11 @@ func (inst *Instance) processTick() {
 	for _, e := range kicked {
 		if inst.kickNotifier != nil {
 			inst.kickNotifier(inst.RoomID, e)
+		}
+	}
+	for _, e := range doorExits {
+		if inst.doorExitNotifier != nil {
+			inst.doorExitNotifier(inst.RoomID, e)
 		}
 	}
 }
@@ -41,8 +47,9 @@ func (inst *Instance) processIdleCheck() {
 	inst.state = StateActive
 }
 
-// processEntityMovement advances each walking entity one step along its path.
-func (inst *Instance) processEntityMovement() {
+// processEntityMovement advances each walking entity one step along its path
+// and returns entities that reached the door tile this tick.
+func (inst *Instance) processEntityMovement() (doorExits []domain.RoomEntity) {
 	inst.mu.Lock()
 	defer inst.mu.Unlock()
 	for _, entity := range inst.entities {
@@ -82,8 +89,12 @@ func (inst *Instance) processEntityMovement() {
 		if len(entity.Path) == 0 {
 			entity.IsWalking = false
 			entity.GoalPosition = nil
+			if entity.Position.X == inst.Layout.DoorX && entity.Position.Y == inst.Layout.DoorY {
+				doorExits = append(doorExits, *entity)
+			}
 		}
 	}
+	return doorExits
 }
 
 // processEntityIdle increments idle timers for stationary entities and returns
@@ -118,6 +129,18 @@ func (inst *Instance) processEntityIdle() (newlySlept []domain.RoomEntity, kicke
 	return newlySlept, kicked
 }
 
+// removeDoorExits removes door-exited entities from the instance after their final update is broadcast.
+func (inst *Instance) removeDoorExits(exits []domain.RoomEntity) {
+	if len(exits) == 0 {
+		return
+	}
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	for _, e := range exits {
+		delete(inst.entities, e.VirtualID)
+	}
+}
+
 // broadcastDirtyEntities sends status updates for changed entities.
 func (inst *Instance) broadcastDirtyEntities() {
 	inst.mu.RLock()
@@ -134,35 +157,30 @@ func (inst *Instance) broadcastDirtyEntities() {
 	}
 }
 
-// calcRotation computes the facing direction between two positions.
+// calcRotation computes the facing direction from (fromX, fromY) toward (toX, toY).
+// Direction mapping follows the Habbo isometric convention (0=N, 2=E, 4=S, 6=W).
+// Sign-based comparison is used so the function works for any tile distance.
 func calcRotation(_, _ int, toX, toY, fromX, fromY int) int {
 	dx := toX - fromX
 	dy := toY - fromY
-	if dx == 0 && dy == -1 {
+	switch {
+	case dx < 0 && dy < 0:
+		return 7
+	case dx > 0 && dy < 0:
+		return 1
+	case dx > 0 && dy > 0:
+		return 3
+	case dx < 0 && dy > 0:
+		return 5
+	case dx < 0:
+		return 6
+	case dx > 0:
+		return 2
+	case dy > 0:
+		return 4
+	default:
 		return 0
 	}
-	if dx == 1 && dy == -1 {
-		return 1
-	}
-	if dx == 1 && dy == 0 {
-		return 2
-	}
-	if dx == 1 && dy == 1 {
-		return 3
-	}
-	if dx == 0 && dy == 1 {
-		return 4
-	}
-	if dx == -1 && dy == 1 {
-		return 5
-	}
-	if dx == -1 && dy == 0 {
-		return 6
-	}
-	if dx == -1 && dy == -1 {
-		return 7
-	}
-	return 2
 }
 
 // startWalk computes a path and initiates entity movement.

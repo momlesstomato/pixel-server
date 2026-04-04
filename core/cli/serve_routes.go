@@ -108,6 +108,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		services.room.Manager().SetBroadcaster(roomRT.Broadcast)
 		services.room.Manager().SetSleepNotifier(roomRT.OnSleep)
 		services.room.Manager().SetKickNotifier(roomRT.OnKick)
+		services.room.Manager().SetDoorExitNotifier(roomRT.OnDoorExit)
 		furnitureRT.SetRoomFinder(roomRT.ConnRoomID)
 		furnitureRT.SetRoomBroadcaster(roomRT.BroadcastRawToRoom)
 		furnitureRT.SetRoomEntityRotator(roomRT.RotateSittingEntitiesInRoom)

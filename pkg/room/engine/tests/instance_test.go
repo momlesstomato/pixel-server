@@ -117,3 +117,40 @@ func TestInstance_ContextCancel(t *testing.T) {
 	}
 	assert.Equal(t, engine.StateStopped, inst.State())
 }
+
+// TestLookTo_Standing verifies body and head both rotate toward target when standing.
+func TestLookTo_Standing(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	reply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: reply})
+	<-reply
+	lookReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgLookTo, Entity: entity, TargetX: 4, TargetY: 0, Reply: lookReply})
+	require.NoError(t, <-lookReply)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, e.HeadRotation, e.BodyRotation, "body and head must match when standing")
+}
+
+// TestLookTo_Self verifies facing direction 2 when clicking own tile.
+func TestLookTo_Self(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	reply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: reply})
+	<-reply
+	selfReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgLookTo, Entity: entity, TargetX: entity.Position.X, TargetY: entity.Position.Y, Reply: selfReply})
+	require.NoError(t, <-selfReply)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, 2, e.BodyRotation, "self-click must face frontward (dir 2)")
+	assert.Equal(t, 2, e.HeadRotation, "self-click must face frontward (dir 2)")
+}

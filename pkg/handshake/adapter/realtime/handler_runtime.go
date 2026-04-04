@@ -169,6 +169,9 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 					handler.handleProtocolError(connID, transport, frame.PacketID, protocolErrorMalformedPacket, &errorMeter) {
 					return
 				}
+				if userRuntime != nil {
+					_, _ = userRuntime.Handle(ctx, connID, frame.PacketID, frame.Body)
+				}
 			default:
 				if authenticated && userRuntime != nil {
 					handled, handleErr := userRuntime.Handle(ctx, connID, frame.PacketID, frame.Body)

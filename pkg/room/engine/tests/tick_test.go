@@ -126,3 +126,37 @@ func TestTick_EnterPositionsDoorTile(t *testing.T) {
 	assert.Equal(t, 3, e.Position.Y)
 	assert.Equal(t, 4, e.BodyRotation)
 }
+
+// TestTick_DoorExitNotifier verifies the notifier fires and entity is removed when walking to the door tile.
+func TestTick_DoorExitNotifier(t *testing.T) {
+	layout := testLayout()
+	layout.DoorX = 2
+	layout.DoorY = 2
+	inst := engine.NewInstance(1, layout, zap.NewNop(), noopBroadcaster)
+	exitCh := make(chan int, 1)
+	inst.SetDoorExitNotifier(func(roomID int, _ domain.RoomEntity) {
+		exitCh <- roomID
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	reply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: reply})
+	<-reply
+	walkAway := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 0, TargetY: 0, Reply: walkAway})
+	require.NoError(t, <-walkAway)
+	time.Sleep(2 * time.Second)
+	walkBack := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkBack})
+	require.NoError(t, <-walkBack)
+	select {
+	case roomID := <-exitCh:
+		assert.Equal(t, 1, roomID)
+	case <-time.After(3 * time.Second):
+		t.Fatal("door exit notifier was not fired")
+	}
+	_, stillPresent := inst.Entity(entity.VirtualID)
+	assert.False(t, stillPresent, "entity must be removed after door exit")
+}

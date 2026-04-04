@@ -135,3 +135,12 @@ func (p *LetUserInPacket) Decode(body []byte) error {
 	p.Let = let
 	return nil
 }
+
+// DesktopViewComposer navigates the client back to hotel view (s2c 122).
+type DesktopViewComposer struct{}
+
+// PacketID returns the protocol packet identifier.
+func (p DesktopViewComposer) PacketID() uint16 { return DesktopViewComposerID }
+
+// Encode serializes the hotel view redirect payload.
+func (p DesktopViewComposer) Encode() ([]byte, error) { return []byte{}, nil }

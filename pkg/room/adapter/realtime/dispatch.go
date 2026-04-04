@@ -51,6 +51,8 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 		return true, rt.handleGetRoomSettings(ctx, connID, userID, body)
 	case packet.SaveRoomSettingsPacketID:
 		return true, rt.handleSaveRoomSettings(ctx, connID, userID, body)
+	case packet.DesktopViewPacketID, packet.CloseConnectionPacketID:
+		return true, rt.handleLeaveRoom(connID)
 	default:
 		return false, nil
 	}

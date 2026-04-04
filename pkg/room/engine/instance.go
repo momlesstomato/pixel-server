@@ -26,6 +26,9 @@ type SleepNotifier func(roomID int, virtualID int, sleeping bool)
 // KickNotifier is called when an entity is auto-kicked due to idle timeout.
 type KickNotifier func(roomID int, entity domain.RoomEntity)
 
+// DoorExitNotifier is called when an entity walks out through the room door tile.
+type DoorExitNotifier func(roomID int, entity domain.RoomEntity)
+
 // TileSeatChecker checks whether a tile has sittable or layable furniture.
 // Returns the seat height, furniture direction, whether sitting and whether laying are possible.
 type TileSeatChecker func(roomID, x, y int) (height float64, dir int, canSit, canLay bool)
@@ -77,6 +80,8 @@ type Instance struct {
 	sleepNotifier SleepNotifier
 	// kickNotifier is called when an entity is auto-kicked due to idle timeout.
 	kickNotifier KickNotifier
+	// doorExitNotifier is called when an entity exits through the room door tile.
+	doorExitNotifier DoorExitNotifier
 	// seatChecker checks whether a tile has sittable or layable furniture.
 	seatChecker TileSeatChecker
 }
@@ -125,6 +130,11 @@ func (inst *Instance) SetSleepNotifier(n SleepNotifier) {
 // SetKickNotifier configures the callback invoked when an entity is auto-kicked.
 func (inst *Instance) SetKickNotifier(n KickNotifier) {
 	inst.kickNotifier = n
+}
+
+// SetDoorExitNotifier configures the callback invoked when an entity exits through the door tile.
+func (inst *Instance) SetDoorExitNotifier(n DoorExitNotifier) {
+	inst.doorExitNotifier = n
 }
 
 // SetTileSeatChecker configures the furniture seat lookup callback for this instance.
