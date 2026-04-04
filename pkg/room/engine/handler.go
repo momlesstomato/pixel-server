@@ -111,6 +111,8 @@ func (inst *Instance) handleAction(msg Message) error {
 }
 
 // handleDance updates entity dance animation style.
+// When dance starts (danceID > 0) any active sit or lay posture is cleared so the
+// entity stands up before dancing, matching canonical Habbo emulator behaviour.
 func (inst *Instance) handleDance(msg Message) error {
 	if msg.Entity == nil {
 		return domain.ErrEntityNotFound
@@ -124,6 +126,15 @@ func (inst *Instance) handleDance(msg Message) error {
 	entity.DanceID = msg.IntValue
 	if entity.DanceID > 0 {
 		entity.Statuses["dance"] = fmt.Sprintf("%d", entity.DanceID)
+		if entity.IsSitting {
+			if !entity.IsSittingAuto {
+				entity.Position.Z += 0.35
+			}
+			delete(entity.Statuses, "sit")
+			delete(entity.Statuses, "lay")
+			entity.IsSitting = false
+			entity.IsSittingAuto = false
+		}
 	} else {
 		delete(entity.Statuses, "dance")
 	}

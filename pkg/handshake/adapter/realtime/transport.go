@@ -81,11 +81,12 @@ func (transport *Transport) Send(connID string, packetID uint16, body []byte) er
 
 // writeFrame encodes and writes one packet frame bypassing plugin event dispatch.
 func (transport *Transport) writeFrame(packetID uint16, body []byte) error {
+	transport.mutex.Lock()
 	frame, err := transport.encodePayload(packetID, body)
 	if err != nil {
+		transport.mutex.Unlock()
 		return err
 	}
-	transport.mutex.Lock()
 	err = transport.connection.WriteMessage(websocket.BinaryMessage, frame)
 	transport.mutex.Unlock()
 	if err == nil {

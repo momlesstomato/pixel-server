@@ -68,10 +68,7 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 	if err != nil {
 		return nil, err
 	}
-	broadcaster, err := broadcast.NewRedisBroadcaster(runtime.Redis, "")
-	if err != nil {
-		return nil, err
-	}
+	broadcaster := broadcast.NewLocalBroadcaster()
 	statusStore, err := statusredisstore.NewStore(runtime.Redis, runtime.Config.Status.RedisKey)
 	if err != nil {
 		return nil, err

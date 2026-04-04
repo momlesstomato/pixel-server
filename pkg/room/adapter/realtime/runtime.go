@@ -139,7 +139,9 @@ func (rt *Runtime) leaveCurrentRoom(connID string) {
 				break
 			}
 			reply := make(chan error, 1)
-			inst.Send(engine.Message{Type: engine.MsgLeave, Entity: entity, Reply: reply})
+			if !inst.Send(engine.Message{Type: engine.MsgLeave, Entity: entity, Reply: reply}) {
+				break
+			}
 			<-reply
 			body, encErr := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
 			if encErr == nil {

@@ -3,8 +3,10 @@ package realtime
 import (
 	"context"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
 	"go.uber.org/zap"
 )
 
@@ -88,7 +90,7 @@ func (rt *Runtime) handleWhisper(ctx context.Context, connID string, userID int,
 	return nil
 }
 
-// sendToRecipients transmits one encoded packet to a list of player entities.
+// sendToRecipients transmits one encoded packet to a list of player entities via the broadcaster.
 func (rt *Runtime) sendToRecipients(recipients []domain.RoomEntity, pkt interface {
 	PacketID() uint16
 	Encode() ([]byte, error)
@@ -98,12 +100,14 @@ func (rt *Runtime) sendToRecipients(recipients []domain.RoomEntity, pkt interfac
 		rt.logger.Warn("encode recipient packet failed", zap.Error(err))
 		return
 	}
+	frame := codec.EncodeFrame(pkt.PacketID(), body)
+	ctx := context.Background()
 	for i := range recipients {
-		if recipients[i].Type != domain.EntityPlayer || recipients[i].ConnID == "" {
+		if recipients[i].Type != domain.EntityPlayer || recipients[i].UserID == 0 {
 			continue
 		}
-		if err := rt.transport.Send(recipients[i].ConnID, pkt.PacketID(), body); err != nil {
-			rt.logger.Warn("send to recipient failed", zap.String("conn_id", recipients[i].ConnID), zap.Error(err))
+		if err := rt.broadcaster.Publish(ctx, sessionnotification.UserChannel(recipients[i].UserID), frame); err != nil {
+			rt.logger.Warn("publish to recipient failed", zap.Int("user_id", recipients[i].UserID), zap.Error(err))
 		}
 	}
 }

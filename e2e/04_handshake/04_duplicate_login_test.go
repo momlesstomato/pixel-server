@@ -59,12 +59,18 @@ func Test04DuplicateLoginClosesPreviousConnection(t *testing.T) {
 	_ = testkit.ReadFrame(t, second)
 	_ = testkit.ReadFrame(t, second)
 	first.SetReadDeadline(time.Now().Add(time.Second))
-	_, _, err = first.ReadMessage()
-	if err == nil {
-		t.Fatalf("expected duplicate login close on first connection")
-	}
 	var closeErr *gws.CloseError
-	if !errors.As(err, &closeErr) || closeErr.Code != authflow.DuplicateLoginCloseCode {
+	for {
+		_, _, err = first.ReadMessage()
+		if err == nil {
+			continue
+		}
+		if !errors.As(err, &closeErr) {
+			t.Fatalf("expected close error on first connection, got %v", err)
+		}
+		break
+	}
+	if closeErr.Code != authflow.DuplicateLoginCloseCode {
 		t.Fatalf("expected duplicate close code %d, got %v", authflow.DuplicateLoginCloseCode, err)
 	}
 }
