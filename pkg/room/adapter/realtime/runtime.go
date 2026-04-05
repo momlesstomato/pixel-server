@@ -27,6 +27,12 @@ type UsernameResolver func(ctx context.Context, userID int) (string, error)
 // ProfileResolver resolves the full display profile for one authenticated user identifier.
 type ProfileResolver func(ctx context.Context, userID int) (username, look, motto, gender string, err error)
 
+// VisitRecorder records one room visit.
+type VisitRecorder interface {
+	// RecordVisit persists a room visit entry.
+	RecordVisit(ctx context.Context, userID int, roomID int) error
+}
+
 // Runtime defines room realm websocket packet behavior.
 type Runtime struct {
 	// service stores room application behavior.
@@ -53,6 +59,10 @@ type Runtime struct {
 	profileResolver ProfileResolver
 	// floorItemSender sends the room floor item list to one arriving connection.
 	floorItemSender func(ctx context.Context, connID string, roomID int) error
+	// voteRepo stores optional vote persistence for room scoring.
+	voteRepo domain.VoteRepository
+	// visitRecorder stores optional room visit tracking behavior.
+	visitRecorder VisitRecorder
 }
 
 // doorbellEntry tracks a visitor waiting for doorbell approval.
@@ -176,6 +186,16 @@ func (rt *Runtime) SetUsernameResolver(fn UsernameResolver) {
 // SetProfileResolver configures the full user profile lookup function.
 func (rt *Runtime) SetProfileResolver(fn ProfileResolver) {
 	rt.profileResolver = fn
+}
+
+// SetVoteRepository configures the optional vote persistence layer.
+func (rt *Runtime) SetVoteRepository(repo domain.VoteRepository) {
+	rt.voteRepo = repo
+}
+
+// SetVisitRecorder configures optional room visit tracking.
+func (rt *Runtime) SetVisitRecorder(recorder VisitRecorder) {
+	rt.visitRecorder = recorder
 }
 
 // resolveUsername looks up the display name for a user identifier.

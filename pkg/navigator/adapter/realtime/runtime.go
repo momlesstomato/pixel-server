@@ -5,6 +5,7 @@ import (
 
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	navapp "github.com/momlesstomato/pixel-server/pkg/navigator/application"
+	navdomain "github.com/momlesstomato/pixel-server/pkg/navigator/domain"
 	"go.uber.org/zap"
 )
 
@@ -26,6 +27,8 @@ type Runtime struct {
 	logger *zap.Logger
 	// liveRoomCount provides live player count from room engine for navigator display.
 	liveRoomCount func(roomID int) int
+	// permissions stores optional permission resolution behavior.
+	permissions navdomain.PermissionChecker
 }
 
 // NewRuntime creates one navigator realtime runtime instance.
@@ -60,6 +63,11 @@ func (runtime *Runtime) Dispose(_ string) {}
 // SetLiveRoomCountProvider configures the callback used to overlay live player counts in navigator results.
 func (runtime *Runtime) SetLiveRoomCountProvider(fn func(roomID int) int) {
 	runtime.liveRoomCount = fn
+}
+
+// SetPermissionChecker configures optional permission resolution behavior.
+func (runtime *Runtime) SetPermissionChecker(checker navdomain.PermissionChecker) {
+	runtime.permissions = checker
 }
 
 // sendPacket encodes and transmits one outgoing packet.

@@ -59,49 +59,62 @@ func (s *EntityService) Walk(_ context.Context, inst *engine.Instance, entity *d
 
 // Dance sends a dance state change into the room engine.
 func (s *EntityService) Dance(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity, danceID int) error {
+	if s.fire != nil {
+		ev := &sdkentity.EntityDancing{RoomID: inst.RoomID, UserID: entity.UserID, VirtualID: entity.VirtualID, DanceID: danceID}
+		s.fire(ev)
+		if ev.Cancelled() {
+			return domain.ErrAccessDenied
+		}
+	}
 	reply := make(chan error, 1)
 	inst.Send(engine.Message{Type: engine.MsgDance, Entity: entity, IntValue: danceID, Reply: reply})
-	return <-reply
+	if err := <-reply; err != nil {
+		return err
+	}
+	if s.fire != nil {
+		s.fire(&sdkentity.EntityDanced{RoomID: inst.RoomID, UserID: entity.UserID, VirtualID: entity.VirtualID, DanceID: danceID})
+	}
+	return nil
 }
 
 // Action sends a generic user action into the room engine.
 func (s *EntityService) Action(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity, actionID int) error {
+	if s.fire != nil {
+		ev := &sdkentity.EntityActing{RoomID: inst.RoomID, UserID: entity.UserID, VirtualID: entity.VirtualID, ActionID: actionID}
+		s.fire(ev)
+		if ev.Cancelled() {
+			return domain.ErrAccessDenied
+		}
+	}
 	reply := make(chan error, 1)
 	inst.Send(engine.Message{Type: engine.MsgAction, Entity: entity, IntValue: actionID, Reply: reply})
-	return <-reply
+	if err := <-reply; err != nil {
+		return err
+	}
+	if s.fire != nil {
+		s.fire(&sdkentity.EntityActed{RoomID: inst.RoomID, UserID: entity.UserID, VirtualID: entity.VirtualID, ActionID: actionID})
+	}
+	return nil
 }
 
 // Sign sends a sign display request into the room engine.
 func (s *EntityService) Sign(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity, signID int) error {
+	if s.fire != nil {
+		ev := &sdkentity.EntitySigning{RoomID: inst.RoomID, UserID: entity.UserID, VirtualID: entity.VirtualID, SignID: signID}
+		s.fire(ev)
+		if ev.Cancelled() {
+			return domain.ErrAccessDenied
+		}
+	}
 	reply := make(chan error, 1)
 	inst.Send(engine.Message{Type: engine.MsgSign, Entity: entity, IntValue: signID, Reply: reply})
-	return <-reply
+	if err := <-reply; err != nil {
+		return err
+	}
+	if s.fire != nil {
+		s.fire(&sdkentity.EntitySigned{RoomID: inst.RoomID, UserID: entity.UserID, VirtualID: entity.VirtualID, SignID: signID})
+	}
+	return nil
 }
 
-// StartTyping sets the entity typing indicator in the room engine.
-func (s *EntityService) StartTyping(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity) error {
-	reply := make(chan error, 1)
-	inst.Send(engine.Message{Type: engine.MsgTyping, Entity: entity, IntValue: 1, Reply: reply})
-	return <-reply
-}
 
-// StopTyping clears the entity typing indicator in the room engine.
-func (s *EntityService) StopTyping(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity) error {
-	reply := make(chan error, 1)
-	inst.Send(engine.Message{Type: engine.MsgTyping, Entity: entity, IntValue: 0, Reply: reply})
-	return <-reply
-}
-
-// LookTo rotates the entity head toward a target coordinate.
-func (s *EntityService) LookTo(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity, x, y int) error {
-	reply := make(chan error, 1)
-	inst.Send(engine.Message{Type: engine.MsgLookTo, Entity: entity, TargetX: x, TargetY: y, Reply: reply})
-	return <-reply
-}
-
-// Sit toggles entity sit posture on or off.
-func (s *EntityService) Sit(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity) error {
-	reply := make(chan error, 1)
-	inst.Send(engine.Message{Type: engine.MsgSit, Entity: entity, Reply: reply})
-	return <-reply
-}

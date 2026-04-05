@@ -28,6 +28,12 @@ type Room struct {
 	Tags []string
 	// TradeMode stores the trade policy (0 = disabled, 1 = owner, 2 = all).
 	TradeMode int
+	// PromotedUntil stores the room promotion expiry timestamp.
+	PromotedUntil *time.Time
+	// PromotionName stores the active promotion display name.
+	PromotionName string
+	// StaffPick reports whether the room is staff-picked.
+	StaffPick bool
 	// CreatedAt stores room creation timestamp.
 	CreatedAt time.Time
 	// UpdatedAt stores room update timestamp.

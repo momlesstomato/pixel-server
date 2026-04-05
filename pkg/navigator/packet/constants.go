@@ -71,3 +71,9 @@ const FavouriteChangedPacketID uint16 = 2524
 
 // FavouritesListPacketID defines packet identifier for navigator.favourites_list (s2c).
 const FavouritesListPacketID uint16 = 151
+
+// PurchaseRoomAdPacketID defines packet identifier for navigator.purchase_room_ad (c2s).
+const PurchaseRoomAdPacketID uint16 = 2937
+
+// StaffPickPacketID defines packet identifier for navigator.staff_pick (c2s).
+const StaffPickPacketID uint16 = 1920

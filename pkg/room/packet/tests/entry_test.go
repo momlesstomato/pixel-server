@@ -103,3 +103,43 @@ func TestLetUserInPacket_DecodeDeclined(t *testing.T) {
 	assert.Equal(t, "Bob", pkt.Username)
 	assert.False(t, pkt.Let)
 }
+
+// TestRoomForwardComposer_Encode verifies room forward encoding.
+func TestRoomForwardComposer_Encode(t *testing.T) {
+	pkt := packet.RoomForwardComposer{RoomID: 77}
+	body, err := pkt.Encode()
+	require.NoError(t, err)
+	assert.NotEmpty(t, body)
+	assert.Equal(t, packet.RoomForwardComposerID, pkt.PacketID())
+}
+
+// TestDeleteRoomPacket_RoundTrip verifies delete room encode/decode.
+func TestDeleteRoomPacket_RoundTrip(t *testing.T) {
+	enc := packet.RoomForwardComposer{RoomID: 55}
+	body, err := enc.Encode()
+	require.NoError(t, err)
+	var pkt packet.DeleteRoomPacket
+	require.NoError(t, pkt.Decode(body))
+	assert.Equal(t, int32(55), pkt.RoomID)
+	assert.Equal(t, packet.DeleteRoomPacketID, pkt.PacketID())
+}
+
+// TestGiveRoomScorePacket_Decode verifies vote packet decoding.
+func TestGiveRoomScorePacket_Decode(t *testing.T) {
+	enc := packet.RoomScoreComposer{Score: 1, CanVote: true}
+	body, err := enc.Encode()
+	require.NoError(t, err)
+	var pkt packet.GiveRoomScorePacket
+	require.NoError(t, pkt.Decode(body))
+	assert.Equal(t, int32(1), pkt.Score)
+	assert.Equal(t, packet.GiveRoomScorePacketID, pkt.PacketID())
+}
+
+// TestRoomScoreComposer_Encode verifies room score encoding.
+func TestRoomScoreComposer_Encode(t *testing.T) {
+	pkt := packet.RoomScoreComposer{Score: 42, CanVote: false}
+	body, err := pkt.Encode()
+	require.NoError(t, err)
+	assert.NotEmpty(t, body)
+	assert.Equal(t, packet.RoomScoreComposerID, pkt.PacketID())
+}

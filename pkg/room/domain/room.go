@@ -54,6 +54,8 @@ type Room struct {
 	Tags []string
 	// TradeMode stores the trade policy code.
 	TradeMode int
+	// ForwardRoomID stores the room to forward clients to on entry (0 = disabled).
+	ForwardRoomID int
 }
 
 // RoomModel defines a predefined room template layout.

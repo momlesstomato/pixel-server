@@ -43,6 +43,8 @@ func mapRoom(row model.Room) domain.Room {
 		Name: row.Name, Description: row.Description, State: row.State,
 		CategoryID: int(row.CategoryID), MaxUsers: row.MaxUsers,
 		Score: row.Score, Tags: tags, TradeMode: row.TradeMode,
+		PromotedUntil: row.PromotedUntil, PromotionName: row.PromotionName,
+		StaffPick: row.StaffPick,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
 }

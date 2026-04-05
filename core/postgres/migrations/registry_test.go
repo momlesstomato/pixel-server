@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSteps verifies migration step registry contents.
 func TestRegistryReturnsOrderedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 47 {
-		t.Fatalf("expected 47 migration steps, got %d", len(steps))
+	if len(steps) != 55 {
+		t.Fatalf("expected 55 migration steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260314_01_permission_groups" {
 		t.Fatalf("unexpected migration step metadata")
@@ -59,40 +59,70 @@ func TestRegistryReturnsOrderedSteps(t *testing.T) {
 	if steps[18] == nil || steps[18].ID != "20260401_02_restore_sprite_id" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[31] == nil || steps[31].ID != "20260324_09_drop_cost_primary_type" {
+	if steps[30] == nil || steps[30].ID != "20260324_07c_catalog_pages_pipe_delimiter" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[32] == nil || steps[32].ID != "20260324_10_rename_cost_columns" {
+	if steps[31] == nil || steps[31].ID != "20260324_08_drop_catalog_name" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[36] == nil || steps[36].ID != "20260320_13_subscriptions" {
+	if steps[32] == nil || steps[32].ID != "20260324_09_drop_cost_primary_type" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[37] == nil || steps[37].ID != "20260325_14_club_offers" {
+	if steps[33] == nil || steps[33].ID != "20260324_10_rename_cost_columns" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[38] == nil || steps[38].ID != "20260325_13_navigator_categories" {
+	if steps[37] == nil || steps[37].ID != "20260320_13_subscriptions" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[39] == nil || steps[39].ID != "20260325_14_rooms" {
+	if steps[38] == nil || steps[38].ID != "20260325_14_club_offers" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[40] == nil || steps[40].ID != "20260325_15_navigator_saved_searches" {
+	if steps[39] == nil || steps[39].ID != "20260325_13_navigator_categories" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[41] == nil || steps[41].ID != "20260325_16_navigator_favourites" {
+	if steps[40] == nil || steps[40].ID != "20260325_14_rooms" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[42] == nil || steps[42].ID != "20260401_01_room_models" {
+	if steps[41] == nil || steps[41].ID != "20260325_15_navigator_saved_searches" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[43] == nil || steps[43].ID != "20260401_02_room_extension" {
+	if steps[42] == nil || steps[42].ID != "20260325_16_navigator_favourites" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[44] == nil || steps[44].ID != "20260401_03_room_bans" {
+	if steps[43] == nil || steps[43].ID != "20260404_05_room_promotion" {
 		t.Fatalf("unexpected migration step metadata")
 	}
-	if steps[45] == nil || steps[45].ID != "20260401_04_room_rights" {
+	if steps[44] == nil || steps[44].ID != "20260404_06_staff_pick" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[45] == nil || steps[45].ID != "20260401_01_room_models" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[46] == nil || steps[46].ID != "20260401_02_room_extension" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[47] == nil || steps[47].ID != "20260401_03_room_bans" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[48] == nil || steps[48].ID != "20260401_04_room_rights" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[49] == nil || steps[49].ID != "20260402_05_room_chat_logs" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[50] == nil || steps[50].ID != "20260402_06_room_votes" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[51] == nil || steps[51].ID != "20260402_07_room_soft_delete" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[52] == nil || steps[52].ID != "20260404_08_room_forward" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[53] == nil || steps[53].ID != "20260404_01_moderation_actions" {
+		t.Fatalf("unexpected migration step metadata")
+	}
+	if steps[54] == nil || steps[54].ID != "20260404_02_moderation_phase2" {
 		t.Fatalf("unexpected migration step metadata")
 	}
 }

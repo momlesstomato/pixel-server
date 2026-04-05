@@ -288,3 +288,82 @@ func IntToAccessState(n int32) domain.AccessState {
 		return domain.AccessOpen
 	}
 }
+
+// GetBannedUsersPacket decodes client ban list request (c2s 2652).
+type GetBannedUsersPacket struct {
+	// RoomID stores the target room identifier.
+	RoomID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p GetBannedUsersPacket) PacketID() uint16 { return GetBannedUsersPacketID }
+
+// Decode parses packet body payload.
+func (p *GetBannedUsersPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	id, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.RoomID = id
+	return nil
+}
+
+// BannedUserEntry defines one entry in the banned users list.
+type BannedUserEntry struct {
+	// UserID stores the banned user identifier.
+	UserID int32
+	// Username stores the banned user display name.
+	Username string
+}
+
+// BannedUsersComposer sends the ban list for a room (s2c 1869).
+type BannedUsersComposer struct {
+	// RoomID stores the room identifier.
+	RoomID int32
+	// Bans stores the list of banned users.
+	Bans []BannedUserEntry
+}
+
+// PacketID returns the protocol packet identifier.
+func (p BannedUsersComposer) PacketID() uint16 { return BannedUsersComposerID }
+
+// Encode serializes the banned users list response.
+func (p BannedUsersComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.RoomID)
+	w.WriteInt32(int32(len(p.Bans)))
+	for _, b := range p.Bans {
+		w.WriteInt32(b.UserID)
+		if err := w.WriteString(b.Username); err != nil {
+			return nil, err
+		}
+	}
+	return w.Bytes(), nil
+}
+
+// UnbanUserPacket decodes client unban request (c2s 3842).
+type UnbanUserPacket struct {
+	// UserID stores the user to unban.
+	UserID int32
+	// RoomID stores the target room identifier.
+	RoomID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p UnbanUserPacket) PacketID() uint16 { return UnbanUserPacketID }
+
+// Decode parses packet body payload.
+func (p *UnbanUserPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	uid, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	rid, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.UserID, p.RoomID = uid, rid
+	return nil
+}

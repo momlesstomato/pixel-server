@@ -16,6 +16,10 @@ func (rt *Runtime) handleChat(ctx context.Context, connID string, userID int, bo
 	if inst == nil {
 		return nil
 	}
+	room, err := rt.service.FindRoom(ctx, inst.RoomID)
+	if err == nil && inst.Muted() && room.OwnerID != userID {
+		return nil
+	}
 	var pkt packet.ChatPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil
@@ -37,6 +41,10 @@ func (rt *Runtime) handleChat(ctx context.Context, connID string, userID int, bo
 func (rt *Runtime) handleShout(ctx context.Context, connID string, userID int, body []byte) error {
 	inst, entity := rt.findEntityByConnID(connID, userID)
 	if inst == nil {
+		return nil
+	}
+	room, err := rt.service.FindRoom(ctx, inst.RoomID)
+	if err == nil && inst.Muted() && room.OwnerID != userID {
 		return nil
 	}
 	var pkt packet.ShoutPacket

@@ -134,3 +134,48 @@ const RoomSettingsComposerID uint16 = 1498
 
 // RoomSettingsSavedComposerID defines server room.room_settings_saved (s2c 948).
 const RoomSettingsSavedComposerID uint16 = 948
+
+// GiveRoomScorePacketID defines client room.give_room_score (c2s 3616).
+const GiveRoomScorePacketID uint16 = 3616
+
+// RoomScoreComposerID defines server room.room_score (s2c 3271).
+const RoomScoreComposerID uint16 = 3271
+
+// DeleteRoomPacketID defines client room.delete_room (c2s 532).
+const DeleteRoomPacketID uint16 = 532
+
+// GetBannedUsersPacketID defines client room.get_banned_users (c2s 2652).
+const GetBannedUsersPacketID uint16 = 2652
+
+// BannedUsersComposerID defines server room.banned_users (s2c 1869).
+const BannedUsersComposerID uint16 = 1869
+
+// UnbanUserPacketID defines client room.unban_user (c2s 3842).
+const UnbanUserPacketID uint16 = 3842
+
+// RoomForwardComposerID defines server room.room_forward (s2c 160).
+const RoomForwardComposerID uint16 = 160
+
+// AssignRightsPacketID defines client room.assign_rights (c2s 3843).
+const AssignRightsPacketID uint16 = 3843
+
+// RemoveRightsPacketID defines client room.remove_rights (c2s 877).
+const RemoveRightsPacketID uint16 = 877
+
+// RemoveMyRightsPacketID defines client room.remove_my_rights (c2s 111).
+const RemoveMyRightsPacketID uint16 = 111
+
+// RemoveAllRightsPacketID defines client room.remove_all_rights (c2s 884).
+const RemoveAllRightsPacketID uint16 = 884
+
+// GetRoomRightsPacketID defines client room.get_room_rights (c2s 3937).
+const GetRoomRightsPacketID uint16 = 3937
+
+// ToggleMuteToolPacketID defines client room.toggle_mute_tool (c2s 1301).
+const ToggleMuteToolPacketID uint16 = 1301
+
+// YouAreControllerComposerID defines server room.you_are_controller (s2c 680).
+const YouAreControllerComposerID uint16 = 680
+
+// RoomRightsListComposerID defines server room.rights_list (s2c 225).
+const RoomRightsListComposerID uint16 = 225

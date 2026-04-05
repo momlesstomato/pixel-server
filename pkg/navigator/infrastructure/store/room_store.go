@@ -22,6 +22,12 @@ func (s *Store) ListRooms(ctx context.Context, filter domain.RoomFilter) ([]doma
 		like := "%" + filter.SearchQuery + "%"
 		query = query.Where("name ILIKE ? OR tags ILIKE ?", like, like)
 	}
+	if filter.PromotedOnly {
+		query = query.Where("promoted_until IS NOT NULL AND promoted_until > NOW()")
+	}
+	if filter.StaffPickOnly {
+		query = query.Where("staff_pick = true")
+	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -108,6 +114,15 @@ func buildRoomUpdates(patch domain.RoomPatch) map[string]any {
 	}
 	if patch.MaxUsers != nil {
 		updates["max_users"] = *patch.MaxUsers
+	}
+	if patch.PromotedUntil != nil {
+		updates["promoted_until"] = *patch.PromotedUntil
+	}
+	if patch.PromotionName != nil {
+		updates["promotion_name"] = *patch.PromotionName
+	}
+	if patch.StaffPick != nil {
+		updates["staff_pick"] = *patch.StaffPick
 	}
 	return updates
 }

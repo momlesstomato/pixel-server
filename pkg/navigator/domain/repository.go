@@ -1,6 +1,9 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Repository defines navigator persistence behavior.
 type Repository interface {
@@ -46,6 +49,10 @@ type RoomFilter struct {
 	SearchQuery string
 	// OwnerID stores optional owner filter.
 	OwnerID *int
+	// PromotedOnly filters to rooms with an active promotion.
+	PromotedOnly bool
+	// StaffPickOnly filters to staff-picked rooms.
+	StaffPickOnly bool
 	// Offset stores pagination offset.
 	Offset int
 	// Limit stores pagination page size.
@@ -64,4 +71,10 @@ type RoomPatch struct {
 	CategoryID *int
 	// MaxUsers stores optional capacity update.
 	MaxUsers *int
+	// PromotedUntil stores optional promotion expiry update.
+	PromotedUntil *time.Time
+	// PromotionName stores optional promotion display name update.
+	PromotionName *string
+	// StaffPick stores optional staff pick flag update.
+	StaffPick *bool
 }

@@ -7,6 +7,7 @@ import (
 	furnituremigration "github.com/momlesstomato/pixel-server/pkg/furniture/infrastructure/migration"
 	inventorymigration "github.com/momlesstomato/pixel-server/pkg/inventory/infrastructure/migration"
 	messengermigration "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/migration"
+	moderationmigration "github.com/momlesstomato/pixel-server/pkg/moderation/infrastructure/migration"
 	navigatormigration "github.com/momlesstomato/pixel-server/pkg/navigator/infrastructure/migration"
 	permissionmigration "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/migration"
 	roommigration "github.com/momlesstomato/pixel-server/pkg/room/infrastructure/migration"
@@ -59,9 +60,17 @@ func Registry() []*gormigrate.Migration {
 		navigatormigration.Step02Rooms(),
 		navigatormigration.Step03SavedSearches(),
 		navigatormigration.Step04Favourites(),
+		navigatormigration.Step05RoomPromotion(),
+		navigatormigration.Step06StaffPick(),
 		roommigration.Step01RoomModels(),
 		roommigration.Step02RoomExtension(),
 		roommigration.Step03RoomBans(),
 		roommigration.Step04RoomRights(),
+		roommigration.Step05ChatLogs(),
+		roommigration.Step06RoomVotes(),
+		roommigration.Step07RoomSoftDelete(),
+		roommigration.Step08RoomForward(),
+		moderationmigration.Step01ModerationActions(),
+		moderationmigration.Step02Phase2Tables(),
 	}
 }

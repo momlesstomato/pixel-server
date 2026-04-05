@@ -51,6 +51,26 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 		return true, rt.handleGetRoomSettings(ctx, connID, userID, body)
 	case packet.SaveRoomSettingsPacketID:
 		return true, rt.handleSaveRoomSettings(ctx, connID, userID, body)
+	case packet.GiveRoomScorePacketID:
+		return true, rt.handleGiveRoomScore(ctx, connID, userID, body)
+	case packet.DeleteRoomPacketID:
+		return true, rt.handleDeleteRoom(ctx, connID, userID, body)
+	case packet.GetBannedUsersPacketID:
+		return true, rt.handleGetBannedUsers(ctx, connID, userID, body)
+	case packet.UnbanUserPacketID:
+		return true, rt.handleUnbanUser(ctx, connID, userID, body)
+	case packet.AssignRightsPacketID:
+		return true, rt.handleAssignRights(ctx, connID, userID, body)
+	case packet.RemoveRightsPacketID:
+		return true, rt.handleRemoveRights(ctx, connID, userID, body)
+	case packet.RemoveMyRightsPacketID:
+		return true, rt.handleRemoveMyRights(ctx, connID, userID)
+	case packet.RemoveAllRightsPacketID:
+		return true, rt.handleRemoveAllRights(ctx, connID, userID)
+	case packet.GetRoomRightsPacketID:
+		return true, rt.handleGetRoomRights(ctx, connID, userID)
+	case packet.ToggleMuteToolPacketID:
+		return true, rt.handleToggleMuteTool(connID, userID)
 	case packet.DesktopViewPacketID, packet.CloseConnectionPacketID:
 		return true, rt.handleLeaveRoom(connID)
 	default:
@@ -73,6 +93,9 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 		rt.logger.Warn("room lookup failed", zap.Int("room_id", roomID), zap.Error(err))
 		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
 	}
+	if room.ForwardRoomID > 0 {
+		return rt.sendPacket(connID, packet.RoomForwardComposer{RoomID: int32(room.ForwardRoomID)})
+	}
 	if accessErr := rt.service.CheckAccess(ctx, room, pkt.Password, userID); accessErr != nil {
 		if accessErr == domain.ErrInvalidPassword {
 			return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 6})
@@ -90,6 +113,9 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 	}
 	rt.leaveCurrentRoom(connID)
 	rt.connRooms[connID] = roomID
+	if rt.visitRecorder != nil {
+		_ = rt.visitRecorder.RecordVisit(ctx, userID, roomID)
+	}
 	return rt.sendRoomData(connID, userID, inst, room)
 }
 
@@ -151,12 +177,31 @@ func (rt *Runtime) sendRoomData(connID string, userID int, inst *engine.Instance
 	}); err != nil {
 		return err
 	}
+	if room.OwnerID == userID {
+		if err := rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 4}); err != nil {
+			return err
+		}
+	} else if rt.service.HasRights(context.Background(), room.ID, userID) {
+		if err := rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 1}); err != nil {
+			return err
+		}
+	}
 	if err := rt.sendPacket(connID, packet.RoomVisualizationComposer{
 		WallThickness: int32(room.WallThickness), FloorThickness: int32(room.FloorThickness),
 	}); err != nil {
 		return err
 	}
 	if err := rt.sendPacket(connID, packet.FurnitureAliasesComposer{}); err != nil {
+		return err
+	}
+	canVote := true
+	if rt.voteRepo != nil {
+		voted, _ := rt.voteRepo.HasVoted(context.Background(), room.ID, userID)
+		canVote = !voted
+	}
+	if err := rt.sendPacket(connID, packet.RoomScoreComposer{
+		Score: int32(room.Score), CanVote: canVote,
+	}); err != nil {
 		return err
 	}
 	if rt.floorItemSender != nil {

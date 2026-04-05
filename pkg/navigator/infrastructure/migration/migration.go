@@ -57,3 +57,44 @@ func Step04Favourites() *gormigrate.Migration {
 		},
 	}
 }
+
+// Step05RoomPromotion returns the migration that adds promotion columns to the rooms table.
+func Step05RoomPromotion() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260404_05_room_promotion",
+		Migrate: func(database *gorm.DB) error {
+			type rooms struct {
+				PromotedUntil *string `gorm:"column:promoted_until;type:timestamptz;default:null"`
+				PromotionName string  `gorm:"column:promotion_name;size:100;not null;default:''"`
+			}
+			return database.Table("rooms").AutoMigrate(&rooms{})
+		},
+		Rollback: func(database *gorm.DB) error {
+			for _, col := range []string{"promoted_until", "promotion_name"} {
+				if database.Migrator().HasColumn("rooms", col) {
+					_ = database.Migrator().DropColumn("rooms", col)
+				}
+			}
+			return nil
+		},
+	}
+}
+
+// Step06StaffPick returns the migration that adds staff_pick column to the rooms table.
+func Step06StaffPick() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260404_06_staff_pick",
+		Migrate: func(database *gorm.DB) error {
+			type rooms struct {
+				StaffPick bool `gorm:"column:staff_pick;not null;default:false"`
+			}
+			return database.Table("rooms").AutoMigrate(&rooms{})
+		},
+		Rollback: func(database *gorm.DB) error {
+			if database.Migrator().HasColumn("rooms", "staff_pick") {
+				return database.Migrator().DropColumn("rooms", "staff_pick")
+			}
+			return nil
+		},
+	}
+}

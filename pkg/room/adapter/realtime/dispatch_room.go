@@ -118,3 +118,186 @@ func (rt *Runtime) handleLeaveRoom(connID string) error {
 	rt.leaveCurrentRoom(connID)
 	return nil
 }
+
+// handleGiveRoomScore processes a room vote request.
+func (rt *Runtime) handleGiveRoomScore(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.GiveRoomScorePacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	roomID, ok := rt.connRooms[connID]
+	if !ok || rt.voteRepo == nil {
+		return nil
+	}
+	voted, _ := rt.voteRepo.HasVoted(ctx, roomID, userID)
+	if voted || pkt.Score < 1 {
+		return rt.sendPacket(connID, packet.RoomScoreComposer{Score: 0, CanVote: false})
+	}
+	if err := rt.voteRepo.CastVote(ctx, roomID, userID); err != nil {
+		rt.logger.Warn("room vote failed", zap.Int("room_id", roomID), zap.Error(err))
+		return nil
+	}
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil {
+		return nil
+	}
+	return rt.sendPacket(connID, packet.RoomScoreComposer{Score: int32(room.Score), CanVote: false})
+}
+
+// handleDeleteRoom processes a room deletion request from the owner.
+func (rt *Runtime) handleDeleteRoom(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.DeleteRoomPacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	roomID := int(pkt.RoomID)
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil || room.OwnerID != userID {
+		return nil
+	}
+	if err := rt.service.SoftDelete(ctx, roomID); err != nil {
+		rt.logger.Warn("room delete failed", zap.Int("room_id", roomID), zap.Error(err))
+		return nil
+	}
+	inst, ok := rt.service.Manager().Get(roomID)
+	if ok {
+		for _, e := range inst.Entities() {
+			if e.Type == domain.EntityPlayer && e.UserID != 0 {
+				_ = rt.sendPacket(e.ConnID, packet.DesktopViewComposer{})
+			}
+		}
+		rt.service.Manager().Unload(roomID)
+	}
+	return nil
+}
+
+// handleGetBannedUsers sends the ban list for a room to the owner.
+func (rt *Runtime) handleGetBannedUsers(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.GetBannedUsersPacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	roomID := int(pkt.RoomID)
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil || room.OwnerID != userID {
+		return nil
+	}
+	bans, err := rt.service.ListBans(ctx, roomID)
+	if err != nil {
+		return nil
+	}
+	entries := make([]packet.BannedUserEntry, len(bans))
+	for i, ban := range bans {
+		name := rt.resolveUsername(ctx, ban.UserID)
+		entries[i] = packet.BannedUserEntry{UserID: int32(ban.UserID), Username: name}
+	}
+	return rt.sendPacket(connID, packet.BannedUsersComposer{RoomID: pkt.RoomID, Bans: entries})
+}
+
+// handleUnbanUser removes a ban entry for a user in a room.
+func (rt *Runtime) handleUnbanUser(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.UnbanUserPacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	roomID := int(pkt.RoomID)
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil || room.OwnerID != userID {
+		return nil
+	}
+	ban, err := rt.service.FindBan(ctx, roomID, int(pkt.UserID))
+	if err != nil || ban == nil {
+		return nil
+	}
+	_ = rt.service.RemoveBan(ctx, ban.ID)
+	return nil
+}
+
+// handleAssignRights grants room rights to one user.
+func (rt *Runtime) handleAssignRights(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.AssignRightsPacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	if err := rt.service.GrantRights(ctx, roomID, userID, int(pkt.UserID)); err != nil {
+		rt.logger.Warn("grant rights failed", zap.Int("room_id", roomID), zap.Error(err))
+	}
+	return nil
+}
+
+// handleRemoveRights revokes room rights from one user.
+func (rt *Runtime) handleRemoveRights(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.RemoveRightsPacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	if err := rt.service.RevokeRights(ctx, roomID, userID, int(pkt.UserID)); err != nil {
+		rt.logger.Warn("revoke rights failed", zap.Int("room_id", roomID), zap.Error(err))
+	}
+	return nil
+}
+
+// handleRemoveMyRights removes rights for the requesting user.
+func (rt *Runtime) handleRemoveMyRights(ctx context.Context, connID string, userID int) error {
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	_ = rt.service.RevokeRights(ctx, roomID, userID, userID)
+	return nil
+}
+
+// handleRemoveAllRights removes all rights holders from the current room.
+func (rt *Runtime) handleRemoveAllRights(ctx context.Context, connID string, userID int) error {
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	if err := rt.service.RevokeAllRights(ctx, roomID, userID); err != nil {
+		rt.logger.Warn("revoke all rights failed", zap.Int("room_id", roomID), zap.Error(err))
+	}
+	return nil
+}
+
+// handleGetRoomRights sends the rights holder list to the owner.
+func (rt *Runtime) handleGetRoomRights(ctx context.Context, connID string, userID int) error {
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	holders, err := rt.service.ListRights(ctx, roomID, userID)
+	if err != nil {
+		return nil
+	}
+	entries := make([]packet.RightsEntry, len(holders))
+	for i, uid := range holders {
+		entries[i] = packet.RightsEntry{UserID: int32(uid), Username: rt.resolveUsername(ctx, uid)}
+	}
+	return rt.sendPacket(connID, packet.RoomRightsListComposer{RoomID: int32(roomID), Entries: entries})
+}
+
+// handleToggleMuteTool toggles the room global chat mute state.
+func (rt *Runtime) handleToggleMuteTool(connID string, userID int) error {
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	room, err := rt.service.FindRoom(context.Background(), roomID)
+	if err != nil || room.OwnerID != userID {
+		return nil
+	}
+	inst, ok := rt.service.Manager().Get(roomID)
+	if !ok {
+		return nil
+	}
+	inst.SetMuted(!inst.Muted())
+	return nil
+}

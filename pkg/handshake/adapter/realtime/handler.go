@@ -59,6 +59,8 @@ type Handler struct {
 	userRuntimeFactory func(*Transport) (UserRuntime, error)
 	// userFinder resolves real usernames for identity account packets.
 	userFinder authflow.UserFinder
+	// banChecker verifies hotel-scope bans before authentication.
+	banChecker authflow.BanChecker
 	// shutdownRegistrar registers per-connection graceful close functions with the HTTP module.
 	shutdownRegistrar func(*websocket.Conn, func())
 	// shutdownUnregistrar removes per-connection graceful close functions on disconnect.
@@ -138,6 +140,9 @@ func (handler *Handler) newRuntimeUseCases(transport *Transport) (*runtimeUseCas
 	}
 	if handler.userFinder != nil {
 		authenticate.SetUserFinder(handler.userFinder)
+	}
+	if handler.banChecker != nil {
+		authenticate.SetBanChecker(handler.banChecker)
 	}
 	return &runtimeUseCases{
 		authenticate: authenticate, timeout: timeout, disconnect: disconnect, heartbeat: heartbeat,

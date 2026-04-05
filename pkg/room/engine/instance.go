@@ -84,6 +84,8 @@ type Instance struct {
 	doorExitNotifier DoorExitNotifier
 	// seatChecker checks whether a tile has sittable or layable furniture.
 	seatChecker TileSeatChecker
+	// muted reports whether the room has chat globally muted.
+	muted bool
 }
 
 // NewInstance creates one room instance ready to start.
@@ -140,6 +142,20 @@ func (inst *Instance) SetDoorExitNotifier(n DoorExitNotifier) {
 // SetTileSeatChecker configures the furniture seat lookup callback for this instance.
 func (inst *Instance) SetTileSeatChecker(fn TileSeatChecker) {
 	inst.seatChecker = fn
+}
+
+// Muted reports whether the room has chat globally muted.
+func (inst *Instance) Muted() bool {
+	inst.mu.RLock()
+	defer inst.mu.RUnlock()
+	return inst.muted
+}
+
+// SetMuted updates the room global chat mute state.
+func (inst *Instance) SetMuted(v bool) {
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	inst.muted = v
 }
 
 // run is the main goroutine loop processing ticks and messages.

@@ -18,11 +18,14 @@ import (
 	inventorydomain "github.com/momlesstomato/pixel-server/pkg/inventory/domain"
 	messengerapplication "github.com/momlesstomato/pixel-server/pkg/messenger/application"
 	messengerstore "github.com/momlesstomato/pixel-server/pkg/messenger/infrastructure/store"
+	moderationapplication "github.com/momlesstomato/pixel-server/pkg/moderation/application"
+	moderationstore "github.com/momlesstomato/pixel-server/pkg/moderation/infrastructure/store"
 	navigatorapplication "github.com/momlesstomato/pixel-server/pkg/navigator/application"
 	permissionnotification "github.com/momlesstomato/pixel-server/pkg/permission/adapter/notification"
 	permissionapplication "github.com/momlesstomato/pixel-server/pkg/permission/application"
 	permissionstore "github.com/momlesstomato/pixel-server/pkg/permission/infrastructure/store"
 	roomapplication "github.com/momlesstomato/pixel-server/pkg/room/application"
+	roomstore "github.com/momlesstomato/pixel-server/pkg/room/infrastructure/store"
 	sessionhotelstatus "github.com/momlesstomato/pixel-server/pkg/status/application/hotelstatus"
 	statusredisstore "github.com/momlesstomato/pixel-server/pkg/status/infrastructure/redisstore"
 	subscriptionapplication "github.com/momlesstomato/pixel-server/pkg/subscription/application"
@@ -49,9 +52,16 @@ type serveServices struct {
 	room          *roomapplication.Service
 	entityService *roomapplication.EntityService
 	chatService   *roomapplication.ChatService
+	voteStore     *roomstore.VoteStore
+	chatLogStore  *roomstore.ChatLogStore
+	moderation    *moderationapplication.Service
 	economyBundle *economyServiceBundle
 	handler       *handshakerealtime.Handler
 	fire          func(sdk.Event)
+	ticketService    *moderationapplication.TicketService
+	wordFilter       *moderationapplication.WordFilterService
+	presetService    *moderationapplication.PresetService
+	visitService     *moderationapplication.VisitService
 }
 
 // buildServeServices constructs shared application dependencies.
@@ -130,6 +140,54 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 	if err != nil {
 		return nil, err
 	}
+	chatLogStore, err := roomstore.NewChatLogStore(runtime.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
+	chatService.SetChatLogRepository(chatLogStore)
+	modActionStore, err := moderationstore.NewActionStore(runtime.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
+	moderation, err := moderationapplication.NewService(modActionStore)
+	if err != nil {
+		return nil, err
+	}
+	chatService.SetMuteChecker(moderation)
+	ticketStore, err := moderationstore.NewTicketStore(runtime.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
+	wordFilterStore, err := moderationstore.NewWordFilterStore(runtime.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
+	presetStore, err := moderationstore.NewPresetStore(runtime.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
+	visitStore, err := moderationstore.NewVisitStore(runtime.PostgreSQL)
+	if err != nil {
+		return nil, err
+	}
+	ticketService, err := moderationapplication.NewTicketService(ticketStore)
+	if err != nil {
+		return nil, err
+	}
+	wordFilter, err := moderationapplication.NewWordFilterService(wordFilterStore)
+	if err != nil {
+		return nil, err
+	}
+	presetService, err := moderationapplication.NewPresetService(presetStore)
+	if err != nil {
+		return nil, err
+	}
+	visitService, err := moderationapplication.NewVisitService(visitStore)
+	if err != nil {
+		return nil, err
+	}
+	chatService.SetWordFilter(wordFilter)
+	voteStore, err := roomstore.NewVoteStore(runtime.PostgreSQL)
 	return &serveServices{
 		sso:      authenticationapplication.NewService(ssoStore, runtime.Config.Authentication),
 		registry: registry, bus: bus, broadcaster: broadcaster, hotelStatus: hotelStatus,
@@ -138,7 +196,10 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		catalog: economyServices.catalog, economy: economyServices.economy,
 		subscription: economyServices.subscription, navigator: economyServices.navigator,
 		room: roomService, entityService: entityService, chatService: chatService,
-		economyBundle: economyServices,
+		voteStore: voteStore, chatLogStore: chatLogStore, economyBundle: economyServices,
+		moderation: moderation,
+		ticketService: ticketService, wordFilter: wordFilter,
+		presetService: presetService, visitService: visitService,
 	}, nil
 }
 

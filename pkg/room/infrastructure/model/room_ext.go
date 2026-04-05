@@ -18,4 +18,6 @@ type RoomExtension struct {
 	AllowPets bool `gorm:"column:allow_pets;not null;default:true"`
 	// AllowTrading stores whether trading is enabled.
 	AllowTrading bool `gorm:"column:allow_trading;not null;default:false"`
+	// ForwardRoomID stores the optional room forward target identifier.
+	ForwardRoomID *int `gorm:"column:forward_room_id;default:null"`
 }

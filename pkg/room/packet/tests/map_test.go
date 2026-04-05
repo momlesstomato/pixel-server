@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
 	"github.com/stretchr/testify/assert"
@@ -114,4 +115,48 @@ func TestIntToAccessState_RoundTrip(t *testing.T) {
 	assert.Equal(t, domain.AccessPassword, packet.IntToAccessState(2))
 	assert.Equal(t, domain.AccessInvisible, packet.IntToAccessState(3))
 	assert.Equal(t, domain.AccessOpen, packet.IntToAccessState(99))
+}
+
+// TestGetBannedUsersPacket_Decode verifies ban list request decoding.
+func TestGetBannedUsersPacket_Decode(t *testing.T) {
+	enc := packet.RoomForwardComposer{RoomID: 5}
+	body, err := enc.Encode()
+	require.NoError(t, err)
+	var pkt packet.GetBannedUsersPacket
+	require.NoError(t, pkt.Decode(body))
+	assert.Equal(t, int32(5), pkt.RoomID)
+	assert.Equal(t, packet.GetBannedUsersPacketID, pkt.PacketID())
+}
+
+// TestBannedUsersComposer_EncodeEmpty verifies empty ban list encoding.
+func TestBannedUsersComposer_EncodeEmpty(t *testing.T) {
+	pkt := packet.BannedUsersComposer{RoomID: 3, Bans: nil}
+	body, err := pkt.Encode()
+	require.NoError(t, err)
+	assert.NotEmpty(t, body)
+	assert.Equal(t, packet.BannedUsersComposerID, pkt.PacketID())
+}
+
+// TestBannedUsersComposer_EncodeWithEntries verifies encoding with entries.
+func TestBannedUsersComposer_EncodeWithEntries(t *testing.T) {
+	pkt := packet.BannedUsersComposer{
+		RoomID: 1,
+		Bans:   []packet.BannedUserEntry{{UserID: 10, Username: "alice"}, {UserID: 20, Username: "bob"}},
+	}
+	body, err := pkt.Encode()
+	require.NoError(t, err)
+	assert.NotEmpty(t, body)
+}
+
+// TestUnbanUserPacket_Decode verifies unban request decoding.
+func TestUnbanUserPacket_Decode(t *testing.T) {
+	w := codec.NewWriter()
+	w.WriteInt32(7)
+	w.WriteInt32(99)
+	body := w.Bytes()
+	var dec packet.UnbanUserPacket
+	require.NoError(t, dec.Decode(body))
+	assert.Equal(t, int32(7), dec.UserID)
+	assert.Equal(t, int32(99), dec.RoomID)
+	assert.Equal(t, packet.UnbanUserPacketID, dec.PacketID())
 }

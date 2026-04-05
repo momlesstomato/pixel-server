@@ -13,6 +13,12 @@ type UserFinder interface {
 	FindByID(context.Context, int) (string, error)
 }
 
+// BanChecker defines hotel ban verification behavior for authentication.
+type BanChecker interface {
+	// IsHotelBanned returns true when user has an active hotel-scope ban.
+	IsHotelBanned(context.Context, int) (bool, error)
+}
+
 // UnauthorizedCloseCode defines the websocket close code for auth failures.
 const UnauthorizedCloseCode = websocket.CloseAbnormalClosure
 

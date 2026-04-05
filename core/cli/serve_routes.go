@@ -18,8 +18,13 @@ import (
 	managementhttpapi "github.com/momlesstomato/pixel-server/pkg/management/adapter/httpapi"
 	messengerhttpapi "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/httpapi"
 	messengerrealtime "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/realtime"
+	moderationhttpapi "github.com/momlesstomato/pixel-server/pkg/moderation/adapter/httpapi"
+	moderationrealtime "github.com/momlesstomato/pixel-server/pkg/moderation/adapter/realtime"
+	moderationapplication "github.com/momlesstomato/pixel-server/pkg/moderation/application"
 	navigatorhttpapi "github.com/momlesstomato/pixel-server/pkg/navigator/adapter/httpapi"
 	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
+	permissionapplication "github.com/momlesstomato/pixel-server/pkg/permission/application"
+	roomhttpapi "github.com/momlesstomato/pixel-server/pkg/room/adapter/httpapi"
 	roomrealtime "github.com/momlesstomato/pixel-server/pkg/room/adapter/realtime"
 	roomdomain "github.com/momlesstomato/pixel-server/pkg/room/domain"
 	subscriptionhttpapi "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/httpapi"
@@ -61,6 +66,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 	handler.ConfigureBroadcaster(services.broadcaster)
 	handler.SetShutdownRegistrar(module.RegisterWebSocketCloser, module.UnregisterWebSocketCloser)
 	handler.ConfigureUserFinder(&userFinderAdapter{service: services.users})
+	handler.ConfigureBanChecker(&banCheckerAdapter{svc: services.moderation})
 	handler.ConfigurePostAuth(services.hotelStatus, services.users, services.users, services.permissions, runtime.Config.App.Name)
 	handler.ConfigureUserRuntime(func(transport *handshakerealtime.Transport) (handshakerealtime.UserRuntime, error) {
 		options := userrealtime.Options{
@@ -121,6 +127,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			return user.Username, nil
 		})
 		roomRT.SetFloorItemSender(furnitureRT.SendRoomFloorItems)
+		roomRT.SetVoteRepository(services.voteStore)
 		services.room.Manager().SetTileSeatChecker(furnitureRT.TileSeatCheckerFor)
 		roomRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
 			user, err := services.users.FindByID(ctx, userID)
@@ -137,6 +144,16 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			return user.Username, user.Figure, user.Motto, user.Gender, nil
 		})
 		runtimes = append(runtimes, roomRT)
+		modRT, err := moderationrealtime.NewRuntime(services.moderation, services.registry, transport, services.broadcaster, &busCloserAdapter{bus: services.bus}, runtime.Logger)
+		if err != nil {
+			return nil, err
+		}
+		modRT.SetTicketService(services.ticketService)
+		modRT.SetPresetService(services.presetService)
+		modRT.SetVisitService(services.visitService)
+		modRT.SetPermissionChecker(&permissionCheckerAdapter{svc: services.permissions})
+		roomRT.SetVisitRecorder(&visitRecorderAdapter{svc: services.visitService})
+		runtimes = append(runtimes, modRT)
 		return &compositeRuntime{runtimes: runtimes}, nil
 	})
 	services.handler = handler
@@ -167,6 +184,15 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 		func(m *corehttp.Module) error { return economyhttpapi.RegisterRoutes(m, services.economy) },
 		func(m *corehttp.Module) error { return subscriptionhttpapi.RegisterRoutes(m, services.subscription) },
 		func(m *corehttp.Module) error { return navigatorhttpapi.RegisterRoutes(m, services.navigator) },
+		func(m *corehttp.Module) error {
+			return roomhttpapi.RegisterRoutes(m, services.chatLogStore)
+		},
+		func(m *corehttp.Module) error {
+			return moderationhttpapi.RegisterRoutes(m, services.moderation)
+		},
+		func(m *corehttp.Module) error {
+			return moderationhttpapi.RegisterPhase2Routes(m, services.ticketService, services.wordFilter, services.presetService, services.visitService)
+		},
 	} {
 		if err := register(module); err != nil {
 			return err
@@ -178,6 +204,8 @@ func registerServeHTTPRoutes(module *corehttp.Module, services *serveServices, w
 		messengerhttpapi.OpenAPIPaths(), furniturehttpapi.OpenAPIPaths(),
 		inventoryhttpapi.OpenAPIPaths(), cataloghttpapi.OpenAPIPaths(),
 		economyhttpapi.OpenAPIPaths(), subscriptionhttpapi.OpenAPIPaths(), navigatorhttpapi.OpenAPIPaths(),
+		roomhttpapi.OpenAPIPaths(), moderationhttpapi.OpenAPIPaths(),
+		moderationhttpapi.Phase2OpenAPIPaths(),
 	)
 	return httpopenapi.RegisterRoutes(module, httpopenapi.BuildDocument(wsPath, paths), "", "")
 }
@@ -205,4 +233,34 @@ type busCloserAdapter struct {
 // Close publishes a close signal for one connection identifier.
 func (adapter *busCloserAdapter) Close(ctx context.Context, connID string, code int, reason string) error {
 	return adapter.bus.Publish(ctx, connID, handshakerealtime.CloseSignal{Code: code, Reason: reason})
+}
+
+// banCheckerAdapter adapts moderation Service to authflow.BanChecker.
+type banCheckerAdapter struct {
+	svc *moderationapplication.Service
+}
+
+// IsHotelBanned returns true when user has an active hotel ban.
+func (a *banCheckerAdapter) IsHotelBanned(ctx context.Context, userID int) (bool, error) {
+	return a.svc.IsHotelBanned(ctx, userID)
+}
+
+// permissionCheckerAdapter adapts permission Service to moderation PermissionChecker.
+type permissionCheckerAdapter struct {
+	svc *permissionapplication.Service
+}
+
+// HasPermission reports whether a user holds the named permission.
+func (a *permissionCheckerAdapter) HasPermission(ctx context.Context, userID int, perm string) (bool, error) {
+	return a.svc.HasPermission(ctx, userID, perm)
+}
+
+// visitRecorderAdapter adapts moderation VisitService to room VisitRecorder.
+type visitRecorderAdapter struct {
+	svc *moderationapplication.VisitService
+}
+
+// RecordVisit persists a room visit entry.
+func (a *visitRecorderAdapter) RecordVisit(ctx context.Context, userID int, roomID int) error {
+	return a.svc.RecordVisit(ctx, userID, roomID)
 }

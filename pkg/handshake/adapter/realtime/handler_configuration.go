@@ -43,6 +43,11 @@ func (handler *Handler) ConfigureUserFinder(finder authflow.UserFinder) {
 	handler.userFinder = finder
 }
 
+// ConfigureBanChecker wires hotel-scope ban verification before authentication.
+func (handler *Handler) ConfigureBanChecker(checker authflow.BanChecker) {
+	handler.banChecker = checker
+}
+
 // SetShutdownRegistrar wires per-connection graceful close registration with the HTTP module.
 // The register function is called after a transport is created so that server shutdown
 // sends the disconnect reason packet through the encrypted transport instead of raw bytes.

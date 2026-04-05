@@ -19,8 +19,10 @@ import (
 	furniturecommand "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/command"
 	inventorycommand "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/command"
 	messengercommand "github.com/momlesstomato/pixel-server/pkg/messenger/adapter/command"
+	moderationcommand "github.com/momlesstomato/pixel-server/pkg/moderation/adapter/command"
 	navigatorcommand "github.com/momlesstomato/pixel-server/pkg/navigator/adapter/command"
 	permissioncommand "github.com/momlesstomato/pixel-server/pkg/permission/adapter/command"
+	roomcommand "github.com/momlesstomato/pixel-server/pkg/room/adapter/command"
 	subscriptioncommand "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/command"
 	usercommand "github.com/momlesstomato/pixel-server/pkg/user/adapter/command"
 	userdomain "github.com/momlesstomato/pixel-server/pkg/user/domain"
@@ -112,6 +114,7 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	svc.economy.SetEventFirer(fire)
 	svc.navigator.SetEventFirer(fire)
 	svc.room.SetEventFirer(fire)
+	svc.moderation.SetEventFirer(fire)
 	address := fmt.Sprintf("%s:%d", runtime.Config.App.BindIP, runtime.Config.App.Port)
 	runtime.Logger.Info("http server starting", zap.String("address", address))
 	return runServeLifecycle(runtime, runtime.HTTP, address, listen)
@@ -141,6 +144,10 @@ type Dependencies struct {
 	Subscription subscriptioncommand.Dependencies
 	// Navigator defines navigator command runtime dependencies.
 	Navigator navigatorcommand.Dependencies
+	// Room defines room command runtime dependencies.
+	Room roomcommand.Dependencies
+	// Moderation defines moderation command runtime dependencies.
+	Moderation moderationcommand.Dependencies
 }
 
 // NewRootCommand creates the root CLI command tree.
@@ -161,6 +168,8 @@ func NewRootCommand(dependencies Dependencies) *cobra.Command {
 	command.AddCommand(economycommand.NewEconomyCommand(dependencies.Economy))
 	command.AddCommand(subscriptioncommand.NewSubscriptionCommand(dependencies.Subscription))
 	command.AddCommand(navigatorcommand.NewNavigatorCommand(dependencies.Navigator))
+	command.AddCommand(roomcommand.NewRoomCommand(dependencies.Room))
+	command.AddCommand(moderationcommand.NewModerationCommand(dependencies.Moderation))
 	return command
 }
 

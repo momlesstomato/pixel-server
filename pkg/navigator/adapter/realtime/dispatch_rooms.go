@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/navigator/application"
@@ -111,4 +112,45 @@ func parseCreateRoom(body []byte) (string, string, string, int, int, []string) {
 	_ = model
 	_ = tradeMode
 	return name, desc, "open", int(catID), int(maxUsers), tags
+}
+
+// handlePurchaseRoomAd activates a room promotion for a specified duration.
+func (runtime *Runtime) handlePurchaseRoomAd(ctx context.Context, connID string, _ int, body []byte) error {
+	r := codec.NewReader(body)
+	roomID, _ := r.ReadInt32()
+	minutes, _ := r.ReadInt32()
+	name, _ := r.ReadString()
+	if roomID <= 0 || minutes <= 0 {
+		return nil
+	}
+	until := time.Now().Add(time.Duration(minutes) * time.Minute)
+	_, err := runtime.service.UpdateRoom(ctx, int(roomID), domain.RoomPatch{
+		PromotedUntil: &until,
+		PromotionName: &name,
+	})
+	if err != nil {
+		runtime.logger.Warn("purchase room ad failed", zap.Int32("room_id", roomID), zap.Error(err))
+	}
+	return nil
+}
+
+// handleStaffPick toggles the staff pick flag on a room.
+func (runtime *Runtime) handleStaffPick(ctx context.Context, connID string, userID int, body []byte) error {
+	if runtime.permissions != nil {
+		ok, _ := runtime.permissions.HasPermission(ctx, userID, domain.PermStaffPick)
+		if !ok {
+			return nil
+		}
+	}
+	r := codec.NewReader(body)
+	roomID, _ := r.ReadInt32()
+	pick, _ := r.ReadBool()
+	if roomID <= 0 {
+		return nil
+	}
+	_, err := runtime.service.UpdateRoom(ctx, int(roomID), domain.RoomPatch{StaffPick: &pick})
+	if err != nil {
+		runtime.logger.Warn("staff pick failed", zap.Int32("room_id", roomID), zap.Error(err))
+	}
+	return nil
 }

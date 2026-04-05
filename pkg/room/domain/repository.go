@@ -69,4 +69,38 @@ type RoomRepository interface {
 	FindByID(ctx context.Context, roomID int) (Room, error)
 	// SaveSettings persists updated room settings for one room.
 	SaveSettings(ctx context.Context, room Room) error
+	// SoftDelete marks one room as deleted by setting deleted_at.
+	SoftDelete(ctx context.Context, roomID int) error
+}
+
+// ChatLogEntry defines one immutable chat history record.
+type ChatLogEntry struct {
+	// RoomID stores the room where the message was sent.
+	RoomID int
+	// UserID stores the sender user identifier.
+	UserID int
+	// Username stores the sender display name at message time.
+	Username string
+	// Message stores the chat text payload.
+	Message string
+	// ChatType stores the message kind (talk, shout, whisper).
+	ChatType string
+	// CreatedAt stores the message timestamp.
+	CreatedAt time.Time
+}
+
+// ChatLogRepository defines persistence operations for room chat history.
+type ChatLogRepository interface {
+	// Append persists one chat log entry.
+	Append(ctx context.Context, entry ChatLogEntry) error
+	// ListByRoom returns chat entries for one room filtered by time range.
+	ListByRoom(ctx context.Context, roomID int, from time.Time, to time.Time) ([]ChatLogEntry, error)
+}
+
+// VoteRepository defines persistence operations for room score votes.
+type VoteRepository interface {
+	// HasVoted reports whether one user has voted for one room.
+	HasVoted(ctx context.Context, roomID int, userID int) (bool, error)
+	// CastVote records one vote and increments the room score.
+	CastVote(ctx context.Context, roomID int, userID int) error
 }

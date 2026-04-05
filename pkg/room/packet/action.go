@@ -163,3 +163,79 @@ func (p SleepComposer) Encode() ([]byte, error) {
 	w.WriteBool(p.IsAsleep)
 	return w.Bytes(), nil
 }
+
+// AssignRightsPacket decodes client room.assign_rights request (c2s 3843).
+type AssignRightsPacket struct {
+	// UserID stores the target user identifier.
+	UserID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p AssignRightsPacket) PacketID() uint16 { return AssignRightsPacketID }
+
+// Decode parses packet body.
+func (p *AssignRightsPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	id, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.UserID = id
+	return nil
+}
+
+// RemoveRightsPacket decodes client room.remove_rights request (c2s 877).
+type RemoveRightsPacket struct {
+	// UserID stores the target user identifier.
+	UserID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RemoveRightsPacket) PacketID() uint16 { return RemoveRightsPacketID }
+
+// Decode parses packet body.
+func (p *RemoveRightsPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	id, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.UserID = id
+	return nil
+}
+
+// RemoveMyRightsPacket decodes client room.remove_my_rights request (c2s 111).
+type RemoveMyRightsPacket struct{}
+
+// PacketID returns the protocol packet identifier.
+func (p RemoveMyRightsPacket) PacketID() uint16 { return RemoveMyRightsPacketID }
+
+// Decode parses packet body.
+func (p *RemoveMyRightsPacket) Decode(_ []byte) error { return nil }
+
+// RemoveAllRightsPacket decodes client room.remove_all_rights request (c2s 884).
+type RemoveAllRightsPacket struct{}
+
+// PacketID returns the protocol packet identifier.
+func (p RemoveAllRightsPacket) PacketID() uint16 { return RemoveAllRightsPacketID }
+
+// Decode parses packet body.
+func (p *RemoveAllRightsPacket) Decode(_ []byte) error { return nil }
+
+// GetRoomRightsPacket decodes client room.get_room_rights request (c2s 3937).
+type GetRoomRightsPacket struct{}
+
+// PacketID returns the protocol packet identifier.
+func (p GetRoomRightsPacket) PacketID() uint16 { return GetRoomRightsPacketID }
+
+// Decode parses packet body.
+func (p *GetRoomRightsPacket) Decode(_ []byte) error { return nil }
+
+// ToggleMuteToolPacket decodes client room.toggle_mute_tool request (c2s 1301).
+type ToggleMuteToolPacket struct{}
+
+// PacketID returns the protocol packet identifier.
+func (p ToggleMuteToolPacket) PacketID() uint16 { return ToggleMuteToolPacketID }
+
+// Decode parses packet body.
+func (p *ToggleMuteToolPacket) Decode(_ []byte) error { return nil }

@@ -20,6 +20,8 @@ type AuthenticateUseCase struct {
 	transport Transport
 	// users resolves real user display names for identity packets.
 	users UserFinder
+	// banChecker verifies hotel-scope bans before authentication.
+	banChecker BanChecker
 	// now provides deterministic time source for session timestamps.
 	now func() time.Time
 	// fire dispatches optional plugin lifecycle events.
@@ -50,6 +52,11 @@ func (useCase *AuthenticateUseCase) SetUserFinder(users UserFinder) {
 	useCase.users = users
 }
 
+// SetBanChecker wires hotel-scope ban verification before authentication.
+func (useCase *AuthenticateUseCase) SetBanChecker(checker BanChecker) {
+	useCase.banChecker = checker
+}
+
 // Authenticate validates ticket, handles duplicate sessions, and emits auth packets.
 func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request AuthenticateRequest) (AuthenticateResult, error) {
 	if request.ConnID == "" {
@@ -64,6 +71,17 @@ func (useCase *AuthenticateUseCase) Authenticate(ctx context.Context, request Au
 	if err != nil {
 		useCase.closeWithReason(request.ConnID, packetauth.DisconnectReasonInvalidLoginTicket, UnauthorizedCloseCode, "unauthorized")
 		return AuthenticateResult{}, err
+	}
+	if useCase.banChecker != nil {
+		banned, banErr := useCase.banChecker.IsHotelBanned(ctx, userID)
+		if banErr != nil {
+			useCase.closeWithReason(request.ConnID, packetauth.DisconnectReasonStillBanned, UnauthorizedCloseCode, "ban check failed")
+			return AuthenticateResult{}, fmt.Errorf("ban check for user %d: %w", userID, banErr)
+		}
+		if banned {
+			useCase.closeWithReason(request.ConnID, packetauth.DisconnectReasonStillBanned, UnauthorizedCloseCode, "banned")
+			return AuthenticateResult{}, fmt.Errorf("user %d is hotel-banned", userID)
+		}
 	}
 	username, err := useCase.resolveUsername(ctx, request.ConnID, userID)
 	if err != nil {

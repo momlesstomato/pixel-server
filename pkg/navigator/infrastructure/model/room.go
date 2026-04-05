@@ -26,6 +26,12 @@ type Room struct {
 	Tags string `gorm:"size:255;not null;default:''"`
 	// TradeMode stores the trade policy code.
 	TradeMode int `gorm:"not null;default:0"`
+	// PromotedUntil stores the room promotion expiry timestamp.
+	PromotedUntil *time.Time `gorm:"column:promoted_until;default:null"`
+	// PromotionName stores the promotion display name.
+	PromotionName string `gorm:"column:promotion_name;size:100;not null;default:''"`
+	// StaffPick stores whether the room is staff-picked.
+	StaffPick bool `gorm:"column:staff_pick;not null;default:false"`
 	// CreatedAt stores row creation timestamp.
 	CreatedAt time.Time
 	// UpdatedAt stores row update timestamp.

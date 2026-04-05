@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"gorm.io/gorm"
@@ -47,6 +48,8 @@ type roomRecord struct {
 	AllowPets bool `gorm:"column:allow_pets"`
 	// AllowTrading stores whether trading is enabled.
 	AllowTrading bool `gorm:"column:allow_trading"`
+	// ForwardRoomID stores the optional room forward target identifier.
+	ForwardRoomID *int `gorm:"column:forward_room_id"`
 }
 
 // TableName returns the PostgreSQL table name for roomRecord.
@@ -91,11 +94,22 @@ func (s *RoomStore) SaveSettings(ctx context.Context, room domain.Room) error {
 	return s.db.WithContext(ctx).Table("rooms").Where("id = ?", room.ID).Updates(updates).Error
 }
 
+// SoftDelete marks one room as deleted by setting deleted_at.
+func (s *RoomStore) SoftDelete(ctx context.Context, roomID int) error {
+	now := time.Now()
+	return s.db.WithContext(ctx).Table("rooms").Where("id = ?", roomID).
+		Update("deleted_at", now).Error
+}
+
 // recordToDomain converts a database record to the domain Room aggregate.
 func recordToDomain(rec roomRecord) domain.Room {
 	var tags []string
 	if rec.Tags != "" {
 		tags = strings.Split(rec.Tags, ",")
+	}
+	var forwardRoomID int
+	if rec.ForwardRoomID != nil {
+		forwardRoomID = *rec.ForwardRoomID
 	}
 	return domain.Room{
 		ID: int(rec.ID), OwnerID: int(rec.OwnerID), OwnerName: rec.OwnerName,
@@ -113,5 +127,6 @@ func recordToDomain(rec roomRecord) domain.Room {
 		WallThickness:  rec.WallThickness,
 		AllowPets:      rec.AllowPets,
 		AllowTrading:   rec.AllowTrading,
+		ForwardRoomID:  forwardRoomID,
 	}
 }

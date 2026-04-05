@@ -144,3 +144,127 @@ func (p DesktopViewComposer) PacketID() uint16 { return DesktopViewComposerID }
 
 // Encode serializes the hotel view redirect payload.
 func (p DesktopViewComposer) Encode() ([]byte, error) { return []byte{}, nil }
+
+// RoomForwardComposer redirects the client to another room (s2c 160).
+type RoomForwardComposer struct {
+	// RoomID stores the target room identifier.
+	RoomID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomForwardComposer) PacketID() uint16 { return RoomForwardComposerID }
+
+// Encode serializes the room forward payload.
+func (p RoomForwardComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.RoomID)
+	return w.Bytes(), nil
+}
+
+// DeleteRoomPacket decodes client room deletion request (c2s 532).
+type DeleteRoomPacket struct {
+	// RoomID stores the room to delete.
+	RoomID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p DeleteRoomPacket) PacketID() uint16 { return DeleteRoomPacketID }
+
+// Decode parses packet body payload.
+func (p *DeleteRoomPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	id, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.RoomID = id
+	return nil
+}
+
+// GiveRoomScorePacket decodes client room vote request (c2s 3616).
+type GiveRoomScorePacket struct {
+	// Score stores the vote value (typically 1 or -1).
+	Score int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p GiveRoomScorePacket) PacketID() uint16 { return GiveRoomScorePacketID }
+
+// Decode parses packet body payload.
+func (p *GiveRoomScorePacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	score, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.Score = score
+	return nil
+}
+
+// RoomScoreComposer sends room score and voting eligibility (s2c 3271).
+type RoomScoreComposer struct {
+	// Score stores the current room score.
+	Score int32
+	// CanVote reports whether the recipient may vote.
+	CanVote bool
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomScoreComposer) PacketID() uint16 { return RoomScoreComposerID }
+
+// Encode serializes room score response.
+func (p RoomScoreComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.Score)
+	w.WriteBool(p.CanVote)
+	return w.Bytes(), nil
+}
+
+// YouAreControllerComposer informs a user of their room rights level (s2c 680).
+type YouAreControllerComposer struct {
+	// Level stores the rights level (0 = none, 1 = rights holder).
+	Level int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p YouAreControllerComposer) PacketID() uint16 { return YouAreControllerComposerID }
+
+// Encode serializes the rights level response.
+func (p YouAreControllerComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.Level)
+	return w.Bytes(), nil
+}
+
+// RightsEntry defines one rights holder entry for the rights list composer.
+type RightsEntry struct {
+	// UserID stores the rights holder identifier.
+	UserID int32
+	// Username stores the rights holder display name.
+	Username string
+}
+
+// RoomRightsListComposer sends all room rights holders to the owner (s2c 225).
+type RoomRightsListComposer struct {
+	// RoomID stores the room identifier.
+	RoomID int32
+	// Entries stores the rights holder list.
+	Entries []RightsEntry
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomRightsListComposer) PacketID() uint16 { return RoomRightsListComposerID }
+
+// Encode serializes the rights list response.
+func (p RoomRightsListComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.RoomID)
+	w.WriteInt32(int32(len(p.Entries)))
+	for _, e := range p.Entries {
+		w.WriteInt32(e.UserID)
+		if err := w.WriteString(e.Username); err != nil {
+			return nil, err
+		}
+	}
+	return w.Bytes(), nil
+}

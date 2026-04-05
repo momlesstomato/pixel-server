@@ -39,6 +39,10 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 		return true, runtime.handleDeleteSearch(ctx, connID, userID, body)
 	case packet.GetUserEventCatsPacketID:
 		return true, runtime.handleGetEventCats(connID)
+	case packet.PurchaseRoomAdPacketID:
+		return true, runtime.handlePurchaseRoomAd(ctx, connID, userID, body)
+	case packet.StaffPickPacketID:
+		return true, runtime.handleStaffPick(ctx, connID, userID, body)
 	case packet.SaveSettingsPacketID:
 		return true, nil
 	default:
@@ -74,8 +78,13 @@ func (runtime *Runtime) handleInit(ctx context.Context, connID string, userID in
 func (runtime *Runtime) handleSearch(ctx context.Context, connID string, userID int, body []byte) error {
 	searchCode, filter := parseSearchParams(body)
 	roomFilter := domain.RoomFilter{SearchQuery: filter, Limit: 50}
-	if searchCode == "myworld_view" {
+	switch searchCode {
+	case "myworld_view":
 		roomFilter.OwnerID = &userID
+	case "new_ads":
+		roomFilter.PromotedOnly = true
+	case "official":
+		roomFilter.StaffPickOnly = true
 	}
 	rooms, _, err := runtime.service.ListRooms(ctx, roomFilter)
 	if err != nil {
