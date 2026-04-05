@@ -116,5 +116,3 @@ func (s *EntityService) Sign(_ context.Context, inst *engine.Instance, entity *d
 	}
 	return nil
 }
-
-

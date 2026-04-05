@@ -8,8 +8,8 @@ import (
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/moderation/domain"
 	"github.com/momlesstomato/pixel-server/pkg/moderation/packet"
-	notificationpacket "github.com/momlesstomato/pixel-server/pkg/session/packet/notification"
 	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+	notificationpacket "github.com/momlesstomato/pixel-server/pkg/session/packet/notification"
 	bannedpacket "github.com/momlesstomato/pixel-server/pkg/user/packet/banned"
 	"go.uber.org/zap"
 )

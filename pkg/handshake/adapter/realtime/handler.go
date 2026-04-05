@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/gofiber/contrib/websocket"
+	sdk "github.com/momlesstomato/pixel-sdk"
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"

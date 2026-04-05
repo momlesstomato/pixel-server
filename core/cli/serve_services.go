@@ -58,10 +58,10 @@ type serveServices struct {
 	economyBundle *economyServiceBundle
 	handler       *handshakerealtime.Handler
 	fire          func(sdk.Event)
-	ticketService    *moderationapplication.TicketService
-	wordFilter       *moderationapplication.WordFilterService
-	presetService    *moderationapplication.PresetService
-	visitService     *moderationapplication.VisitService
+	ticketService *moderationapplication.TicketService
+	wordFilter    *moderationapplication.WordFilterService
+	presetService *moderationapplication.PresetService
+	visitService  *moderationapplication.VisitService
 }
 
 // buildServeServices constructs shared application dependencies.
@@ -197,7 +197,7 @@ func buildServeServices(runtime *initializer.Runtime) (*serveServices, error) {
 		subscription: economyServices.subscription, navigator: economyServices.navigator,
 		room: roomService, entityService: entityService, chatService: chatService,
 		voteStore: voteStore, chatLogStore: chatLogStore, economyBundle: economyServices,
-		moderation: moderation,
+		moderation:    moderation,
 		ticketService: ticketService, wordFilter: wordFilter,
 		presetService: presetService, visitService: visitService,
 	}, nil
