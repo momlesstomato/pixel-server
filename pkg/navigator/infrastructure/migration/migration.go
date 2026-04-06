@@ -70,6 +70,9 @@ func Step05RoomPromotion() *gormigrate.Migration {
 			return database.Table("rooms").AutoMigrate(&rooms{})
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			for _, col := range []string{"promoted_until", "promotion_name"} {
 				if database.Migrator().HasColumn("rooms", col) {
 					_ = database.Migrator().DropColumn("rooms", col)
@@ -91,6 +94,9 @@ func Step06StaffPick() *gormigrate.Migration {
 			return database.Table("rooms").AutoMigrate(&rooms{})
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			if database.Migrator().HasColumn("rooms", "staff_pick") {
 				return database.Migrator().DropColumn("rooms", "staff_pick")
 			}

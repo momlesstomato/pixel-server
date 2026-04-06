@@ -24,5 +24,8 @@ const SelectClubGiftPacketID uint16 = 2276
 // ClubOffersResponsePacketID defines packet identifier for catalog.club_offers (s2c).
 const ClubOffersResponsePacketID uint16 = 2405
 
+// HCExtendOfferResponsePacketID defines packet identifier for catalog.hc_extend_offer (s2c).
+const HCExtendOfferResponsePacketID uint16 = 3964
+
 // ClubGiftInfoResponsePacketID defines packet identifier for catalog.club_gift_info (s2c).
 const ClubGiftInfoResponsePacketID uint16 = 619

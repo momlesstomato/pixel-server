@@ -27,6 +27,12 @@ type UserRuntime interface {
 	Dispose(string)
 }
 
+// PostAuthHook defines a callback invoked after successful authentication.
+type PostAuthHook interface {
+	// OnPostAuth is invoked once after a user authenticates.
+	OnPostAuth(ctx context.Context, connID string, userID int)
+}
+
 // Handler defines websocket handshake runtime behavior.
 type Handler struct {
 	// validator validates SSO tickets during authentication flow.

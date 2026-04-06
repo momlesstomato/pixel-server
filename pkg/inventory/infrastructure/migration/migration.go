@@ -6,6 +6,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// userCreditsRow is a minimal table proxy used only to check or drop the legacy credits column.
+type userCreditsRow struct {
+	// Credits stores the legacy credits column to be removed.
+	Credits int `gorm:"column:credits"`
+}
+
+// TableName returns the users table name for this proxy struct.
+func (userCreditsRow) TableName() string { return "users" }
+
 // Step01UserCurrencies returns the migration that creates currency_types, user_currencies,
 // and currency_transactions tables.
 func Step01UserCurrencies() *gormigrate.Migration {
@@ -38,21 +47,16 @@ func Step02DropUserCredits() *gormigrate.Migration {
 	return &gormigrate.Migration{
 		ID: "20260320_04_drop_user_credits",
 		Migrate: func(database *gorm.DB) error {
-			return database.Exec(`
-				DO $$ BEGIN
-					IF EXISTS (
-						SELECT 1 FROM information_schema.columns
-						WHERE table_name = 'users' AND column_name = 'credits'
-					) THEN
-						ALTER TABLE users DROP COLUMN credits;
-					END IF;
-				END $$
-			`).Error
+			if !database.Migrator().HasColumn(&userCreditsRow{}, "credits") {
+				return nil
+			}
+			return database.Migrator().DropColumn(&userCreditsRow{}, "credits")
 		},
 		Rollback: func(database *gorm.DB) error {
-			return database.Exec(
-				"ALTER TABLE users ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0",
-			).Error
+			if database.Migrator().HasColumn(&userCreditsRow{}, "credits") {
+				return nil
+			}
+			return database.Migrator().AddColumn(&userCreditsRow{}, "credits")
 		},
 	}
 }

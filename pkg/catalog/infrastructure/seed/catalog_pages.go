@@ -14,6 +14,12 @@ var defaultPages = []catalogmodel.Page{
 	{Caption: "Pets", Visible: true, Enabled: true, OrderNum: 4, IconImage: 4, PageLayout: "pets"},
 }
 
+// hcShopPage defines the HC/subscription shop catalog page.
+var hcShopPage = catalogmodel.Page{
+	Caption: "HC Shop", Visible: true, Enabled: true, OrderNum: 10,
+	IconImage: 10, PageLayout: "club_buy", ClubOnly: false,
+}
+
 // Step01DefaultPages returns seed step for essential catalog pages.
 func Step01DefaultPages() *gormigrate.Migration {
 	return &gormigrate.Migration{
@@ -32,6 +38,19 @@ func Step01DefaultPages() *gormigrate.Migration {
 				captions = append(captions, p.Caption)
 			}
 			return database.Where("caption IN ?", captions).Delete(&catalogmodel.Page{}).Error
+		},
+	}
+}
+
+// Step02HCShopPage returns seed step for the HC/subscription shop catalog page.
+func Step02HCShopPage() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260405_S02_hc_shop_page",
+		Migrate: func(database *gorm.DB) error {
+			return database.FirstOrCreate(&hcShopPage, catalogmodel.Page{Caption: hcShopPage.Caption}).Error
+		},
+		Rollback: func(database *gorm.DB) error {
+			return database.Where("caption = ?", hcShopPage.Caption).Delete(&catalogmodel.Page{}).Error
 		},
 	}
 }

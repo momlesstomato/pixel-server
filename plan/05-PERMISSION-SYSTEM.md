@@ -177,12 +177,16 @@ const (
 
 ```go
 const (
-    ModerationWildcard = "moderation.*"
-    ModerationBan      = "moderation.ban"
-    ModerationKick     = "moderation.kick"
-    ModerationMute     = "moderation.mute"
-    ModerationAlert    = "moderation.alert"
-    ModerationRoomCtrl = "moderation.room"
+    PermKick      = "moderation.kick"
+    PermBan       = "moderation.ban"
+    PermMute      = "moderation.mute"
+    PermWarn      = "moderation.warn"
+    PermTradeLock = "moderation.trade_lock"
+    PermUnban     = "moderation.unban"
+    PermUnmute    = "moderation.unmute"
+    PermHistory   = "moderation.history"
+    PermTool      = "moderation.tool"
+    PermAmbassador = "role.ambassador"
 )
 ```
 
@@ -507,9 +511,24 @@ Migration creates these default groups:
 | Name | Display | Priority | Club | Security | Ambassador | Default | Permissions |
 |------|---------|----------|------|----------|------------|---------|-------------|
 | `default` | Default | 0 | 0 | 0 | false | true | `perk.safe_chat`, `perk.helpers`, `perk.citizen` |
-| `vip` | VIP | 10 | 2 | 0 | false | false | `perk.*` |
-| `moderator` | Moderator | 50 | 0 | 1 | false | false | `perk.*`, `moderation.kick`, `moderation.mute`, `moderation.alert` |
+| `vip` | VIP | 10 | 2 | 0 | false | false | `perk.*`, `messenger.friends.extended` |
+| `moderator` | Moderator | 50 | 0 | 1 | false | false | `perk.*`, `moderation.kick`, `moderation.mute`, `moderation.alert`, `moderation.tool`, `moderation.history`, `messenger.flood.bypass` |
 | `admin` | Administrator | 100 | 2 | 3 | true | false | `*` |
+| `staff` | Staff | 75 | 0 | 2 | false | false | `perk.*`, `moderation.kick`, `moderation.ban`, `moderation.mute`, `moderation.warn`, `moderation.trade_lock`, `moderation.unban`, `moderation.unmute`, `moderation.history`, `moderation.tool`, `messenger.flood.bypass` |
+| `ambassador` | Ambassador | 20 | 0 | 0 | true | false | `perk.safe_chat`, `perk.citizen`, `perk.helpers`, `role.ambassador`, `messenger.friends.extended`, `moderation.history` |
+
+### Multi-Group Assignment Seeds
+
+Admin and staff users are granted additional group membership via the
+assignment backfill seed step (`Step09AssignmentBackfill`):
+
+| User role | Primary group | Additional groups |
+|-----------|--------------|-------------------|
+| admin users | admin | moderator, vip |
+| staff users | staff | moderator |
+
+This demonstrates multi-group support where effective permissions are
+the union of all assigned groups.
 
 ---
 
@@ -633,7 +652,7 @@ duplicate entries. No transaction needed for idempotent inserts.
 | 25 | Implement `pluginPermissionAPI` wrapper | 24 | DONE |
 | 26 | Fire `PermissionChecked` event (opt-in, not default) | 25 | DONE |
 | 27 | E2E test: custom plugin permission check | 25 | DONE |
-| 28 | Documentation: permission system wiki page | all | PENDING |
+| 28 | Documentation: permission system wiki page | all | DONE |
 
 ---
 

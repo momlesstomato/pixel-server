@@ -57,6 +57,15 @@ func (c *compositeRuntime) Dispose(connID string) {
 	}
 }
 
+// OnPostAuth delegates post-authentication hooks to component runtimes.
+func (c *compositeRuntime) OnPostAuth(ctx context.Context, connID string, userID int) {
+	for _, r := range c.runtimes {
+		if hook, ok := r.(handshakerealtime.PostAuthHook); ok {
+			hook.OnPostAuth(ctx, connID, userID)
+		}
+	}
+}
+
 // registerServeWebSocket registers websocket endpoint behavior.
 func registerServeWebSocket(module *corehttp.Module, path string, runtime *initializer.Runtime, services *serveServices) error {
 	handler, err := handshakerealtime.NewHandler(services.sso, services.registry, packetsecurity.NewMachineIDPolicy(nil), services.bus, runtime.Logger, 30*time.Second)

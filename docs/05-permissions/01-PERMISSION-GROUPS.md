@@ -63,9 +63,24 @@ Resolve([]string{"*"}, "anything.at.all")                        // true
 | Name | Priority | Club | Security | Ambassador | Default | Grants |
 |------|----------|------|----------|------------|---------|--------|
 | `default` | 0 | 0 | 0 | No | **Yes** | `perk.safe_chat`, `perk.helpers`, `perk.citizen` |
-| `vip` | 10 | 2 | 0 | No | No | `perk.*` |
-| `moderator` | 50 | 0 | 1 | No | No | `perk.*`, `moderation.kick`, `moderation.mute`, `moderation.alert` |
+| `vip` | 10 | 2 | 0 | No | No | `perk.*`, `messenger.friends.extended` |
+| `moderator` | 50 | 0 | 1 | No | No | `perk.*`, `moderation.kick`, `moderation.mute`, `moderation.alert`, `moderation.tool`, `moderation.history`, `messenger.flood.bypass` |
 | `admin` | 100 | 2 | 3 | **Yes** | No | `*` |
+| `staff` | 75 | 0 | 2 | No | No | `perk.*`, `moderation.*` (kick, ban, mute, warn, trade_lock, unban, unmute, history, tool), `messenger.flood.bypass` |
+| `ambassador` | 20 | 0 | 0 | **Yes** | No | `perk.safe_chat`, `perk.citizen`, `perk.helpers`, `role.ambassador`, `messenger.friends.extended`, `moderation.history` |
+
+### Multi-Group Assignments
+
+Users can belong to multiple groups simultaneously. Effective permissions
+are the union of all assigned group grants. The primary group (displayed
+in-game) is the one with the highest priority.
+
+Admin and staff seed users receive additional group assignments:
+
+| User role | Primary group | Additional groups |
+|-----------|--------------|-------------------|
+| admin users | admin | moderator, vip |
+| staff users | staff | moderator |
 
 ## REST API
 

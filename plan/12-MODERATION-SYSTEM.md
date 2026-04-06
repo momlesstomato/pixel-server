@@ -150,20 +150,52 @@ a scope discriminator:
 
 ## Permission Scopes
 
-### New permissions required
+### Permission constants (`pkg/moderation/domain/permission.go`)
 
-| Permission | Purpose |
-|------------|---------|
-| moderation.kick | Hotel-level kick (force disconnect) |
-| moderation.ban | Hotel-level ban (account/IP/machine) |
-| moderation.mute | Hotel-level mute (chat restriction) |
-| moderation.warn | Send warning/caution to user |
-| moderation.unban | Deactivate hotel bans |
-| moderation.unmute | Deactivate hotel mutes |
-| moderation.history | View user moderation history |
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `PermKick` | `moderation.kick` | Hotel-level kick (force disconnect) |
+| `PermBan` | `moderation.ban` | Hotel-level ban (account/IP/machine) |
+| `PermMute` | `moderation.mute` | Hotel-level mute (chat restriction) |
+| `PermWarn` | `moderation.warn` | Send warning/caution to user |
+| `PermTradeLock` | `moderation.trade_lock` | Hotel-level trade lock sanction |
+| `PermUnban` | `moderation.unban` | Deactivate hotel bans |
+| `PermUnmute` | `moderation.unmute` | Deactivate hotel mutes |
+| `PermHistory` | `moderation.history` | View user moderation history |
+| `PermTool` | `moderation.tool` | Enable moderator tool initialization on login |
+| `PermAmbassador` | `role.ambassador` | Identifies ambassador role for alert broadcasts |
 
-Room-level actions use existing room ownership / rights checks, not
-permission scopes.
+### Realtime wiring
+
+The `PermissionChecker` interface is defined in `pkg/moderation/adapter/realtime/runtime.go`
+and wired at startup via `modRT.SetPermissionChecker(...)` in `core/cli/serve_routes.go`.
+
+Every hotel-level realtime action checks the issuer's permission before executing:
+
+| Packet handler | Guard permission |
+|----------------|-----------------|
+| `handleModKick` | `moderation.kick` |
+| `handleModBan` | `moderation.ban` |
+| `handleModMute` | `moderation.mute` |
+| `handleModWarn` | `moderation.warn` |
+| `handleTradeLock` | `moderation.trade_lock` |
+### Moderator tool initialization (PostAuthHook)
+
+The moderation realm participates in the **PostAuthHook** lifecycle to
+send `ModeratorInitPacket` (S2C 2696) immediately after authentication:
+
+1. `pkg/handshake/adapter/realtime/handler.go` defines the `PostAuthHook`
+   interface with `OnPostAuth(ctx, connID, userID)`.
+2. After `postauth.Run()` completes, `handleAuthPacket` checks whether
+   the `UserRuntime` (a `compositeRuntime`) implements `PostAuthHook`.
+3. `compositeRuntime.OnPostAuth` iterates its component runtimes and
+   delegates to any that implement `PostAuthHook`.
+4. `moderationrealtime.Runtime.OnPostAuth` calls `SendModToolInit`,
+   which checks `moderation.tool` permission before sending the packet.
+5. `TicketPermission` and `ChatlogPermission` fields on the packet are
+   resolved via `moderation.history` permission (not hardcoded).
+CFH (`handleCallForHelp`) requires no special permission — any authenticated user may submit.
+Room-level actions use existing room ownership / rights checks, not permission scopes.
 
 ---
 

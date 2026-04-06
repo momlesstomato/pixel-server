@@ -1,6 +1,8 @@
 package packet
 
 import (
+	"time"
+
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/subscription/domain"
 )
@@ -19,6 +21,7 @@ func (p ClubOffersPacket) PacketID() uint16 { return ClubOffersResponsePacketID 
 // Encode serializes club offers list into packet body.
 func (p ClubOffersPacket) Encode() ([]byte, error) {
 	w := codec.NewWriter()
+	now := time.Now().UTC()
 	w.WriteInt32(int32(len(p.Offers)))
 	for _, o := range p.Offers {
 		w.WriteInt32(int32(o.ID))
@@ -29,12 +32,20 @@ func (p ClubOffersPacket) Encode() ([]byte, error) {
 		w.WriteInt32(int32(o.Credits))
 		w.WriteInt32(int32(o.Points))
 		w.WriteInt32(int32(o.PointsType))
+		w.WriteBool(o.OfferType == "VIP")
+		totalSeconds := int64(o.Days) * 86400
+		months := totalSeconds / (86400 * 31)
+		remainder := totalSeconds - months*(86400*31)
+		extraDays := remainder / 86400
+		remainder -= extraDays * 86400
+		w.WriteInt32(int32(months))
+		w.WriteInt32(int32(extraDays))
 		w.WriteBool(o.Giftable)
-		w.WriteInt32(int32(o.Days))
-		w.WriteInt32(int32(o.Days / 31))
-		w.WriteInt32(int32(o.Days * 24 * 60))
-		w.WriteBool(false)
-		w.WriteInt32(0)
+		w.WriteInt32(int32(remainder))
+		expiry := now.Add(time.Duration(totalSeconds) * time.Second)
+		w.WriteInt32(int32(expiry.Year()))
+		w.WriteInt32(int32(expiry.Month()))
+		w.WriteInt32(int32(expiry.Day()))
 	}
 	w.WriteInt32(p.WindowID)
 	return w.Bytes(), nil

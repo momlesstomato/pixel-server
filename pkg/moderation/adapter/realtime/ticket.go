@@ -32,6 +32,12 @@ func (rt *Runtime) handleCallForHelp(ctx context.Context, _ string, userID int, 
 
 // handleTradeLock processes a moderator trade lock sanction.
 func (rt *Runtime) handleTradeLock(ctx context.Context, _ string, issuerID int, body []byte) error {
+	if rt.permissions != nil {
+		ok, err := rt.permissions.HasPermission(ctx, issuerID, domain.PermTradeLock)
+		if err != nil || !ok {
+			return nil
+		}
+	}
 	var pkt packet.SanctionTradeLockPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil

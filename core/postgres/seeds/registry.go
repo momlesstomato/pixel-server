@@ -21,11 +21,18 @@ func Registry() []*gormigrate.Migration {
 		Step04TestUserSettings(),
 		Step05DemoUsersBackfill(),
 		Step06DemoUserSettingsBackfill(),
+		permissionseed.Step03StaffAndAmbassadorGroups(),
+		permissionseed.Step04StaffAndAmbassadorPermissions(),
+		Step07ExtendedGroupUsers(),
+		Step08ExtendedGroupUserSettings(),
 		inventoryseed.Step01CurrencyTypes(),
 		catalogseed.Step01DefaultPages(),
+		catalogseed.Step02HCShopPage(),
 		subscriptionseed.Step01DefaultClubOffers(),
+		subscriptionseed.Step02SubscriptionUsers(),
 		navigatorseed.Step01DefaultCategories(),
 		navigatorseed.Step02DemoRooms(),
 		roomseed.Step01StandardModels(),
+		Step09AssignmentBackfill(),
 	}
 }

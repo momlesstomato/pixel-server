@@ -40,6 +40,12 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 
 // handleModKick processes a moderator hotel kick.
 func (rt *Runtime) handleModKick(ctx context.Context, _ string, issuerID int, body []byte) error {
+	if rt.permissions != nil {
+		ok, err := rt.permissions.HasPermission(ctx, issuerID, domain.PermKick)
+		if err != nil || !ok {
+			return nil
+		}
+	}
 	var pkt packet.ModKickUserPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil
@@ -61,6 +67,12 @@ func (rt *Runtime) handleModKick(ctx context.Context, _ string, issuerID int, bo
 
 // handleModMute processes a moderator hotel mute.
 func (rt *Runtime) handleModMute(ctx context.Context, _ string, issuerID int, body []byte) error {
+	if rt.permissions != nil {
+		ok, err := rt.permissions.HasPermission(ctx, issuerID, domain.PermMute)
+		if err != nil || !ok {
+			return nil
+		}
+	}
 	var pkt packet.ModMuteUserPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil
@@ -81,6 +93,12 @@ func (rt *Runtime) handleModMute(ctx context.Context, _ string, issuerID int, bo
 
 // handleModBan processes a moderator hotel ban.
 func (rt *Runtime) handleModBan(ctx context.Context, _ string, issuerID int, body []byte) error {
+	if rt.permissions != nil {
+		ok, err := rt.permissions.HasPermission(ctx, issuerID, domain.PermBan)
+		if err != nil || !ok {
+			return nil
+		}
+	}
 	var pkt packet.ModBanUserPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil
@@ -108,6 +126,12 @@ func (rt *Runtime) handleModBan(ctx context.Context, _ string, issuerID int, bod
 
 // handleModWarn processes a moderator warning/caution.
 func (rt *Runtime) handleModWarn(ctx context.Context, _ string, issuerID int, body []byte) error {
+	if rt.permissions != nil {
+		ok, err := rt.permissions.HasPermission(ctx, issuerID, domain.PermWarn)
+		if err != nil || !ok {
+			return nil
+		}
+	}
 	var pkt packet.ModWarnUserPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil

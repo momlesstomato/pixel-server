@@ -37,6 +37,9 @@ func Step02RoomExtension() *gormigrate.Migration {
 			return database.Table("rooms").AutoMigrate(&rooms{})
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			columns := []string{"model_slug", "custom_heightmap", "wall_height", "floor_thickness", "wall_thickness", "password_hash", "allow_pets", "allow_trading"}
 			for _, col := range columns {
 				if database.Migrator().HasColumn("rooms", col) {

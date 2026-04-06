@@ -22,6 +22,8 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 		return true, runtime.handleGetSubscription(ctx, connID, userID, body)
 	case packet.GetClubOffersPacketID:
 		return true, runtime.handleGetClubOffers(ctx, connID, userID)
+	case packet.GetHCExtendOfferPacketID:
+		return true, runtime.handleGetHCExtendOffer(ctx, connID, userID)
 	case packet.GetClubGiftInfoPacketID:
 		return true, runtime.handleGetClubGiftInfo(connID)
 	default:
@@ -53,6 +55,25 @@ func (runtime *Runtime) handleGetClubOffers(ctx context.Context, connID string, 
 	return runtime.sendPacket(connID, packet.ClubOffersPacket{Offers: offers, WindowID: 0})
 }
 
+// handleGetHCExtendOffer responds with one extend offer for a user with an active subscription.
+func (runtime *Runtime) handleGetHCExtendOffer(ctx context.Context, connID string, userID int) error {
+	sub, err := runtime.service.FindActiveSubscription(ctx, userID)
+	if err != nil {
+		return runtime.handleGetClubOffers(ctx, connID, userID)
+	}
+	offers, err := runtime.service.ListClubOffers(ctx)
+	if err != nil || len(offers) == 0 {
+		return runtime.handleGetClubOffers(ctx, connID, userID)
+	}
+	offer := offers[0]
+	expiry := sub.StartedAt.Add(time.Duration(sub.DurationDays) * 24 * time.Hour)
+	daysLeft := int32(time.Until(expiry).Hours() / 24)
+	if daysLeft < 0 {
+		daysLeft = 0
+	}
+	return runtime.sendPacket(connID, packet.HCExtendOfferPacket{Offer: offer, SubscriptionDaysLeft: daysLeft})
+}
+
 // handleGetClubGiftInfo responds with club gift eligibility.
 func (runtime *Runtime) handleGetClubGiftInfo(connID string) error {
 	return runtime.sendPacket(connID, packet.ClubGiftInfoPacket{DaysUntilNextGift: 0, GiftsAvailable: 0})
@@ -79,15 +100,25 @@ func buildSubscriptionPacket(sub subdomain.Subscription, productName string) pac
 	if minutesLeft < 0 {
 		minutesLeft = 0
 	}
+	elapsedDays := int32(time.Since(sub.StartedAt).Hours() / 24)
+	if elapsedDays < 0 {
+		elapsedDays = 0
+	}
+	minutesSince := int32(time.Since(sub.StartedAt).Minutes())
+	if minutesSince < 0 {
+		minutesSince = 0
+	}
 	return packet.SubscriptionResponsePacket{
-		ProductName:            productName,
-		DaysToPeriodEnd:        remaining,
-		MemberPeriods:          1,
-		PeriodsAhead:           0,
-		ResponseType:           1,
-		HasEverBeenMember:      true,
-		IsVIP:                  sub.SubscriptionType == subdomain.SubscriptionHabboClub,
-		PastClubDays:           int32(sub.DurationDays),
-		MinutesUntilExpiration: minutesLeft,
+		ProductName:              productName,
+		DaysToPeriodEnd:          remaining,
+		MemberPeriods:            elapsedDays / 31,
+		PeriodsAhead:             0,
+		ResponseType:             1,
+		HasEverBeenMember:        true,
+		IsVIP:                    true,
+		PastClubDays:             0,
+		PastVIPDays:              elapsedDays,
+		MinutesUntilExpiration:   minutesLeft,
+		MinutesSinceLastModified: minutesSince,
 	}
 }

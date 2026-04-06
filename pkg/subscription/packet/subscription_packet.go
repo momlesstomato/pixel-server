@@ -24,6 +24,8 @@ type SubscriptionResponsePacket struct {
 	PastVIPDays int32
 	// MinutesUntilExpiration stores minutes until the current period expires.
 	MinutesUntilExpiration int32
+	// MinutesSinceLastModified stores minutes elapsed since the subscription was created or last modified.
+	MinutesSinceLastModified int32
 }
 
 // PacketID returns protocol packet identifier.
@@ -44,5 +46,6 @@ func (p SubscriptionResponsePacket) Encode() ([]byte, error) {
 	w.WriteInt32(p.PastClubDays)
 	w.WriteInt32(p.PastVIPDays)
 	w.WriteInt32(p.MinutesUntilExpiration)
+	w.WriteInt32(p.MinutesSinceLastModified)
 	return w.Bytes(), nil
 }

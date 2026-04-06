@@ -60,9 +60,10 @@ func TestManagerMigrateSeedUpDownWithDefaults(t *testing.T) {
 	if err := manager.SeedDown(); err != nil {
 		t.Fatalf("expected seed down success, got %v", err)
 	}
-	for i := range 4 {
+	total := len(migrations.Registry())
+	for i := 0; i < total-10; i++ {
 		if err := manager.MigrateDown(); err != nil {
-			t.Fatalf("rollback messenger step %d: %v", 4-i, err)
+			t.Fatalf("rollback step %d: %v", total-i, err)
 		}
 	}
 	if err := manager.MigrateDown(); err != nil {

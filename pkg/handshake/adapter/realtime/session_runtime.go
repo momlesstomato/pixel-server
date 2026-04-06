@@ -126,13 +126,16 @@ func (handler *Handler) sendConnectionError(connID string, transport *Transport,
 }
 
 // handleAuthPacket authenticates one connection and wires post-auth behavior.
-func (handler *Handler) handleAuthPacket(ctx context.Context, connID string, body []byte, machineID string, transport *Transport, useCases *runtimeUseCases, authSignal chan struct{}, pongSignal chan struct{}, heartbeatStop *func(), disposables *[]coreconnection.Disposable, cancel context.CancelFunc, userSubscribed *bool) bool {
+func (handler *Handler) handleAuthPacket(ctx context.Context, connID string, body []byte, machineID string, transport *Transport, useCases *runtimeUseCases, authSignal chan struct{}, pongSignal chan struct{}, heartbeatStop *func(), disposables *[]coreconnection.Disposable, cancel context.CancelFunc, userSubscribed *bool, userRuntime UserRuntime) bool {
 	userID, ok := handler.handleSSO(ctx, connID, body, machineID, useCases.authenticate)
 	if !ok {
 		return false
 	}
 	if useCases.postauth != nil && useCases.postauth.Run(ctx, connID, userID) != nil {
 		return false
+	}
+	if hook, ok := userRuntime.(PostAuthHook); ok {
+		hook.OnPostAuth(ctx, connID, userID)
 	}
 	if !*userSubscribed {
 		userMessages, userDisposable, err := handler.subscribeChannel(ctx, sessionnotification.UserChannel(userID))

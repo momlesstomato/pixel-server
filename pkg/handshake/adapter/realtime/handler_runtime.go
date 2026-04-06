@@ -121,7 +121,7 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 					}
 					continue
 				}
-				if !handler.handleAuthPacket(ctx, connID, frame.Body, machineID, transport, useCases, authSignal, pongSignal, heartbeatStop, disposables, cancel, &userSubscribed) {
+				if !handler.handleAuthPacket(ctx, connID, frame.Body, machineID, transport, useCases, authSignal, pongSignal, heartbeatStop, disposables, cancel, &userSubscribed, userRuntime) {
 					return
 				}
 				authenticated = true

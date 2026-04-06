@@ -25,6 +25,9 @@ func Step06MinRankToPermission() *gormigrate.Migration {
 	return &gormigrate.Migration{
 		ID: "20260322_07b_catalog_pages_min_permission",
 		Migrate: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			return database.Exec(`
 				ALTER TABLE catalog_pages
 					ADD COLUMN IF NOT EXISTS min_permission VARCHAR(128) NOT NULL DEFAULT '',
@@ -32,6 +35,9 @@ func Step06MinRankToPermission() *gormigrate.Migration {
 			`).Error
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			return database.Exec(`
 				ALTER TABLE catalog_pages
 					ADD COLUMN IF NOT EXISTS min_rank INTEGER NOT NULL DEFAULT 1,
@@ -60,7 +66,10 @@ func Step04OfferCostColumns() *gormigrate.Migration {
 	return &gormigrate.Migration{
 		ID: "20260320_08b_offer_cost_columns",
 		Migrate: func(database *gorm.DB) error {
-			if err := database.Exec(`
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
+			return database.Exec(`
 				DO $$ BEGIN
 					IF EXISTS (SELECT 1 FROM information_schema.columns
 						WHERE table_name = 'catalog_items' AND column_name = 'cost_credits') THEN
@@ -91,12 +100,12 @@ func Step04OfferCostColumns() *gormigrate.Migration {
 						ALTER TABLE catalog_items ADD COLUMN cost_secondary_type INTEGER NOT NULL DEFAULT 0;
 					END IF;
 				END $$
-			`).Error; err != nil {
-				return err
-			}
-			return nil
+			`).Error
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			return database.Exec(`
 				DO $$ BEGIN
 					IF EXISTS (SELECT 1 FROM information_schema.columns
@@ -142,11 +151,17 @@ func Step05VoucherCurrencyType() *gormigrate.Migration {
 	return &gormigrate.Migration{
 		ID: "20260320_09b_voucher_currency_type",
 		Migrate: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			return database.Exec(
 				"ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS reward_currency_type INTEGER",
 			).Error
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			return database.Exec(
 				"ALTER TABLE vouchers DROP COLUMN IF EXISTS reward_currency_type",
 			).Error

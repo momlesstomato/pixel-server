@@ -43,6 +43,9 @@ func Step07RoomSoftDelete() *gormigrate.Migration {
 			return database.Table("rooms").AutoMigrate(&rooms{})
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			if database.Migrator().HasColumn("rooms", "deleted_at") {
 				return database.Migrator().DropColumn("rooms", "deleted_at")
 			}
@@ -62,6 +65,9 @@ func Step08RoomForward() *gormigrate.Migration {
 			return database.Table("rooms").AutoMigrate(&rooms{})
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			if database.Migrator().HasColumn("rooms", "forward_room_id") {
 				return database.Migrator().DropColumn("rooms", "forward_room_id")
 			}

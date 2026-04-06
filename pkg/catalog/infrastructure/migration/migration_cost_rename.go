@@ -13,6 +13,9 @@ func Step10RenameCostColumns() *gormigrate.Migration {
 	return &gormigrate.Migration{
 		ID: "20260324_10_rename_cost_columns",
 		Migrate: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			stmts := []string{
 				"ALTER TABLE catalog_items RENAME COLUMN cost_primary TO cost_credits",
 				"ALTER TABLE catalog_items RENAME COLUMN cost_secondary TO cost_activity_points",
@@ -26,6 +29,9 @@ func Step10RenameCostColumns() *gormigrate.Migration {
 			return nil
 		},
 		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
 			stmts := []string{
 				"ALTER TABLE catalog_items RENAME COLUMN cost_credits TO cost_primary",
 				"ALTER TABLE catalog_items RENAME COLUMN cost_activity_points TO cost_secondary",

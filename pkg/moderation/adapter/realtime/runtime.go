@@ -126,14 +126,12 @@ func (rt *Runtime) alertAmbassadors(ctx context.Context, message string) {
 		return
 	}
 	for _, s := range sessions {
-		ok, _ := rt.permissions.HasPermission(ctx, s.UserID, ambassadorPermission)
+		ok, _ := rt.permissions.HasPermission(ctx, s.UserID, domain.PermAmbassador)
 		if ok {
 			rt.sendCautionToUser(ctx, s.UserID, message)
 		}
 	}
 }
-
-const ambassadorPermission = "role.ambassador"
 
 // _ suppresses unused import warning.
 var _ = domain.ScopeHotel

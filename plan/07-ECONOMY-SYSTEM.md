@@ -1753,29 +1753,29 @@ Marketplace, voucher system, effects, gift flow, and credit exchange.
 
 | # | Task | Depends On | Status |
 |---|------|------------|--------|
-| 76 | Create `user_subscriptions` + `catalog_club_offers` tables + migration (15) | M2 | NOT STARTED |
-| 77 | Create `Subscription` domain entity + repository | 76 | NOT STARTED |
-| 78 | Create `ClubOffer` domain entity | 76 | NOT STARTED |
+| 76 | Create `user_subscriptions` + `catalog_club_offers` tables + migration (15) | M2 | DONE |
+| 77 | Create `Subscription` domain entity + repository | 76 | DONE |
+| 78 | Create `ClubOffer` domain entity | 76 | DONE |
 | 79 | Create `targeted_offers` + `user_targeted_offer_state` tables + migration (16) | M2 | NOT STARTED |
 | 80 | Create `TargetedOffer` domain entity + repository | 79 | NOT STARTED |
-| 81 | Seed: 3 club membership offers (12) | 76 | NOT STARTED |
-| 82 | `user.get_subscription` C2S → `user.subscription` S2C (954) | 77 | NOT STARTED |
-| 83 | Wire `user.subscription` into post-auth burst | 82 | NOT STARTED |
-| 84 | `catalog.get_club_offers` C2S → `catalog.club_offers` S2C | 78 | NOT STARTED |
+| 81 | Seed: 3 club membership offers (12) | 76 | DONE |
+| 82 | `user.get_subscription` C2S → `user.subscription` S2C (954) | 77 | DONE |
+| 83 | Wire `user.subscription` into post-auth burst | 82 | DONE |
+| 84 | `catalog.get_club_offers` C2S → `catalog.club_offers` S2C (encoding matches Arcturus vendor reference) | 78 | DONE |
 | 85 | Club purchase flow (extend duration, update club_level) | 78, M1.8 | NOT STARTED |
 | 86 | `catalog.get_hc_extend_offer` / `get_basic_extend_offer` C2S | 78 | NOT STARTED |
-| 87 | `catalog.get_club_gift_info` C2S → `catalog.club_gift_info` S2C | 77 | NOT STARTED |
+| 87 | `catalog.get_club_gift_info` C2S → `catalog.club_gift_info` S2C | 77 | DONE |
 | 88 | `catalog.select_club_gift` C2S → `catalog.club_gift_selected` S2C | 87 | NOT STARTED |
 | 89 | `catalog.club_gift_notification` S2C (2188) on login | 87 | NOT STARTED |
 | 90 | Subscription expiry checker background job | 77 | NOT STARTED |
 | 91 | `offer.get_targeted` / `get_next_targeted` C2S → `offer.targeted` S2C | 80 | NOT STARTED |
 | 92 | `offer.purchase_targeted` C2S flow | 80, M1.8 | NOT STARTED |
 | 93 | `offer.set_targeted_state` C2S handler | 80 | NOT STARTED |
-| 94 | Admin API: subscription, club offers, targeted offers | 77, 78, 80 | NOT STARTED |
-| 95 | Admin CLI: subscription, club offers | 94 | NOT STARTED |
+| 94 | Admin API: subscription, club offers, targeted offers | 77, 78, 80 | DONE (subscription + club offers) |
+| 95 | Admin CLI: subscription, club offers | 94 | DONE (subscription + club offers) |
 | 96 | Plugin events: SubscriptionCreated/Expired/Extended, ClubGiftClaimed, TargetedOfferPurchased | M3 tasks | NOT STARTED |
-| 97 | OpenAPI specs for all M3 endpoints | 94 | NOT STARTED |
-| 98 | Unit + integration tests for M3 | all M3 | NOT STARTED |
+| 97 | OpenAPI specs for all M3 endpoints | 94 | DONE (subscription + club offers) |
+| 98 | Unit + integration tests for M3 | all M3 | DONE (subscription + club offers) |
 | 99 | E2E tests: subscription flow, club offers, targeted offers | all M3 | NOT STARTED |
 
 ---

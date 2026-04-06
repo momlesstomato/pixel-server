@@ -8,33 +8,48 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestModeratorInitPacketEncode verifies moderator init encoding.
+// TestModeratorInitPacketEncode verifies moderator init encoding matches the ModeratorInitData wire format.
 func TestModeratorInitPacketEncode(t *testing.T) {
 	pkt := ModeratorInitPacket{
-		Presets: []PresetCategory{
-			{Name: "Offenses", Entries: []string{"Scam", "Harassment"}},
-		},
-		TicketPermission:  true,
-		ChatlogPermission: false,
+		MessageTemplates:    []string{"Scam", "Harassment"},
+		CfhPermission:       true,
+		ChatlogsPermission:  false,
+		AlertPermission:     true,
+		KickPermission:      false,
+		BanPermission:       false,
+		RoomAlertPermission: true,
+		RoomKickPermission:  false,
 	}
 	assert.Equal(t, ModeratorInitPacketID, pkt.PacketID())
 	body, err := pkt.Encode()
 	require.NoError(t, err)
 	r := codec.NewReader(body)
-	count, _ := r.ReadInt32()
-	assert.Equal(t, int32(1), count)
-	name, _ := r.ReadString()
-	assert.Equal(t, "Offenses", name)
-	entries, _ := r.ReadInt32()
-	assert.Equal(t, int32(2), entries)
-	e1, _ := r.ReadString()
-	assert.Equal(t, "Scam", e1)
-	e2, _ := r.ReadString()
-	assert.Equal(t, "Harassment", e2)
-	ticketPerm, _ := r.ReadBool()
-	assert.True(t, ticketPerm)
-	chatPerm, _ := r.ReadBool()
-	assert.False(t, chatPerm)
+	issues, _ := r.ReadInt32()
+	assert.Equal(t, int32(0), issues)
+	tplCount, _ := r.ReadInt32()
+	assert.Equal(t, int32(2), tplCount)
+	t1, _ := r.ReadString()
+	assert.Equal(t, "Scam", t1)
+	t2, _ := r.ReadString()
+	assert.Equal(t, "Harassment", t2)
+	reserved, _ := r.ReadInt32()
+	assert.Equal(t, int32(0), reserved)
+	cfh, _ := r.ReadBool()
+	assert.True(t, cfh)
+	chatlogs, _ := r.ReadBool()
+	assert.False(t, chatlogs)
+	alert, _ := r.ReadBool()
+	assert.True(t, alert)
+	kick, _ := r.ReadBool()
+	assert.False(t, kick)
+	ban, _ := r.ReadBool()
+	assert.False(t, ban)
+	roomAlert, _ := r.ReadBool()
+	assert.True(t, roomAlert)
+	roomKick, _ := r.ReadBool()
+	assert.False(t, roomKick)
+	roomTpl, _ := r.ReadInt32()
+	assert.Equal(t, int32(0), roomTpl)
 }
 
 // TestCallForHelpPacketDecode verifies CFH decoding.
