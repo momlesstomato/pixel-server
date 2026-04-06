@@ -164,6 +164,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		roomRT.SetFloorItemSender(furnitureRT.SendRoomFloorItems)
 		roomRT.SetVoteRepository(services.voteStore)
 		services.room.Manager().SetTileSeatChecker(furnitureRT.TileSeatCheckerFor)
+		services.room.Manager().SetSeatTargetResolver(furnitureRT.ResolveSeatTargetFor)
 		roomRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
 			user, err := services.users.FindByID(ctx, userID)
 			if err != nil {

@@ -28,6 +28,8 @@ type Manager struct {
 	doorExitNotifier DoorExitNotifier
 	// seatChecker stores the furniture seat lookup callback.
 	seatChecker TileSeatChecker
+	// seatTargetResolver stores the furniture target normalization callback.
+	seatTargetResolver SeatTargetResolver
 }
 
 // NewManager creates a room instance manager.
@@ -54,6 +56,7 @@ func (m *Manager) Load(roomID int, layout domain.Layout) *Instance {
 	inst.SetKickNotifier(m.kickNotifier)
 	inst.SetDoorExitNotifier(m.doorExitNotifier)
 	inst.SetTileSeatChecker(m.seatChecker)
+	inst.SetSeatTargetResolver(m.seatTargetResolver)
 	inst.Start(m.ctx)
 	m.rooms[roomID] = inst
 	m.logger.Info("room loaded", zap.Int("room_id", roomID))
@@ -142,6 +145,13 @@ func (m *Manager) SetTileSeatChecker(fn TileSeatChecker) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.seatChecker = fn
+}
+
+// SetSeatTargetResolver configures the furniture target resolver for all new instances.
+func (m *Manager) SetSeatTargetResolver(fn SeatTargetResolver) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.seatTargetResolver = fn
 }
 
 // Cleanup removes stopped instances from the registry.

@@ -36,7 +36,7 @@ func mapDefinition(row furnituremodel.Definition) domain.Definition {
 		AllowRecycle: row.AllowRecycle, AllowTrade: row.AllowTrade,
 		AllowMarketplaceSell: row.AllowMarketplaceSell, AllowGift: row.AllowGift,
 		AllowInventoryStack: row.AllowInventoryStack,
-		InteractionType: domain.InteractionType(row.InteractionType),
+		InteractionType:     domain.InteractionType(row.InteractionType),
 	}
 }
 

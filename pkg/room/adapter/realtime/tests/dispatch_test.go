@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/core/codec"
+	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/room/adapter/realtime"
 	roomapp "github.com/momlesstomato/pixel-server/pkg/room/application"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"

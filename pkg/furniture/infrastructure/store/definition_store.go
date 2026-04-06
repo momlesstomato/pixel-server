@@ -56,7 +56,7 @@ func (store *Store) CreateDefinition(ctx context.Context, def domain.Definition)
 		AllowRecycle: def.AllowRecycle, AllowTrade: def.AllowTrade,
 		AllowMarketplaceSell: def.AllowMarketplaceSell, AllowGift: def.AllowGift,
 		AllowInventoryStack: def.AllowInventoryStack,
-		InteractionType: string(def.InteractionType),
+		InteractionType:     string(def.InteractionType),
 	}
 	if err := store.database.WithContext(ctx).Create(&row).Error; err != nil {
 		return domain.Definition{}, err

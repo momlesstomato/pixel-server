@@ -320,3 +320,79 @@ func TestHandleSitUsesLayPosture(t *testing.T) {
 	_, hasLay := e.Statuses["lay"]
 	assert.False(t, hasLay)
 }
+
+// TestWalkToLayTileUsesCanonicalAnchor verifies bed clicks reroute to a single lay anchor tile.
+func TestWalkToLayTileUsesCanonicalAnchor(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.SetTileSeatChecker(func(_ int, x, y int) (float64, int, bool, bool) {
+		if x == 2 && y == 2 {
+			return 0.75, 4, false, true
+		}
+		return 0, 0, false, false
+	})
+	inst.SetSeatTargetResolver(func(_ int, x, y int) (int, int, bool) {
+		if x >= 2 && x <= 3 && y >= 2 && y <= 4 {
+			return 2, 2, true
+		}
+		return 0, 0, false
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 3, TargetY: 4, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, 2, e.Position.X)
+	assert.Equal(t, 2, e.Position.Y)
+	assert.True(t, e.IsSitting)
+	assert.True(t, e.IsSittingAuto)
+	assert.Equal(t, "0.75", e.Statuses["lay"])
+}
+
+// TestWalkToOccupiedBedAnchorBlocked verifies a second user cannot use another row of the same occupied bed.
+func TestWalkToOccupiedBedAnchorBlocked(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.SetTileSeatChecker(func(_ int, x, y int) (float64, int, bool, bool) {
+		if x == 2 && y == 2 {
+			return 0.75, 4, false, true
+		}
+		return 0, 0, false, false
+	})
+	inst.SetSeatTargetResolver(func(_ int, x, y int) (int, int, bool) {
+		if x >= 2 && x <= 3 && y >= 2 && y <= 4 {
+			return 2, 2, true
+		}
+		return 0, 0, false
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	first := testEntity()
+	enterFirstReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: first, Reply: enterFirstReply})
+	<-enterFirstReply
+	firstWalkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: first, TargetX: 3, TargetY: 4, Reply: firstWalkReply})
+	require.NoError(t, <-firstWalkReply)
+	time.Sleep(3 * time.Second)
+	secondEntity := domain.NewPlayerEntity(0, 2, "conn-2", "SecondUser", "hr-200", "hi", "M", domain.Tile{X: 0, Y: 0, Z: 0, State: domain.TileOpen})
+	second := &secondEntity
+	enterSecondReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: second, Reply: enterSecondReply})
+	<-enterSecondReply
+	secondWalkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: second, TargetX: 3, TargetY: 3, Reply: secondWalkReply})
+	assert.ErrorIs(t, <-secondWalkReply, domain.ErrPathBlocked)
+	secondState, ok := inst.Entity(second.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, 0, secondState.Position.X)
+	assert.Equal(t, 0, secondState.Position.Y)
+	assert.False(t, secondState.IsSitting)
+}

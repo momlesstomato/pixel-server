@@ -37,6 +37,10 @@ type seatEntry struct {
 	x int
 	// y stores the tile vertical coordinate.
 	y int
+	// anchorX stores the canonical tile horizontal coordinate for seat or lay targeting.
+	anchorX int
+	// anchorY stores the canonical tile vertical coordinate for seat or lay targeting.
+	anchorY int
 	// height stores the furniture stack height used as the sit value.
 	height float64
 	// dir stores the furniture rotation direction (0-7).
@@ -246,6 +250,29 @@ func (runtime *Runtime) TileSeatCheckerFor(roomID, x, y int) (height float64, di
 		return 0, 0, false, false
 	}
 	return height, dir, canSit, canLay
+}
+
+// ResolveSeatTargetFor returns the canonical target tile for a seat or lay-capable furniture tile.
+func (runtime *Runtime) ResolveSeatTargetFor(roomID, x, y int) (targetX, targetY int, ok bool) {
+	runtime.seatMu.RLock()
+	defer runtime.seatMu.RUnlock()
+	bestHeight := 0.0
+	found := false
+	for _, entry := range runtime.seatCache[roomID] {
+		if entry.x != x || entry.y != y {
+			continue
+		}
+		if !found || entry.height >= bestHeight {
+			targetX = entry.anchorX
+			targetY = entry.anchorY
+			bestHeight = entry.height
+			found = true
+		}
+	}
+	if !found {
+		return 0, 0, false
+	}
+	return targetX, targetY, true
 }
 
 // replaceSeatEntries replaces all cached seat entries for one item.

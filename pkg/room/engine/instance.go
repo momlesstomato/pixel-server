@@ -33,6 +33,9 @@ type DoorExitNotifier func(roomID int, entity domain.RoomEntity)
 // Returns the seat height, furniture direction, whether sitting and whether laying are possible.
 type TileSeatChecker func(roomID, x, y int) (height float64, dir int, canSit, canLay bool)
 
+// SeatTargetResolver resolves a clicked furniture tile to its canonical stand/sit/lay target tile.
+type SeatTargetResolver func(roomID, x, y int) (targetX, targetY int, ok bool)
+
 // RoomState identifies the lifecycle phase of a room instance.
 type RoomState int
 
@@ -84,6 +87,8 @@ type Instance struct {
 	doorExitNotifier DoorExitNotifier
 	// seatChecker checks whether a tile has sittable or layable furniture.
 	seatChecker TileSeatChecker
+	// seatTargetResolver normalizes furniture clicks to a canonical target tile.
+	seatTargetResolver SeatTargetResolver
 	// muted reports whether the room has chat globally muted.
 	muted bool
 }
@@ -142,6 +147,11 @@ func (inst *Instance) SetDoorExitNotifier(n DoorExitNotifier) {
 // SetTileSeatChecker configures the furniture seat lookup callback for this instance.
 func (inst *Instance) SetTileSeatChecker(fn TileSeatChecker) {
 	inst.seatChecker = fn
+}
+
+// SetSeatTargetResolver configures the furniture target normalization callback for this instance.
+func (inst *Instance) SetSeatTargetResolver(fn SeatTargetResolver) {
+	inst.seatTargetResolver = fn
 }
 
 // Muted reports whether the room has chat globally muted.

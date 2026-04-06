@@ -16,8 +16,8 @@ import (
 	furniturerealtime "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/realtime"
 	furnitureapplication "github.com/momlesstomato/pixel-server/pkg/furniture/application"
 	furnituredomain "github.com/momlesstomato/pixel-server/pkg/furniture/domain"
-	furnipacket "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
 	furniturestore "github.com/momlesstomato/pixel-server/pkg/furniture/infrastructure/store"
+	furnipacket "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	inventoryrealtime "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/realtime"
 	inventoryapplication "github.com/momlesstomato/pixel-server/pkg/inventory/application"
@@ -137,7 +137,7 @@ func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.
 		body, err := furnipacket.InventoryAddPacket{
 			ItemID: item.ID, SpriteID: def.SpriteID, ExtraData: item.ExtraData,
 			AllowRecycle: def.AllowRecycle, AllowTrade: def.AllowTrade,
-			AllowInventoryStack: def.AllowInventoryStack,
+			AllowInventoryStack:  def.AllowInventoryStack,
 			AllowMarketplaceSell: def.AllowMarketplaceSell,
 		}.Encode()
 		if err != nil {

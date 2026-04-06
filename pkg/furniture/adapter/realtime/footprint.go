@@ -33,22 +33,38 @@ func footprintTiles(x, y, dir, width, length int) [][2]int {
 	return tiles
 }
 
+// layAnchorTile returns the canonical tile used for laying on a multi-tile bed.
+func layAnchorTile(x, y, dir, width, length int) [2]int {
+	tiles := footprintTiles(x, y, dir, width, length)
+	if len(tiles) == 0 {
+		return [2]int{x, y}
+	}
+	return tiles[0]
+}
+
 // seatEntriesFromFootprint builds seat cache entries for every covered tile of one item.
 func seatEntriesFromFootprint(itemID, x, y, dir int, height float64, width, length int, canSit, canLay bool) []seatEntry {
 	if !canSit && !canLay {
 		return nil
 	}
 	tiles := footprintTiles(x, y, dir, width, length)
+	anchor := [2]int{x, y}
+	if canLay {
+		anchor = layAnchorTile(x, y, dir, width, length)
+	}
 	entries := make([]seatEntry, 0, len(tiles))
 	for _, tile := range tiles {
+		entryCanLay := canLay && tile == anchor
 		entries = append(entries, seatEntry{
 			itemID:  itemID,
 			x:       tile[0],
 			y:       tile[1],
+			anchorX: anchor[0],
+			anchorY: anchor[1],
 			height:  height,
 			dir:     dir,
 			canSit:  canSit,
-			canLay:  canLay,
+			canLay:  entryCanLay,
 		})
 	}
 	return entries

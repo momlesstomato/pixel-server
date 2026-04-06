@@ -434,7 +434,7 @@ func TestSendRoomFloorItemsSends1778(t *testing.T) {
 	}
 }
 
-// TestSendRoomFloorItemsCachesLayFootprint verifies multi-tile lay furniture registers every covered tile.
+// TestSendRoomFloorItemsCachesLayFootprint verifies multi-tile lay furniture resolves all footprint tiles to one lay anchor.
 func TestSendRoomFloorItemsCachesLayFootprint(t *testing.T) {
 	item := furnituredomain.Item{ID: 7, UserID: 1, RoomID: 5, X: 3, Y: 4, Dir: 0, DefinitionID: 3}
 	def := furnituredomain.Definition{ID: 3, SpriteID: 55, Width: 2, Length: 3, StackHeight: 1.4, CanLay: true}
@@ -446,10 +446,23 @@ func TestSendRoomFloorItemsCachesLayFootprint(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	expected := [][2]int{{3, 4}, {4, 4}, {3, 5}, {4, 5}, {3, 6}, {4, 6}}
-	for _, tile := range expected {
+	for index, tile := range expected {
 		_, _, canSit, canLay := rt.TileSeatCheckerFor(5, tile[0], tile[1])
-		if canSit || !canLay {
-			t.Fatalf("expected lay footprint at tile %v, got canSit=%v canLay=%v", tile, canSit, canLay)
+		targetX, targetY, ok := rt.ResolveSeatTargetFor(5, tile[0], tile[1])
+		if !ok || targetX != 3 || targetY != 4 {
+			t.Fatalf("expected tile %v to resolve to canonical bed anchor [3 4], got ok=%v target=[%d %d]", tile, ok, targetX, targetY)
+		}
+		if canSit {
+			t.Fatalf("expected lay footprint tile %v to remain non-sittable", tile)
+		}
+		if index == 0 {
+			if !canLay {
+				t.Fatalf("expected canonical bed anchor %v to remain layable", tile)
+			}
+			continue
+		}
+		if canLay {
+			t.Fatalf("expected non-anchor bed tile %v to redirect rather than lay in place", tile)
 		}
 	}
 	_, _, _, canLay := rt.TileSeatCheckerFor(5, 5, 6)

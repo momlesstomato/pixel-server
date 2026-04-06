@@ -191,6 +191,12 @@ func calcRotation(_, _ int, toX, toY, fromX, fromY int) int {
 
 // startWalk computes a path and initiates entity movement.
 func (inst *Instance) startWalk(entity *domain.RoomEntity, targetX, targetY int) error {
+	if inst.seatTargetResolver != nil {
+		if resolvedX, resolvedY, ok := inst.seatTargetResolver(inst.RoomID, targetX, targetY); ok {
+			targetX = resolvedX
+			targetY = resolvedY
+		}
+	}
 	var blockers [][2]int
 	for _, e := range inst.entities {
 		if e.VirtualID == entity.VirtualID || e.IsWalking {
