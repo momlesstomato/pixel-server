@@ -4,11 +4,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/catalog/adapter/realtime"
 	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"
 	"github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 	catalogpacket "github.com/momlesstomato/pixel-server/pkg/catalog/packet"
+	furnipacket "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
 	inventorypkt "github.com/momlesstomato/pixel-server/pkg/inventory/packet"
 )
 
@@ -108,6 +110,32 @@ func (zeroSpender) AddCurrencyBalance(_ context.Context, _ int, _ int, d int) (i
 	return d, nil
 }
 
+// itemDelivererStub returns a deterministic delivered item identifier.
+type itemDelivererStub struct{ itemID int }
+
+// DeliverItem returns the configured delivered item identifier.
+func (d itemDelivererStub) DeliverItem(_ context.Context, _ int, _ int, _ string, _ int, _ int) (int, error) {
+	return d.itemID, nil
+}
+
+// recipientFinderStub returns deterministic gift recipient data.
+type recipientFinderStub struct{ info domain.RecipientInfo }
+
+// FindRecipientByUsername returns the configured recipient info.
+func (f recipientFinderStub) FindRecipientByUsername(_ context.Context, _ string) (domain.RecipientInfo, error) {
+	return f.info, nil
+}
+
+// buildGiftBody encodes a minimal gift purchase request body.
+func buildGiftBody(pageID, offerID int32, recipient string) []byte {
+	w := codec.NewWriter()
+	w.WriteInt32(pageID)
+	w.WriteInt32(offerID)
+	_ = w.WriteString("")
+	_ = w.WriteString(recipient)
+	return w.Bytes()
+}
+
 // TestHandleGiftWrappingConfigSendsResponse verifies 418 triggers gift config packet 2234.
 func TestHandleGiftWrappingConfigSendsResponse(t *testing.T) {
 	transport := &transportStub{}
@@ -135,6 +163,72 @@ func TestHandlePurchaseFreeOfferSendsPurchaseOK(t *testing.T) {
 	}
 	if len(transport.sent) < 2 || transport.sent[0] != catalogpacket.PurchaseOKPacketID || transport.sent[1] != inventorypkt.CreditsResponsePacketID {
 		t.Fatalf("expected [%d %d] packets, got %v", catalogpacket.PurchaseOKPacketID, inventorypkt.CreditsResponsePacketID, transport.sent)
+	}
+}
+
+// TestHandlePurchaseBoughtFurniturePushesInventoryDelta verifies purchases send the live inventory add packet before the unseen marker.
+func TestHandlePurchaseBoughtFurniturePushesInventoryDelta(t *testing.T) {
+	offer := domain.CatalogOffer{ID: 1, OfferActive: true, CostCredits: 0, ItemType: "s", ItemDefinitionID: 9}
+	transport := &transportStub{}
+	svc := buildService(repoStub{offer: offer})
+	svc.SetItemDeliverer(itemDelivererStub{itemID: 42})
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
+	rt.SetInventoryItemSender(func(_ context.Context, connID string, userID int, itemID int) error {
+		if connID != "conn1" || userID != 1 || itemID != 42 {
+			t.Fatalf("unexpected inventory sender args conn=%s user=%d item=%d", connID, userID, itemID)
+		}
+		return transport.Send(connID, furnipacket.InventoryAddPacketID, nil)
+	})
+	body := buildPurchaseBody(1, 1)
+	handled, err := rt.Handle(context.Background(), "conn1", catalogpacket.PurchasePacketID, body)
+	if err != nil || !handled {
+		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
+	}
+	expected := []uint16{
+		catalogpacket.PurchaseOKPacketID,
+		inventorypkt.CreditsResponsePacketID,
+		furnipacket.InventoryAddPacketID,
+		catalogpacket.FurniListNotificationPacketID,
+	}
+	if len(transport.sent) != len(expected) {
+		t.Fatalf("expected packets %v, got %v", expected, transport.sent)
+	}
+	for i, packetID := range expected {
+		if transport.sent[i] != packetID {
+			t.Fatalf("expected packets %v, got %v", expected, transport.sent)
+		}
+	}
+}
+
+// TestHandlePurchaseGiftSkipsBuyerInventoryDelta verifies gift purchases do not mutate the buyer inventory view.
+func TestHandlePurchaseGiftSkipsBuyerInventoryDelta(t *testing.T) {
+	offer := domain.CatalogOffer{ID: 1, OfferActive: true, CostCredits: 0, ItemType: "s", ItemDefinitionID: 9}
+	transport := &transportStub{}
+	svc := buildService(repoStub{offer: offer})
+	svc.SetItemDeliverer(itemDelivererStub{itemID: 51})
+	svc.SetRecipientFinder(recipientFinderStub{info: domain.RecipientInfo{UserID: 2, AllowGifts: true}})
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
+	inventoryPushed := false
+	rt.SetInventoryItemSender(func(_ context.Context, _ string, _ int, _ int) error {
+		inventoryPushed = true
+		return nil
+	})
+	body := buildGiftBody(1, 1, "target")
+	handled, err := rt.Handle(context.Background(), "conn1", catalogpacket.PurchaseGiftPacketID, body)
+	if err != nil || !handled {
+		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
+	}
+	if inventoryPushed {
+		t.Fatal("expected no buyer inventory push for gift purchase")
+	}
+	expected := []uint16{catalogpacket.PurchaseOKPacketID, inventorypkt.CreditsResponsePacketID}
+	if len(transport.sent) != len(expected) {
+		t.Fatalf("expected packets %v, got %v", expected, transport.sent)
+	}
+	for i, packetID := range expected {
+		if transport.sent[i] != packetID {
+			t.Fatalf("expected packets %v, got %v", expected, transport.sent)
+		}
 	}
 }
 

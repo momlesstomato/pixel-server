@@ -7,6 +7,7 @@ import (
 
 	"github.com/momlesstomato/pixel-server/core/codec"
 	furnipacket "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
+	"go.uber.org/zap"
 )
 
 // Handle dispatches one authenticated furniture packet payload.
@@ -93,26 +94,43 @@ func (runtime *Runtime) handlePlace(ctx context.Context, connID string, body []b
 	if !ok {
 		return nil
 	}
+	if !runtime.canManageItem(ctx, roomID, userID, itemID) {
+		return nil
+	}
+	if runtime.isTileOccupied(roomID, x, y) {
+		return nil
+	}
+	existing, err := runtime.service.FindItemByID(ctx, itemID)
+	if err != nil {
+		runtime.logger.Warn("find place item failed", zap.Int("item_id", itemID), zap.Error(err))
+		return nil
+	}
+	if existing.RoomID != 0 {
+		return nil
+	}
 	item, err := runtime.service.PlaceFloorItem(ctx, itemID, userID, roomID, x, y, dir)
 	if err != nil {
+		runtime.logger.Warn("place floor item failed", zap.Int("item_id", itemID), zap.Int("room_id", roomID), zap.Int("user_id", userID), zap.Error(err))
 		return nil
 	}
 	def, err := runtime.service.FindDefinitionByID(ctx, item.DefinitionID)
 	if err != nil {
+		runtime.logger.Warn("find floor item definition failed", zap.Int("definition_id", item.DefinitionID), zap.Error(err))
 		return nil
 	}
 	pkt := furnipacket.FloorItemAddPacket{
 		ItemID: item.ID, SpriteID: def.SpriteID,
 		X: item.X, Y: item.Y, Z: item.Z, Dir: item.Dir,
-		ExtraData: item.ExtraData, UserID: item.UserID,
+		StackHeight: def.StackHeight,
+		ExtraData:   item.ExtraData, UserID: item.UserID,
 	}
 	encoded, err := pkt.Encode()
 	if err != nil {
 		return err
 	}
 	runtime.roomBroadcaster(roomID, furnipacket.FloorItemAddPacketID, encoded)
-	if def.CanSit {
-		runtime.addSeatEntry(roomID, item.ID, item.X, item.Y, item.Dir, def.StackHeight, true)
+	if def.CanSit || def.CanLay {
+		runtime.replaceSeatEntries(roomID, item.ID, seatEntriesFromFootprint(item.ID, item.X, item.Y, item.Dir, def.StackHeight, def.Width, def.Length, def.CanSit, def.CanLay))
 	}
-	return runtime.sendPacket(connID, furnipacket.InventoryRemovePacket{ItemID: item.ID})
+	return runtime.sendUserPacket(ctx, connID, item.UserID, furnipacket.InventoryRemovePacket{ItemID: item.ID})
 }

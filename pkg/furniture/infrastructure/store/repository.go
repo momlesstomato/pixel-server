@@ -31,7 +31,7 @@ func mapDefinition(row furnituremodel.Definition) domain.Definition {
 	return domain.Definition{
 		ID: int(row.ID), ItemName: row.ItemName, PublicName: row.PublicName,
 		ItemType: domain.ItemType(row.ItemType), Width: int(row.Width), Length: int(row.Length),
-		StackHeight: row.StackHeight, CanStack: row.CanStack, CanSit: row.CanSit,
+		StackHeight: row.StackHeight, CanStack: row.CanStack, CanSit: row.CanSit, CanLay: row.CanLay,
 		IsWalkable: row.IsWalkable, SpriteID: row.SpriteID,
 		AllowRecycle: row.AllowRecycle, AllowTrade: row.AllowTrade,
 		AllowMarketplaceSell: row.AllowMarketplaceSell, AllowGift: row.AllowGift,

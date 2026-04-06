@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"context"
 	"fmt"
 
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
@@ -14,6 +15,12 @@ type Transport interface {
 	Send(string, uint16, []byte) error
 }
 
+// ClubOffersSender pushes subscription club offers to one connection.
+type ClubOffersSender func(ctx context.Context, connID string, userID int) error
+
+// InventoryItemSender pushes one purchased inventory item delta to one connection.
+type InventoryItemSender func(ctx context.Context, connID string, userID int, itemID int) error
+
 // Runtime defines catalog realm websocket packet behavior.
 type Runtime struct {
 	// service stores catalog application behavior.
@@ -24,6 +31,10 @@ type Runtime struct {
 	transport Transport
 	// logger stores runtime logging behavior.
 	logger *zap.Logger
+	// clubOffersSender pushes subscription offers when a club_buy page is served.
+	clubOffersSender ClubOffersSender
+	// inventoryItemSender pushes one purchased inventory delta to the buyer session.
+	inventoryItemSender InventoryItemSender
 }
 
 // NewRuntime creates one catalog realtime runtime instance.
@@ -50,6 +61,16 @@ func (runtime *Runtime) userID(connID string) (int, bool) {
 		return 0, false
 	}
 	return session.UserID, true
+}
+
+// SetClubOffersSender configures the optional callback invoked for club_buy catalog pages.
+func (runtime *Runtime) SetClubOffersSender(fn ClubOffersSender) {
+	runtime.clubOffersSender = fn
+}
+
+// SetInventoryItemSender configures the optional callback invoked after a successful purchase.
+func (runtime *Runtime) SetInventoryItemSender(fn InventoryItemSender) {
+	runtime.inventoryItemSender = fn
 }
 
 // Dispose releases per-connection resources.

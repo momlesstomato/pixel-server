@@ -14,6 +14,11 @@ func (s *Service) SoftDelete(ctx context.Context, roomID int) error {
 	return s.rooms.SoftDelete(ctx, roomID)
 }
 
+// CreateBan persists a new room ban entry.
+func (s *Service) CreateBan(ctx context.Context, ban domain.RoomBan) (domain.RoomBan, error) {
+	return s.bans.CreateBan(ctx, ban)
+}
+
 // ListBans returns all active bans for one room.
 func (s *Service) ListBans(ctx context.Context, roomID int) ([]domain.RoomBan, error) {
 	return s.bans.ListBansByRoom(ctx, roomID)

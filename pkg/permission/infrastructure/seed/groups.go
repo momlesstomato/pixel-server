@@ -32,7 +32,39 @@ func Step03StaffAndAmbassadorGroups() *gormigrate.Migration {
 	}
 }
 
-// ensureGroups creates default permission groups when missing.
+// Step05SecurityLevelBackfill returns seed step that aligns group security levels to Nitro's SecurityLevel enum.
+// Nitro requires SecurityLevel >= 5 for isModerator; prior seeds used values below this threshold.
+func Step05SecurityLevelBackfill() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260406_05_security_level_backfill",
+		Migrate: func(database *gorm.DB) error {
+			updates := map[string]int{
+				"moderator": 5,
+				"staff":     6,
+				"admin":     8,
+			}
+			for name, level := range updates {
+				if err := database.Model(&permissionmodel.Group{}).Where("name = ?", name).Update("security_level", level).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		Rollback: func(database *gorm.DB) error {
+			reverts := map[string]int{
+				"moderator": 1,
+				"staff":     2,
+				"admin":     3,
+			}
+			for name, level := range reverts {
+				if err := database.Model(&permissionmodel.Group{}).Where("name = ?", name).Update("security_level", level).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+}
 func ensureGroups(database *gorm.DB) error {
 	defaults := []permissionmodel.Group{
 		{Name: "default", DisplayName: "Default", Priority: 0, ClubLevel: 0, SecurityLevel: 0, IsAmbassador: false, IsDefault: true},

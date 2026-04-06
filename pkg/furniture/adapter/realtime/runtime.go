@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/momlesstomato/pixel-server/core/broadcast"
+	"github.com/momlesstomato/pixel-server/core/codec"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	furnitureapp "github.com/momlesstomato/pixel-server/pkg/furniture/application"
 	furnipacket "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
 	"go.uber.org/zap"
 )
 
@@ -19,6 +22,12 @@ type Transport interface {
 
 // UsernameResolver resolves a display name for one authenticated user identifier.
 type UsernameResolver func(ctx context.Context, userID int) (string, error)
+
+// RoomAccessChecker reports whether a user may manage furniture in a room.
+type RoomAccessChecker func(ctx context.Context, roomID, userID int) bool
+
+// RoomOccupancyChecker reports whether a tile is currently occupied by a player entity.
+type RoomOccupancyChecker func(roomID, x, y int) bool
 
 // seatEntry caches the seat properties of one placed sittable furniture item.
 type seatEntry struct {
@@ -34,12 +43,14 @@ type seatEntry struct {
 	dir int
 	// canSit reports whether avatars can sit on this item.
 	canSit bool
+	// canLay reports whether avatars can lay on this item.
+	canLay bool
 }
 
 // RoomEntityRotator updates seated entities at a tile to face a new furniture direction.
 type RoomEntityRotator func(roomID, x, y, dir int)
 
-// RoomEntityEvictor clears sit/lay state for entities at a tile and walks them to the door.
+// RoomEntityEvictor clears sit/lay state for entities at a tile and leaves them standing in place.
 type RoomEntityEvictor func(roomID, x, y int)
 
 // Runtime defines furniture realm websocket packet behavior.
@@ -50,6 +61,8 @@ type Runtime struct {
 	sessions coreconnection.SessionRegistry
 	// transport stores packet write behavior.
 	transport Transport
+	// broadcaster publishes owner-targeted inventory updates to active user sessions.
+	broadcaster broadcast.Broadcaster
 	// logger stores runtime logging behavior.
 	logger *zap.Logger
 	// roomFinder resolves the room identifier for a given connection.
@@ -58,9 +71,13 @@ type Runtime struct {
 	roomBroadcaster func(roomID int, packetID uint16, body []byte)
 	// usernameResolver resolves display names for item owner identifiers.
 	usernameResolver UsernameResolver
+	// roomAccessChecker validates whether a user may manage furniture in a room.
+	roomAccessChecker RoomAccessChecker
+	// roomOccupancyChecker validates whether a target tile is already occupied by a player.
+	roomOccupancyChecker RoomOccupancyChecker
 	// entityRotator rotates seated entities on a tile to match new furniture direction.
 	entityRotator RoomEntityRotator
-	// entityEvictor ejects seated entities from a tile when furniture is moved or removed.
+	// entityEvictor clears seated entities from a tile when furniture is moved or removed.
 	entityEvictor RoomEntityEvictor
 	// seatCache maps room identifier to its list of sittable item entries.
 	seatCache map[int][]seatEntry
@@ -86,6 +103,11 @@ func NewRuntime(service *furnitureapp.Service, sessions coreconnection.SessionRe
 		service: service, sessions: sessions, transport: transport,
 		logger: logger, seatCache: make(map[int][]seatEntry),
 	}, nil
+}
+
+// SetBroadcaster configures the broadcaster used for per-user inventory updates.
+func (runtime *Runtime) SetBroadcaster(value broadcast.Broadcaster) {
+	runtime.broadcaster = value
 }
 
 // userID resolves authenticated user identifier for one connection.
@@ -115,12 +137,22 @@ func (runtime *Runtime) SetUsernameResolver(fn UsernameResolver) {
 	runtime.usernameResolver = fn
 }
 
+// SetRoomAccessChecker configures the room-level furniture permission check.
+func (runtime *Runtime) SetRoomAccessChecker(fn RoomAccessChecker) {
+	runtime.roomAccessChecker = fn
+}
+
+// SetRoomOccupancyChecker configures the room-level tile occupancy check.
+func (runtime *Runtime) SetRoomOccupancyChecker(fn RoomOccupancyChecker) {
+	runtime.roomOccupancyChecker = fn
+}
+
 // SetRoomEntityRotator configures the callback that rotates seated entities when furniture rotates.
 func (runtime *Runtime) SetRoomEntityRotator(fn RoomEntityRotator) {
 	runtime.entityRotator = fn
 }
 
-// SetRoomEntityEvictor configures the callback that ejects seated entities when furniture is moved or removed.
+// SetRoomEntityEvictor configures the callback that clears seated entities when furniture is moved or removed.
 func (runtime *Runtime) SetRoomEntityEvictor(fn RoomEntityEvictor) {
 	runtime.entityEvictor = fn
 }
@@ -137,59 +169,109 @@ func (runtime *Runtime) sendPacket(connID string, pkt interface {
 	return runtime.transport.Send(connID, pkt.PacketID(), body)
 }
 
-// seatEntryFor returns the cached seat entry for one placed item, if present.
-func (runtime *Runtime) seatEntryFor(roomID, itemID int) (seatEntry, bool) {
-	runtime.seatMu.RLock()
-	defer runtime.seatMu.RUnlock()
-	for _, e := range runtime.seatCache[roomID] {
-		if e.itemID == itemID {
-			return e, true
+// sendUserPacket publishes one packet to the owner's broadcast channel when available.
+func (runtime *Runtime) sendUserPacket(ctx context.Context, fallbackConnID string, userID int, pkt interface {
+	PacketID() uint16
+	Encode() ([]byte, error)
+}) error {
+	if runtime.broadcaster == nil || userID <= 0 {
+		return runtime.sendPacket(fallbackConnID, pkt)
+	}
+	body, err := pkt.Encode()
+	if err != nil {
+		return err
+	}
+	return runtime.broadcaster.Publish(ctx, sessionnotification.UserChannel(userID), codec.EncodeFrame(pkt.PacketID(), body))
+}
+
+// canModifyRoom reports whether a user may manage furniture in the target room.
+func (runtime *Runtime) canModifyRoom(ctx context.Context, roomID, userID int) bool {
+	if runtime.roomAccessChecker == nil {
+		return true
+	}
+	return runtime.roomAccessChecker(ctx, roomID, userID)
+}
+
+// isTileOccupied reports whether the target room tile currently contains a player entity.
+func (runtime *Runtime) isTileOccupied(roomID, x, y int) bool {
+	if runtime.roomOccupancyChecker == nil {
+		return false
+	}
+	return runtime.roomOccupancyChecker(roomID, x, y)
+}
+
+// canManageItem reports whether the actor may manage one furniture item in the target room.
+func (runtime *Runtime) canManageItem(ctx context.Context, roomID, userID, itemID int) bool {
+	item, err := runtime.service.FindItemByID(ctx, itemID)
+	if err == nil && item.UserID == userID {
+		if item.RoomID == 0 || item.RoomID == roomID {
+			return true
 		}
 	}
-	return seatEntry{}, false
+	return runtime.canModifyRoom(ctx, roomID, userID)
+}
+
+// seatEntriesFor returns the cached seat entries for one placed item, if present.
+func (runtime *Runtime) seatEntriesFor(roomID, itemID int) []seatEntry {
+	runtime.seatMu.RLock()
+	defer runtime.seatMu.RUnlock()
+	entries := make([]seatEntry, 0)
+	for _, e := range runtime.seatCache[roomID] {
+		if e.itemID == itemID {
+			entries = append(entries, e)
+		}
+	}
+	return entries
 }
 
 // TileSeatCheckerFor returns seat properties for the topmost sittable item at a tile.
 func (runtime *Runtime) TileSeatCheckerFor(roomID, x, y int) (height float64, dir int, canSit, canLay bool) {
 	runtime.seatMu.RLock()
 	defer runtime.seatMu.RUnlock()
+	bestHeight := 0.0
+	found := false
 	for _, e := range runtime.seatCache[roomID] {
-		if e.x == x && e.y == y && e.canSit {
-			return e.height, e.dir, true, false
+		if e.x == x && e.y == y && (e.canSit || e.canLay) {
+			if !found || e.height >= bestHeight {
+				height = e.height
+				dir = e.dir
+				canSit = e.canSit
+				canLay = e.canLay
+				bestHeight = e.height
+				found = true
+			}
 		}
 	}
-	return 0, 0, false, false
+	if !found {
+		return 0, 0, false, false
+	}
+	return height, dir, canSit, canLay
 }
 
-// addSeatEntry inserts or updates a seat cache entry for one item.
-func (runtime *Runtime) addSeatEntry(roomID, itemID, x, y, dir int, height float64, canSit bool) {
-	if !canSit {
-		return
-	}
+// replaceSeatEntries replaces all cached seat entries for one item.
+func (runtime *Runtime) replaceSeatEntries(roomID, itemID int, entries []seatEntry) {
 	runtime.seatMu.Lock()
 	defer runtime.seatMu.Unlock()
-	entries := runtime.seatCache[roomID]
-	for i, e := range entries {
-		if e.itemID == itemID {
-			entries[i] = seatEntry{itemID: itemID, x: x, y: y, dir: dir, height: height, canSit: canSit}
-			runtime.seatCache[roomID] = entries
-			return
+	filtered := runtime.seatCache[roomID][:0]
+	for _, entry := range runtime.seatCache[roomID] {
+		if entry.itemID != itemID {
+			filtered = append(filtered, entry)
 		}
 	}
-	runtime.seatCache[roomID] = append(entries, seatEntry{itemID: itemID, x: x, y: y, dir: dir, height: height, canSit: canSit})
+	runtime.seatCache[roomID] = append(filtered, entries...)
 }
 
-// removeSeatEntry removes the seat cache entry for one item.
-func (runtime *Runtime) removeSeatEntry(roomID, itemID int) {
+// removeSeatEntries removes all seat cache entries for one item.
+func (runtime *Runtime) removeSeatEntries(roomID, itemID int) {
 	runtime.seatMu.Lock()
 	defer runtime.seatMu.Unlock()
-	entries := runtime.seatCache[roomID]
-	for i, e := range entries {
-		if e.itemID == itemID {
-			runtime.seatCache[roomID] = append(entries[:i], entries[i+1:]...)
-			return
+	filtered := runtime.seatCache[roomID][:0]
+	for _, entry := range runtime.seatCache[roomID] {
+		if entry.itemID != itemID {
+			filtered = append(filtered, entry)
 		}
 	}
+	runtime.seatCache[roomID] = filtered
 }
 
 // SendRoomFloorItems loads placed items for one room and sends the floor list to one connection.
@@ -211,7 +293,8 @@ func (runtime *Runtime) SendRoomFloorItems(ctx context.Context, connID string, r
 		floorItems = append(floorItems, furnipacket.FurnitureFloorItem{
 			ItemID: item.ID, SpriteID: def.SpriteID,
 			X: item.X, Y: item.Y, Dir: item.Dir, Z: item.Z,
-			ExtraData: item.ExtraData, UserID: item.UserID,
+			StackHeight: def.StackHeight,
+			ExtraData:   item.ExtraData, UserID: item.UserID,
 		})
 		if _, seen := owners[item.UserID]; !seen {
 			name := ""
@@ -222,8 +305,8 @@ func (runtime *Runtime) SendRoomFloorItems(ctx context.Context, connID string, r
 			}
 			owners[item.UserID] = name
 		}
-		if def.CanSit {
-			runtime.addSeatEntry(roomID, item.ID, item.X, item.Y, item.Dir, def.StackHeight, true)
+		if def.CanSit || def.CanLay {
+			runtime.replaceSeatEntries(roomID, item.ID, seatEntriesFromFootprint(item.ID, item.X, item.Y, item.Dir, def.StackHeight, def.Width, def.Length, def.CanSit, def.CanLay))
 		}
 	}
 	return runtime.sendPacket(connID, furnipacket.FurnitureFloorComposer{

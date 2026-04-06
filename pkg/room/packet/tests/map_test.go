@@ -160,3 +160,18 @@ func TestUnbanUserPacket_Decode(t *testing.T) {
 	assert.Equal(t, int32(99), dec.RoomID)
 	assert.Equal(t, packet.UnbanUserPacketID, dec.PacketID())
 }
+
+// TestBanUserPacket_Decode verifies ban request decoding with ban type.
+func TestBanUserPacket_Decode(t *testing.T) {
+	w := codec.NewWriter()
+	w.WriteInt32(3)
+	w.WriteInt32(10)
+	_ = w.WriteString("RWUAM_BAN_USER_HOUR")
+	body := w.Bytes()
+	var dec packet.BanUserPacket
+	require.NoError(t, dec.Decode(body))
+	assert.Equal(t, int32(3), dec.UserID)
+	assert.Equal(t, int32(10), dec.RoomID)
+	assert.Equal(t, "RWUAM_BAN_USER_HOUR", dec.BanType)
+	assert.Equal(t, packet.BanUserPacketID, dec.PacketID())
+}

@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"context"
 	"fmt"
 
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
@@ -54,6 +55,12 @@ func (runtime *Runtime) userID(connID string) (int, bool) {
 
 // Dispose releases per-connection resources.
 func (runtime *Runtime) Dispose(_ string) {}
+
+// SendClubOffers pushes available club offers to one connection.
+// Called by external runtimes (e.g. catalog) when a club_buy page is served.
+func (runtime *Runtime) SendClubOffers(ctx context.Context, connID string) error {
+	return runtime.handleGetClubOffers(ctx, connID, 0)
+}
 
 // sendPacket encodes and transmits one outgoing packet.
 func (runtime *Runtime) sendPacket(connID string, pkt interface {

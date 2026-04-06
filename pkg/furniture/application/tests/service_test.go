@@ -111,9 +111,9 @@ func TestServicePickupItemRejectsInvalidID(t *testing.T) {
 	}
 }
 
-// TestServicePickupItemRejectsWrongOwner verifies PickupItem rejects non-owner user.
+// TestServicePickupItemRejectsWrongOwner verifies PickupItem rejects non-owner user for inventory items.
 func TestServicePickupItemRejectsWrongOwner(t *testing.T) {
-	item := domain.Item{ID: 5, UserID: 2, RoomID: 10}
+	item := domain.Item{ID: 5, UserID: 2, RoomID: 0}
 	service, _ := furnitureapplication.NewService(repositoryStub{item: item})
 	if _, err := service.PickupItem(context.Background(), 5, 1); err == nil {
 		t.Fatalf("expected ownership failure")

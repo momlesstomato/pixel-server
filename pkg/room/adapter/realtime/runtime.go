@@ -63,6 +63,14 @@ type Runtime struct {
 	voteRepo domain.VoteRepository
 	// visitRecorder stores optional room visit tracking behavior.
 	visitRecorder VisitRecorder
+	// permissions stores optional permission check behavior.
+	permissions PermissionChecker
+}
+
+// PermissionChecker defines permission resolution behavior for room actions.
+type PermissionChecker interface {
+	// HasPermission checks if a user holds a specific permission scope.
+	HasPermission(ctx context.Context, userID int, scope string) (bool, error)
 }
 
 // doorbellEntry tracks a visitor waiting for doorbell approval.
@@ -196,6 +204,11 @@ func (rt *Runtime) SetVoteRepository(repo domain.VoteRepository) {
 // SetVisitRecorder configures optional room visit tracking.
 func (rt *Runtime) SetVisitRecorder(recorder VisitRecorder) {
 	rt.visitRecorder = recorder
+}
+
+// SetPermissionChecker configures optional moderator permission checks for room actions.
+func (rt *Runtime) SetPermissionChecker(checker PermissionChecker) {
+	rt.permissions = checker
 }
 
 // resolveUsername looks up the display name for a user identifier.

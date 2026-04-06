@@ -62,7 +62,13 @@ func (runtime *Runtime) handleGetPage(ctx context.Context, connID string, userID
 		runtime.logger.Error("list catalog offers failed", zap.Int("user_id", userID), zap.Int32("page_id", pageID), zap.Error(err))
 		return err
 	}
-	return runtime.sendPacket(connID, buildPagePacket(page, offers, catalogType))
+	if err := runtime.sendPacket(connID, buildPagePacket(page, offers, catalogType)); err != nil {
+		return err
+	}
+	if page.PageLayout == "club_buy" && runtime.clubOffersSender != nil {
+		return runtime.clubOffersSender(ctx, connID, userID)
+	}
+	return nil
 }
 
 // parseCatalogType reads the catalog mode string from a get_index body.

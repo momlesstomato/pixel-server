@@ -51,7 +51,7 @@ func (store *Store) CreateDefinition(ctx context.Context, def domain.Definition)
 	row := furnituremodel.Definition{
 		ItemName: def.ItemName, PublicName: def.PublicName,
 		ItemType: string(def.ItemType), Width: int16(def.Width), Length: int16(def.Length),
-		StackHeight: def.StackHeight, CanStack: def.CanStack, CanSit: def.CanSit,
+		StackHeight: def.StackHeight, CanStack: def.CanStack, CanSit: def.CanSit, CanLay: def.CanLay,
 		IsWalkable: def.IsWalkable, SpriteID: def.SpriteID,
 		AllowRecycle: def.AllowRecycle, AllowTrade: def.AllowTrade,
 		AllowMarketplaceSell: def.AllowMarketplaceSell, AllowGift: def.AllowGift,
@@ -75,6 +75,9 @@ func (store *Store) UpdateDefinition(ctx context.Context, id int, patch domain.D
 	}
 	if patch.CanStack != nil {
 		updates["can_stack"] = *patch.CanStack
+	}
+	if patch.CanLay != nil {
+		updates["can_lay"] = *patch.CanLay
 	}
 	if patch.AllowTrade != nil {
 		updates["allow_trade"] = *patch.AllowTrade

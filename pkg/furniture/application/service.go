@@ -145,7 +145,10 @@ func (service *Service) PlaceFloorItem(ctx context.Context, itemID int, userID i
 	if err != nil {
 		return domain.Item{}, err
 	}
-	if item.UserID != userID {
+	if item.RoomID == 0 && item.UserID != userID {
+		return domain.Item{}, domain.ErrItemNotOwned
+	}
+	if item.RoomID != 0 && item.RoomID != roomID {
 		return domain.Item{}, domain.ErrItemNotFound
 	}
 	if err := service.repository.PlaceItem(ctx, itemID, roomID, x, y, 0, dir); err != nil {
@@ -172,8 +175,8 @@ func (service *Service) PickupItem(ctx context.Context, itemID int, userID int) 
 	if err != nil {
 		return domain.Item{}, err
 	}
-	if item.UserID != userID {
-		return domain.Item{}, domain.ErrItemNotFound
+	if item.RoomID == 0 && item.UserID != userID {
+		return domain.Item{}, domain.ErrItemNotOwned
 	}
 	if err := service.repository.PlaceItem(ctx, itemID, 0, 0, 0, 0, 0); err != nil {
 		return domain.Item{}, err

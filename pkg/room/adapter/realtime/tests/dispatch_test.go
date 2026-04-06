@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/adapter/realtime"
 	roomapp "github.com/momlesstomato/pixel-server/pkg/room/application"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
@@ -131,4 +132,26 @@ func TestDisposeIsIdempotent(t *testing.T) {
 	rt, _ := newRuntime(t)
 	rt.Dispose("conn1")
 	rt.Dispose("conn1")
+}
+
+// TestHandle_KickUser_NotInRoom verifies kick when requester is not in a room.
+func TestHandle_KickUser_NotInRoom(t *testing.T) {
+	rt, _ := newRuntime(t)
+	w := codec.NewWriter()
+	w.WriteInt32(2)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.KickUserPacketID, w.Bytes())
+	assert.NoError(t, err)
+	assert.True(t, handled)
+}
+
+// TestHandle_BanUser_NotInRoom verifies ban when requester is not in a room.
+func TestHandle_BanUser_NotInRoom(t *testing.T) {
+	rt, _ := newRuntime(t)
+	w := codec.NewWriter()
+	w.WriteInt32(2)
+	w.WriteInt32(1)
+	_ = w.WriteString("RWUAM_BAN_USER_HOUR")
+	handled, err := rt.Handle(context.Background(), "conn1", packet.BanUserPacketID, w.Bytes())
+	assert.NoError(t, err)
+	assert.True(t, handled)
 }

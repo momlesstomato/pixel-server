@@ -87,3 +87,25 @@ func Step05AddItemPlacement() *gormigrate.Migration {
 		},
 	}
 }
+
+// Step06AddCanLay returns the migration that adds can_lay support to item definitions.
+func Step06AddCanLay() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260406_01_add_item_definition_can_lay",
+		Migrate: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return database.AutoMigrate(&furnituremodel.Definition{})
+			}
+			if err := database.Exec(`ALTER TABLE item_definitions ADD COLUMN IF NOT EXISTS can_lay BOOLEAN NOT NULL DEFAULT FALSE`).Error; err != nil {
+				return err
+			}
+			return database.Exec(`UPDATE item_definitions SET can_lay = TRUE WHERE can_lay = FALSE AND (interaction_type = 'bed' OR item_name ILIKE '%bed%' OR public_name ILIKE '%bed%')`).Error
+		},
+		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
+			return database.Exec(`ALTER TABLE item_definitions DROP COLUMN IF EXISTS can_lay`).Error
+		},
+	}
+}

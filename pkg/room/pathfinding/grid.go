@@ -10,6 +10,8 @@ type Grid struct {
 	width int
 	// height stores the grid row count.
 	height int
+	// blocked stores dynamically blocked tile positions (e.g. occupied by entities).
+	blocked map[[2]int]struct{}
 }
 
 // NewGrid creates a pathfinding grid from a tile array.
@@ -22,6 +24,19 @@ func NewGrid(tiles [][]domain.Tile) Grid {
 	return Grid{tiles: tiles, width: w, height: h}
 }
 
+// NewGridWithBlockers creates a pathfinding grid with additional blocked positions.
+func NewGridWithBlockers(tiles [][]domain.Tile, blockers [][2]int) Grid {
+	g := NewGrid(tiles)
+	if len(blockers) == 0 {
+		return g
+	}
+	g.blocked = make(map[[2]int]struct{}, len(blockers))
+	for _, b := range blockers {
+		g.blocked[b] = struct{}{}
+	}
+	return g
+}
+
 // InBounds reports whether the position is inside the grid.
 func (g Grid) InBounds(x, y int) bool {
 	return x >= 0 && x < g.width && y >= 0 && y < g.height
@@ -31,6 +46,11 @@ func (g Grid) InBounds(x, y int) bool {
 func (g Grid) IsWalkable(x, y int) bool {
 	if !g.InBounds(x, y) {
 		return false
+	}
+	if g.blocked != nil {
+		if _, blocked := g.blocked[[2]int{x, y}]; blocked {
+			return false
+		}
 	}
 	return g.tiles[y][x].State == domain.TileOpen
 }

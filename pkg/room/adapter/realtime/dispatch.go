@@ -47,6 +47,10 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 		return true, rt.handleSit(connID, userID)
 	case packet.LetUserInPacketID:
 		return true, rt.handleLetUserIn(ctx, connID, userID, body)
+	case packet.KickUserPacketID:
+		return true, rt.handleKickUser(ctx, connID, userID, body)
+	case packet.BanUserPacketID:
+		return true, rt.handleBanUser(ctx, connID, userID, body)
 	case packet.GetRoomSettingsPacketID:
 		return true, rt.handleGetRoomSettings(ctx, connID, userID, body)
 	case packet.SaveRoomSettingsPacketID:

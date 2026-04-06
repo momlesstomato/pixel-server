@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/momlesstomato/pixel-server/core/broadcast"
+	"github.com/momlesstomato/pixel-server/core/codec"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/furniture/adapter/realtime"
 	furnitureapplication "github.com/momlesstomato/pixel-server/pkg/furniture/application"
@@ -118,6 +120,38 @@ func (t *transportStub) Send(_ string, packetID uint16, _ []byte) error {
 	return nil
 }
 
+type targetedTransportStub struct{ sent map[string][]uint16 }
+
+func (t *targetedTransportStub) Send(connID string, packetID uint16, _ []byte) error {
+	if t.sent == nil {
+		t.sent = make(map[string][]uint16)
+	}
+	t.sent[connID] = append(t.sent[connID], packetID)
+	return nil
+}
+
+type broadcasterStub struct{ sent map[string][]uint16 }
+
+func (b *broadcasterStub) Publish(_ context.Context, channel string, payload []byte) error {
+	if b.sent == nil {
+		b.sent = make(map[string][]uint16)
+	}
+	frames, err := codec.DecodeFrames(payload)
+	if err != nil {
+		return err
+	}
+	for _, frame := range frames {
+		b.sent[channel] = append(b.sent[channel], frame.PacketID)
+	}
+	return nil
+}
+
+func (b *broadcasterStub) Subscribe(context.Context, string) (<-chan []byte, coreconnection.Disposable, error) {
+	return nil, nil, errors.New("not implemented")
+}
+
+var _ broadcast.Broadcaster = (*broadcasterStub)(nil)
+
 // buildRuntime creates a furniture realtime runtime backed by the given stub.
 func buildRuntime(repo furnituredomain.Repository) (*realtime.Runtime, *transportStub) {
 	svc, _ := furnitureapplication.NewService(repo)
@@ -125,6 +159,38 @@ func buildRuntime(repo furnituredomain.Repository) (*realtime.Runtime, *transpor
 	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
 	return rt, transport
 }
+
+type ownerSessionStub struct{}
+
+func (ownerSessionStub) Register(coreconnection.Session) error { return nil }
+
+func (ownerSessionStub) FindByConnID(id string) (coreconnection.Session, bool) {
+	switch id {
+	case "conn1":
+		return coreconnection.Session{ConnID: "conn1", UserID: 1}, true
+	case "owner-conn":
+		return coreconnection.Session{ConnID: "owner-conn", UserID: 2}, true
+	default:
+		return coreconnection.Session{}, false
+	}
+}
+
+func (ownerSessionStub) FindByUserID(userID int) (coreconnection.Session, bool) {
+	switch userID {
+	case 1:
+		return coreconnection.Session{ConnID: "conn1", UserID: 1}, true
+	case 2:
+		return coreconnection.Session{ConnID: "owner-conn", UserID: 2}, true
+	default:
+		return coreconnection.Session{}, false
+	}
+}
+
+func (ownerSessionStub) Touch(string) error { return nil }
+
+func (ownerSessionStub) Remove(string) {}
+
+func (ownerSessionStub) ListAll() ([]coreconnection.Session, error) { return nil, nil }
 
 // TestHandleGetFurnitureSendsFurniList verifies 3150 triggers a 994 furni list response.
 func TestHandleGetFurnitureSendsFurniList(t *testing.T) {

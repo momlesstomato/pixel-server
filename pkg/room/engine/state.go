@@ -2,7 +2,6 @@ package engine
 
 import (
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
-	"github.com/momlesstomato/pixel-server/pkg/room/pathfinding"
 )
 
 // State returns the current lifecycle phase.
@@ -46,27 +45,35 @@ func (inst *Instance) Done() <-chan struct{} {
 	return inst.done
 }
 
-// EjectSittingEntitiesAt clears the sit/lay state of every auto-sitting entity at
-// tile (x, y) and initiates a walk toward the room door.
+// hasSeatPosture reports whether the entity is currently in a sit or lay posture.
+func hasSeatPosture(entity *domain.RoomEntity) bool {
+	_, hasSit := entity.Statuses["sit"]
+	_, hasLay := entity.Statuses["lay"]
+	return entity.IsSitting || hasSit || hasLay
+}
+
+// clearSeatPosture removes sit and lay posture state from an entity.
+func clearSeatPosture(entity *domain.RoomEntity) {
+	entity.IsSitting = false
+	entity.IsSittingAuto = false
+	delete(entity.Statuses, "sit")
+	delete(entity.Statuses, "lay")
+}
+
+// EjectSittingEntitiesAt clears the sit/lay state of every seated entity at
+// tile (x, y) and leaves them standing in place so they can freely navigate afterward.
 // It returns updated entity snapshots so callers can broadcast the change.
 func (inst *Instance) EjectSittingEntitiesAt(x, y int) []domain.RoomEntity {
 	inst.mu.Lock()
 	defer inst.mu.Unlock()
 	var updated []domain.RoomEntity
 	for _, entity := range inst.entities {
-		if !entity.IsSittingAuto || entity.Position.X != x || entity.Position.Y != y {
+		if entity.Position.X != x || entity.Position.Y != y || entity.IsWalking || !hasSeatPosture(entity) {
 			continue
 		}
-		entity.IsSitting = false
-		entity.IsSittingAuto = false
-		delete(entity.Statuses, "sit")
-		delete(entity.Statuses, "lay")
-		grid := pathfinding.NewGrid(inst.Layout.Grid)
-		path := pathfinding.FindPath(grid, entity.Position.X, entity.Position.Y, inst.Layout.DoorX, inst.Layout.DoorY, pathfinding.DefaultOptions())
-		if path != nil {
-			entity.Path = path
-			entity.GoalPosition = &domain.Tile{X: inst.Layout.DoorX, Y: inst.Layout.DoorY}
-			entity.IsWalking = true
+		clearSeatPosture(entity)
+		if y >= 0 && y < len(inst.Layout.Grid) && x >= 0 && x < len(inst.Layout.Grid[y]) {
+			entity.Position.Z = inst.Layout.Grid[y][x].Z
 		}
 		entity.IsIdle = false
 		entity.IdleTimer = 0
@@ -76,8 +83,8 @@ func (inst *Instance) EjectSittingEntitiesAt(x, y int) []domain.RoomEntity {
 	return updated
 }
 
-// RotateSittingEntitiesAt updates the body and head rotation of every entity
-// that is auto-sitting at tile (x, y) to match the new furniture direction.
+// RotateSittingEntitiesAt updates the body and head rotation of every seated entity
+// at tile (x, y) to match the new furniture direction.
 // It returns the updated entity snapshots so callers can broadcast the change.
 func (inst *Instance) RotateSittingEntitiesAt(x, y, dir int) []domain.RoomEntity {
 	if dir%2 != 0 {
@@ -87,7 +94,7 @@ func (inst *Instance) RotateSittingEntitiesAt(x, y, dir int) []domain.RoomEntity
 	defer inst.mu.Unlock()
 	var updated []domain.RoomEntity
 	for _, e := range inst.entities {
-		if e.IsSittingAuto && e.Position.X == x && e.Position.Y == y {
+		if e.Position.X == x && e.Position.Y == y && !e.IsWalking && hasSeatPosture(e) {
 			e.BodyRotation = dir
 			e.HeadRotation = dir
 			e.UpdateNeeded = true

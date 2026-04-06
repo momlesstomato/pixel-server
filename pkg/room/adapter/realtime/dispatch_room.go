@@ -2,9 +2,13 @@ package realtime
 
 import (
 	"context"
+	"time"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+	notificationpacket "github.com/momlesstomato/pixel-server/pkg/session/packet/notification"
 	"go.uber.org/zap"
 )
 
@@ -299,5 +303,92 @@ func (rt *Runtime) handleToggleMuteTool(connID string, userID int) error {
 		return nil
 	}
 	inst.SetMuted(!inst.Muted())
+	return nil
+}
+
+// handleKickUser removes a target user from the room on behalf of the room owner, rights holder, or moderator.
+func (rt *Runtime) handleKickUser(ctx context.Context, connID string, userID int, body []byte) error {
+	r := codec.NewReader(body)
+	targetID, err := r.ReadInt32()
+	if err != nil {
+		return nil
+	}
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil {
+		return nil
+	}
+	modKick := false
+	if rt.permissions != nil {
+		modKick, _ = rt.permissions.HasPermission(ctx, userID, "moderation.kick")
+	}
+	if room.OwnerID != userID && !rt.service.HasRights(ctx, roomID, userID) && !modKick {
+		return nil
+	}
+	target, found := rt.sessions.FindByUserID(int(targetID))
+	if !found {
+		return nil
+	}
+	rt.sendKickedPacket(ctx, int(targetID))
+	rt.leaveCurrentRoom(target.ConnID)
+	return nil
+}
+
+// sendKickedPacket notifies one user that they have been kicked out of the room.
+func (rt *Runtime) sendKickedPacket(ctx context.Context, userID int) {
+	pkt := notificationpacket.GenericErrorPacket{ErrorCode: 4008}
+	body, err := pkt.Encode()
+	if err != nil {
+		return
+	}
+	frame := codec.EncodeFrame(notificationpacket.GenericErrorPacketID, body)
+	_ = rt.broadcaster.Publish(ctx, sessionnotification.UserChannel(userID), frame)
+}
+
+// handleBanUser bans a target user from the room on behalf of the owner, rights holder, or moderator.
+func (rt *Runtime) handleBanUser(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.BanUserPacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	roomID, ok := rt.connRooms[connID]
+	if !ok {
+		return nil
+	}
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil {
+		return nil
+	}
+	modKick := false
+	if rt.permissions != nil {
+		modKick, _ = rt.permissions.HasPermission(ctx, userID, "moderation.kick")
+	}
+	if room.OwnerID != userID && !rt.service.HasRights(ctx, roomID, userID) && !modKick {
+		return nil
+	}
+	targetID := int(pkt.UserID)
+	var expiresAt *time.Time
+	switch pkt.BanType {
+	case "RWUAM_BAN_USER_HOUR":
+		t := time.Now().Add(time.Hour)
+		expiresAt = &t
+	case "RWUAM_BAN_USER_DAY":
+		t := time.Now().Add(24 * time.Hour)
+		expiresAt = &t
+	}
+	ban := domain.RoomBan{RoomID: roomID, UserID: targetID, ExpiresAt: expiresAt}
+	if _, err := rt.service.CreateBan(ctx, ban); err != nil {
+		rt.logger.Warn("create room ban failed", zap.Int("room_id", roomID), zap.Int("target", targetID), zap.Error(err))
+		return nil
+	}
+	target, found := rt.sessions.FindByUserID(targetID)
+	if !found {
+		return nil
+	}
+	rt.sendKickedPacket(ctx, targetID)
+	rt.leaveCurrentRoom(target.ConnID)
 	return nil
 }

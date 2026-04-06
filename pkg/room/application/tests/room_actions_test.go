@@ -60,3 +60,13 @@ func TestRemoveBan_Success(t *testing.T) {
 	svc := newService(t)
 	assert.NoError(t, svc.RemoveBan(context.Background(), 1))
 }
+
+// TestCreateBan_Success verifies CreateBan persists and returns the ban.
+func TestCreateBan_Success(t *testing.T) {
+	svc := newService(t)
+	ban := domain.RoomBan{RoomID: 1, UserID: 5}
+	result, err := svc.CreateBan(context.Background(), ban)
+	assert.NoError(t, err)
+	assert.Equal(t, ban.RoomID, result.RoomID)
+	assert.Equal(t, ban.UserID, result.UserID)
+}

@@ -57,13 +57,19 @@ func (inst *Instance) processEntityMovement() (doorExits []domain.RoomEntity) {
 			entity.StepFrom = nil
 			delete(entity.Statuses, "mv")
 			if inst.seatChecker != nil && !entity.IsSitting {
-				if h, seatDir, isSit, _ := inst.seatChecker(inst.RoomID, entity.Position.X, entity.Position.Y); isSit {
+				if h, seatDir, isSit, isLay := inst.seatChecker(inst.RoomID, entity.Position.X, entity.Position.Y); isSit || isLay {
 					if seatDir%2 != 0 {
 						seatDir--
 					}
 					entity.BodyRotation = seatDir
 					entity.HeadRotation = seatDir
-					entity.Statuses["sit"] = fmt.Sprintf("%.2f", h)
+					delete(entity.Statuses, "sit")
+					delete(entity.Statuses, "lay")
+					if isLay {
+						entity.Statuses["lay"] = fmt.Sprintf("%.2f", h)
+					} else {
+						entity.Statuses["sit"] = fmt.Sprintf("%.2f", h)
+					}
 					entity.IsSitting = true
 					entity.IsSittingAuto = true
 				}
@@ -185,7 +191,14 @@ func calcRotation(_, _ int, toX, toY, fromX, fromY int) int {
 
 // startWalk computes a path and initiates entity movement.
 func (inst *Instance) startWalk(entity *domain.RoomEntity, targetX, targetY int) error {
-	grid := pathfinding.NewGrid(inst.Layout.Grid)
+	var blockers [][2]int
+	for _, e := range inst.entities {
+		if e.VirtualID == entity.VirtualID || e.IsWalking {
+			continue
+		}
+		blockers = append(blockers, [2]int{e.Position.X, e.Position.Y})
+	}
+	grid := pathfinding.NewGridWithBlockers(inst.Layout.Grid, blockers)
 	opts := pathfinding.DefaultOptions()
 	path := pathfinding.FindPath(grid, entity.Position.X, entity.Position.Y, targetX, targetY, opts)
 	if path == nil {

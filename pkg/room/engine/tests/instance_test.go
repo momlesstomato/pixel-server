@@ -154,3 +154,169 @@ func TestLookTo_Self(t *testing.T) {
 	assert.Equal(t, 2, e.BodyRotation, "self-click must face frontward (dir 2)")
 	assert.Equal(t, 2, e.HeadRotation, "self-click must face frontward (dir 2)")
 }
+
+// TestEjectSittingEntitiesAt_StandsInPlace verifies that ejecting an auto-sitting entity
+// clears its sit state and leaves it standing in place without walking toward the door.
+func TestEjectSittingEntitiesAt_StandsInPlace(t *testing.T) {
+	layout := testLayout()
+	inst := engine.NewInstance(1, layout, zap.NewNop(), noopBroadcaster)
+	inst.SetTileSeatChecker(func(_ int, x, y int) (float64, int, bool, bool) {
+		if x == 2 && y == 2 {
+			return 1.0, 2, true, false
+		}
+		return 0, 0, false, false
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok, "entity must be in room after walk")
+	require.True(t, e.IsSitting, "entity should be auto-sitting on arrival")
+	require.True(t, e.IsSittingAuto, "auto-sit flag must be set")
+	updated := inst.EjectSittingEntitiesAt(2, 2)
+	require.Len(t, updated, 1, "one entity must be ejected")
+	e, ok = inst.Entity(entity.VirtualID)
+	require.True(t, ok, "entity must remain in room after ejection")
+	assert.False(t, e.IsSitting, "sit flag must be cleared")
+	assert.False(t, e.IsSittingAuto, "auto-sit flag must be cleared")
+	assert.False(t, e.IsWalking, "entity must not walk to door after ejection")
+	assert.Equal(t, 2, e.Position.X, "entity must stay at ejection tile X")
+	assert.Equal(t, 2, e.Position.Y, "entity must stay at ejection tile Y")
+	_, hasSit := e.Statuses["sit"]
+	assert.False(t, hasSit, "sit status must be removed")
+}
+
+// TestEjectSittingEntitiesAt_ClearsManualSit verifies stale sit state is cleared even when the posture was not marked auto-sit.
+func TestEjectSittingEntitiesAt_ClearsManualSit(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	sitReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgSit, Entity: entity, Reply: sitReply})
+	require.NoError(t, <-sitReply)
+	updated := inst.EjectSittingEntitiesAt(2, 2)
+	require.Len(t, updated, 1)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.False(t, e.IsSitting)
+	assert.False(t, e.IsSittingAuto)
+	_, hasSit := e.Statuses["sit"]
+	assert.False(t, hasSit, "manual sit status must be removed")
+	assert.False(t, e.IsWalking, "manual sit ejection must not force a walk")
+}
+
+// TestRotateSittingEntitiesAt_RotatesManualSit verifies occupied chairs rotate users even when the posture is not auto-sit.
+func TestRotateSittingEntitiesAt_RotatesManualSit(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	sitReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgSit, Entity: entity, Reply: sitReply})
+	require.NoError(t, <-sitReply)
+	updated := inst.RotateSittingEntitiesAt(2, 2, 5)
+	require.Len(t, updated, 1)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, 4, e.BodyRotation, "odd directions must normalize to even chair rotation")
+	assert.Equal(t, 4, e.HeadRotation, "head must rotate with the chair")
+}
+
+// TestAutoLayOnArrival verifies lay-capable furniture applies lay posture automatically on arrival.
+func TestAutoLayOnArrival(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.SetTileSeatChecker(func(_ int, x, y int) (float64, int, bool, bool) {
+		if x == 2 && y == 2 {
+			return 0.75, 4, false, true
+		}
+		return 0, 0, false, false
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.True(t, e.IsSitting)
+	assert.True(t, e.IsSittingAuto)
+	assert.Equal(t, "0.75", e.Statuses["lay"])
+	_, hasSit := e.Statuses["sit"]
+	assert.False(t, hasSit)
+	assert.Equal(t, 4, e.BodyRotation)
+	assert.Equal(t, 4, e.HeadRotation)
+}
+
+// TestHandleSitUsesLayPosture verifies manual posture toggling uses lay on lay-capable furniture.
+func TestHandleSitUsesLayPosture(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.SetTileSeatChecker(func(_ int, x, y int) (float64, int, bool, bool) {
+		if x == 2 && y == 2 {
+			return 1.25, 6, false, true
+		}
+		return 0, 0, false, false
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	inst.EjectSittingEntitiesAt(2, 2)
+	sitReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgSit, Entity: entity, Reply: sitReply})
+	require.NoError(t, <-sitReply)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.True(t, e.IsSitting)
+	assert.False(t, e.IsSittingAuto)
+	assert.Equal(t, "1.25", e.Statuses["lay"])
+	_, hasSit := e.Statuses["sit"]
+	assert.False(t, hasSit)
+	assert.Equal(t, 6, e.BodyRotation)
+	assert.Equal(t, 6, e.HeadRotation)
+	toggleReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgSit, Entity: entity, Reply: toggleReply})
+	require.NoError(t, <-toggleReply)
+	e, ok = inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.False(t, e.IsSitting)
+	_, hasLay := e.Statuses["lay"]
+	assert.False(t, hasLay)
+}

@@ -22,6 +22,8 @@ type Definition struct {
 	CanStack bool `gorm:"not null;default:true"`
 	// CanSit stores whether users can sit on this item.
 	CanSit bool `gorm:"not null;default:false"`
+	// CanLay stores whether users can lay on this item.
+	CanLay bool `gorm:"not null;default:false"`
 	// IsWalkable stores whether users can walk over this item.
 	IsWalkable bool `gorm:"not null;default:false"`
 	// SpriteID stores client-side sprite identifier.

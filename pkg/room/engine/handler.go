@@ -240,16 +240,38 @@ func (inst *Instance) handleSit(msg Message) error {
 		return nil
 	}
 	if !entity.IsSitting {
-		if entity.BodyRotation%2 != 0 {
+		canLay := false
+		if inst.seatChecker != nil {
+			if height, seatDir, canSit, lay := inst.seatChecker(inst.RoomID, entity.Position.X, entity.Position.Y); canSit || lay {
+				if seatDir%2 != 0 {
+					seatDir--
+				}
+				entity.BodyRotation = seatDir
+				entity.HeadRotation = seatDir
+				delete(entity.Statuses, "sit")
+				delete(entity.Statuses, "lay")
+				if lay {
+					entity.Statuses["lay"] = fmt.Sprintf("%.2f", height)
+					canLay = true
+				} else if canSit {
+					entity.Statuses["sit"] = fmt.Sprintf("%.2f", height)
+				}
+			}
+		}
+		if !canLay && entity.BodyRotation%2 != 0 {
 			entity.BodyRotation--
 		}
-		entity.Statuses["sit"] = "1.0"
-		entity.Position.Z -= 0.35
+		if len(entity.Statuses) == 0 || (!canLay && entity.Statuses["sit"] == "") {
+			entity.Statuses["sit"] = "1.0"
+			entity.Position.Z -= 0.35
+		}
 		entity.IsSitting = true
 		entity.IsSittingAuto = false
 	} else {
 		if !entity.IsSittingAuto {
-			entity.Position.Z += 0.35
+			if _, laying := entity.Statuses["lay"]; !laying {
+				entity.Position.Z += 0.35
+			}
 		}
 		delete(entity.Statuses, "sit")
 		delete(entity.Statuses, "lay")

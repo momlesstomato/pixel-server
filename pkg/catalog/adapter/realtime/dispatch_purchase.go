@@ -31,7 +31,10 @@ func (runtime *Runtime) handlePurchase(ctx context.Context, connID string, userI
 	if err := runtime.sendPacket(connID, packet.PurchaseOKPacket{Offer: buildOfferEntry(result.Offer)}); err != nil {
 		return err
 	}
-	return runtime.sendPostPurchase(connID, result)
+	if err := runtime.sendPostPurchaseWallet(connID, result.NewCredits); err != nil {
+		return err
+	}
+	return runtime.sendPostPurchaseInventory(ctx, connID, userID, result.ItemID)
 }
 
 // handlePurchaseGift processes a catalog gift purchase request from the client.
@@ -48,22 +51,32 @@ func (runtime *Runtime) handlePurchaseGift(ctx context.Context, connID string, u
 	if err := runtime.sendPacket(connID, packet.PurchaseOKPacket{Offer: buildOfferEntry(result.Offer)}); err != nil {
 		return err
 	}
-	return runtime.sendPostPurchase(connID, result)
+	return runtime.sendPostPurchaseWallet(connID, result.NewCredits)
 }
 
-// sendPostPurchase sends wallet update and inventory notification packets after a purchase.
-func (runtime *Runtime) sendPostPurchase(connID string, result domain.PurchaseResult) error {
+// sendPostPurchaseWallet sends the updated credit balance after a purchase.
+func (runtime *Runtime) sendPostPurchaseWallet(connID string, newCredits int) error {
 	w := codec.NewWriter()
-	if err := w.WriteString(fmt.Sprintf("%d.0", result.NewCredits)); err != nil {
+	if err := w.WriteString(fmt.Sprintf("%d.0", newCredits)); err != nil {
 		return err
 	}
 	if err := runtime.transport.Send(connID, inventorypkt.CreditsResponsePacketID, w.Bytes()); err != nil {
 		return err
 	}
-	if result.ItemID <= 0 {
+	return nil
+}
+
+// sendPostPurchaseInventory sends the bought inventory delta and unseen notification.
+func (runtime *Runtime) sendPostPurchaseInventory(ctx context.Context, connID string, userID int, itemID int) error {
+	if itemID <= 0 {
 		return nil
 	}
-	return runtime.sendPacket(connID, packet.FurniListNotificationPacket{ItemID: result.ItemID})
+	if runtime.inventoryItemSender != nil {
+		if err := runtime.inventoryItemSender(ctx, connID, userID, itemID); err != nil {
+			return err
+		}
+	}
+	return runtime.sendPacket(connID, packet.FurniListNotificationPacket{ItemID: itemID})
 }
 
 // sendPurchaseError maps a purchase error to the appropriate client error packet.

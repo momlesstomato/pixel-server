@@ -20,6 +20,8 @@ type FurnitureFloorItem struct {
 	Dir int
 	// Z stores the tile height offset.
 	Z float64
+	// StackHeight stores the item height used by the client for stacking and seating.
+	StackHeight float64
 	// ExtraData stores item-specific state data.
 	ExtraData string
 	// UserID stores the owner user identifier.
@@ -67,7 +69,7 @@ func encodeFloorItem(w *codec.Writer, item FurnitureFloorItem) error {
 	if err := w.WriteString(fmt.Sprintf("%.2f", item.Z)); err != nil {
 		return err
 	}
-	if err := w.WriteString("0.00"); err != nil {
+	if err := w.WriteString(fmt.Sprintf("%.2f", item.StackHeight)); err != nil {
 		return err
 	}
 	w.WriteInt32(-1)

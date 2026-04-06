@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	catalogrealtime "github.com/momlesstomato/pixel-server/pkg/catalog/adapter/realtime"
@@ -15,6 +16,7 @@ import (
 	furniturerealtime "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/realtime"
 	furnitureapplication "github.com/momlesstomato/pixel-server/pkg/furniture/application"
 	furnituredomain "github.com/momlesstomato/pixel-server/pkg/furniture/domain"
+	furnipacket "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
 	furniturestore "github.com/momlesstomato/pixel-server/pkg/furniture/infrastructure/store"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	inventoryrealtime "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/realtime"
@@ -106,11 +108,12 @@ func buildEconomyServices(runtime *initializer.Runtime) (*economyServiceBundle, 
 }
 
 // buildEconomyRuntimes creates economy-realm realtime runtimes for packet dispatch.
-func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.SessionRegistry, transport *handshakerealtime.Transport, logger *zap.Logger, liveRoomCount func(int) int) (*furniturerealtime.Runtime, []handshakerealtime.UserRuntime, error) {
+func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.SessionRegistry, transport *handshakerealtime.Transport, broadcaster broadcast.Broadcaster, logger *zap.Logger, liveRoomCount func(int) int) (*furniturerealtime.Runtime, []handshakerealtime.UserRuntime, error) {
 	frt, err := furniturerealtime.NewRuntime(bundle.furniture, sessions, transport, logger)
 	if err != nil {
 		return nil, nil, err
 	}
+	frt.SetBroadcaster(broadcaster)
 	irt, err := inventoryrealtime.NewRuntime(bundle.inventory, sessions, transport, logger)
 	if err != nil {
 		return nil, nil, err
@@ -119,6 +122,29 @@ func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.
 	if err != nil {
 		return nil, nil, err
 	}
+	crt.SetInventoryItemSender(func(ctx context.Context, connID string, userID int, itemID int) error {
+		item, err := bundle.furniture.FindItemByID(ctx, itemID)
+		if err != nil {
+			return err
+		}
+		if item.UserID != userID || item.RoomID != 0 {
+			return nil
+		}
+		def, err := bundle.furniture.FindDefinitionByID(ctx, item.DefinitionID)
+		if err != nil {
+			return err
+		}
+		body, err := furnipacket.InventoryAddPacket{
+			ItemID: item.ID, SpriteID: def.SpriteID, ExtraData: item.ExtraData,
+			AllowRecycle: def.AllowRecycle, AllowTrade: def.AllowTrade,
+			AllowInventoryStack: def.AllowInventoryStack,
+			AllowMarketplaceSell: def.AllowMarketplaceSell,
+		}.Encode()
+		if err != nil {
+			return err
+		}
+		return transport.Send(connID, furnipacket.InventoryAddPacketID, body)
+	})
 	ert, err := economyrealtime.NewRuntime(bundle.economy, sessions, transport, logger)
 	if err != nil {
 		return nil, nil, err
@@ -132,6 +158,9 @@ func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.
 		return nil, nil, err
 	}
 	nrt.SetLiveRoomCountProvider(liveRoomCount)
+	crt.SetClubOffersSender(func(ctx context.Context, connID string, _ int) error {
+		return srt.SendClubOffers(ctx, connID)
+	})
 	return frt, []handshakerealtime.UserRuntime{frt, irt, crt, ert, srt, nrt}, nil
 }
 

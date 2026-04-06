@@ -52,7 +52,7 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 
 // handleInit sends navigator initialization data.
 func (runtime *Runtime) handleInit(ctx context.Context, connID string, userID int) error {
-	tabs := []string{"official", "new_ads", "myworld_view", "friends_rooms", "groups", "recommended", "popular"}
+	tabs := []string{"official_view", "hotel_view", "roomads_view", "myworld_view"}
 	if err := runtime.sendPacket(connID, packet.NavigatorMetaDataPacket{TopLevelContexts: tabs}); err != nil {
 		return err
 	}
@@ -81,9 +81,9 @@ func (runtime *Runtime) handleSearch(ctx context.Context, connID string, userID 
 	switch searchCode {
 	case "myworld_view":
 		roomFilter.OwnerID = &userID
-	case "new_ads":
+	case "roomads_view":
 		roomFilter.PromotedOnly = true
-	case "official":
+	case "official_view":
 		roomFilter.StaffPickOnly = true
 	}
 	rooms, _, err := runtime.service.ListRooms(ctx, roomFilter)

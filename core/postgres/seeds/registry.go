@@ -25,6 +25,7 @@ func Registry() []*gormigrate.Migration {
 		permissionseed.Step04StaffAndAmbassadorPermissions(),
 		Step07ExtendedGroupUsers(),
 		Step08ExtendedGroupUserSettings(),
+		permissionseed.Step05SecurityLevelBackfill(),
 		inventoryseed.Step01CurrencyTypes(),
 		catalogseed.Step01DefaultPages(),
 		catalogseed.Step02HCShopPage(),

@@ -46,6 +46,8 @@ type Definition struct {
 	CanStack bool
 	// CanSit stores whether users can sit on this item.
 	CanSit bool
+	// CanLay stores whether users can lay on this item.
+	CanLay bool
 	// IsWalkable stores whether users can walk over this item.
 	IsWalkable bool
 	// SpriteID stores client-side sprite identifier.

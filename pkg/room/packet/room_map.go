@@ -367,3 +367,35 @@ func (p *UnbanUserPacket) Decode(body []byte) error {
 	p.UserID, p.RoomID = uid, rid
 	return nil
 }
+
+// BanUserPacket decodes client ban user request (c2s 1477).
+type BanUserPacket struct {
+	// UserID stores the user to ban.
+	UserID int32
+	// RoomID stores the room in which the ban applies.
+	RoomID int32
+	// BanType stores the duration key sent by the client.
+	BanType string
+}
+
+// PacketID returns the protocol packet identifier.
+func (p BanUserPacket) PacketID() uint16 { return BanUserPacketID }
+
+// Decode parses packet body payload.
+func (p *BanUserPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	uid, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	rid, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	bt, err := r.ReadString()
+	if err != nil {
+		return err
+	}
+	p.UserID, p.RoomID, p.BanType = uid, rid, bt
+	return nil
+}

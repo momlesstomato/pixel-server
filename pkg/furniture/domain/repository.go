@@ -42,6 +42,8 @@ type DefinitionPatch struct {
 	StackHeight *float64
 	// CanStack stores optional stack flag update.
 	CanStack *bool
+	// CanLay stores optional lay flag update.
+	CanLay *bool
 	// AllowTrade stores optional trade flag update.
 	AllowTrade *bool
 	// AllowMarketplaceSell stores optional marketplace flag update.

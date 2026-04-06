@@ -111,7 +111,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			}
 			return count
 		}
-		furnitureRT, ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, runtime.Logger, liveRoomCount)
+		furnitureRT, ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, services.broadcaster, runtime.Logger, liveRoomCount)
 		if err != nil {
 			return nil, err
 		}
@@ -126,6 +126,32 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		services.room.Manager().SetDoorExitNotifier(roomRT.OnDoorExit)
 		furnitureRT.SetRoomFinder(roomRT.ConnRoomID)
 		furnitureRT.SetRoomBroadcaster(roomRT.BroadcastRawToRoom)
+		furnitureRT.SetRoomAccessChecker(func(ctx context.Context, roomID, userID int) bool {
+			room, err := services.room.FindRoom(ctx, roomID)
+			if err != nil {
+				return false
+			}
+			if room.OwnerID == userID || services.room.HasRights(ctx, roomID, userID) {
+				return true
+			}
+			ok, _ := services.permissions.HasPermission(ctx, userID, "moderation.kick")
+			return ok
+		})
+		furnitureRT.SetRoomOccupancyChecker(func(roomID, x, y int) bool {
+			inst, ok := services.room.Manager().Get(roomID)
+			if !ok {
+				return false
+			}
+			for _, entity := range inst.Entities() {
+				if entity.Type != roomdomain.EntityPlayer {
+					continue
+				}
+				if entity.Position.X == x && entity.Position.Y == y {
+					return true
+				}
+			}
+			return false
+		})
 		furnitureRT.SetRoomEntityRotator(roomRT.RotateSittingEntitiesInRoom)
 		furnitureRT.SetRoomEntityEvictor(roomRT.EjectSittingEntitiesInRoom)
 		furnitureRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
@@ -162,6 +188,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		modRT.SetVisitService(services.visitService)
 		modRT.SetPermissionChecker(&permissionCheckerAdapter{svc: services.permissions})
 		roomRT.SetVisitRecorder(&visitRecorderAdapter{svc: services.visitService})
+		roomRT.SetPermissionChecker(&permissionCheckerAdapter{svc: services.permissions})
 		runtimes = append(runtimes, modRT)
 		return &compositeRuntime{runtimes: runtimes}, nil
 	})

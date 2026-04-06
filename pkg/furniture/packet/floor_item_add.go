@@ -21,6 +21,8 @@ type FloorItemAddPacket struct {
 	Dir int
 	// Z stores the tile height offset as a formatted string.
 	Z float64
+	// StackHeight stores the item height used by the client for stacking and seating.
+	StackHeight float64
 	// ExtraData stores item state data.
 	ExtraData string
 	// UserID stores the placing user identifier.
@@ -43,7 +45,7 @@ func (p FloorItemAddPacket) Encode() ([]byte, error) {
 	if err := w.WriteString(fmt.Sprintf("%.2f", p.Z)); err != nil {
 		return nil, err
 	}
-	if err := w.WriteString("0.00"); err != nil {
+	if err := w.WriteString(fmt.Sprintf("%.2f", p.StackHeight)); err != nil {
 		return nil, err
 	}
 	w.WriteInt32(-1)
@@ -80,6 +82,8 @@ type FloorItemUpdatePacket struct {
 	Dir int
 	// Z stores the tile height offset.
 	Z float64
+	// StackHeight stores the item height used by the client for stacking and seating.
+	StackHeight float64
 	// ExtraData stores item state data.
 	ExtraData string
 	// UserID stores the owning user identifier.
@@ -100,7 +104,7 @@ func (p FloorItemUpdatePacket) Encode() ([]byte, error) {
 	if err := w.WriteString(fmt.Sprintf("%.2f", p.Z)); err != nil {
 		return nil, err
 	}
-	if err := w.WriteString("0.00"); err != nil {
+	if err := w.WriteString(fmt.Sprintf("%.2f", p.StackHeight)); err != nil {
 		return nil, err
 	}
 	w.WriteInt32(-1)
