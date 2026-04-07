@@ -31,7 +31,7 @@ type Runtime struct {
 	transport Transport
 	// logger stores runtime logging behavior.
 	logger *zap.Logger
-	// clubOffersSender pushes subscription offers when a club_buy page is served.
+	// clubOffersSender pushes subscription offers when a club shop page is served.
 	clubOffersSender ClubOffersSender
 	// inventoryItemSender pushes one purchased inventory delta to the buyer session.
 	inventoryItemSender InventoryItemSender
@@ -63,7 +63,7 @@ func (runtime *Runtime) userID(connID string) (int, bool) {
 	return session.UserID, true
 }
 
-// SetClubOffersSender configures the optional callback invoked for club_buy catalog pages.
+// SetClubOffersSender configures the optional callback invoked for club shop catalog pages.
 func (runtime *Runtime) SetClubOffersSender(fn ClubOffersSender) {
 	runtime.clubOffersSender = fn
 }

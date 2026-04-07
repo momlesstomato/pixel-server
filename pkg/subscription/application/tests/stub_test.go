@@ -20,6 +20,12 @@ type repositoryStub struct {
 	deactivateErr error
 	// expired stores deterministic expired subscriptions.
 	expired []domain.Subscription
+	// paydayConfig stores deterministic payday configuration.
+	paydayConfig domain.PaydayConfig
+	// benefitsState stores deterministic benefits progress.
+	benefitsState domain.BenefitsState
+	// clubGifts stores deterministic club gifts.
+	clubGifts []domain.ClubGift
 }
 
 // FindActiveSubscription returns deterministic subscription.
@@ -69,4 +75,45 @@ func (s repositoryStub) CreateClubOffer(_ context.Context, o domain.ClubOffer) (
 // DeleteClubOffer returns deterministic error.
 func (s repositoryStub) DeleteClubOffer(_ context.Context, _ int) error {
 	return s.deleteErr
+}
+
+// FindPaydayConfig returns deterministic payday config.
+func (s repositoryStub) FindPaydayConfig(_ context.Context) (domain.PaydayConfig, error) {
+	if s.paydayConfig.IntervalDays == 0 {
+		return domain.PaydayConfig{}, domain.ErrPaydayConfigNotFound
+	}
+	return s.paydayConfig, nil
+}
+
+// SavePaydayConfig returns deterministic payday config.
+func (s repositoryStub) SavePaydayConfig(_ context.Context, cfg domain.PaydayConfig) (domain.PaydayConfig, error) {
+	return cfg, nil
+}
+
+// FindBenefitsState returns deterministic benefits state.
+func (s repositoryStub) FindBenefitsState(_ context.Context, _ int) (domain.BenefitsState, error) {
+	if s.benefitsState.UserID == 0 {
+		return domain.BenefitsState{}, domain.ErrBenefitsStateNotFound
+	}
+	return s.benefitsState, nil
+}
+
+// SaveBenefitsState returns deterministic benefits state.
+func (s repositoryStub) SaveBenefitsState(_ context.Context, state domain.BenefitsState) (domain.BenefitsState, error) {
+	return state, nil
+}
+
+// ListClubGifts returns deterministic club gift list.
+func (s repositoryStub) ListClubGifts(_ context.Context) ([]domain.ClubGift, error) {
+	return s.clubGifts, nil
+}
+
+// FindClubGiftByName returns deterministic club gift by name.
+func (s repositoryStub) FindClubGiftByName(_ context.Context, name string) (domain.ClubGift, error) {
+	for _, gift := range s.clubGifts {
+		if gift.Name == name {
+			return gift, nil
+		}
+	}
+	return domain.ClubGift{}, domain.ErrClubGiftNotFound
 }

@@ -3,10 +3,23 @@ package tests
 import (
 	"context"
 	"testing"
+	"time"
 
 	subscriptionapplication "github.com/momlesstomato/pixel-server/pkg/subscription/application"
 	"github.com/momlesstomato/pixel-server/pkg/subscription/domain"
 )
+
+type creditSpenderStub struct{ credits int }
+
+func (s creditSpenderStub) AddCredits(_ context.Context, _ int, amount int) (int, error) {
+	return s.credits + amount, nil
+}
+
+type itemDelivererStub struct{ itemID int }
+
+func (s itemDelivererStub) DeliverItem(_ context.Context, _ int, _ int, _ string, _ int, _ int) (int, error) {
+	return s.itemID, nil
+}
 
 // TestNewServiceRejectsNilRepository verifies constructor precondition validation.
 func TestNewServiceRejectsNilRepository(t *testing.T) {
@@ -99,5 +112,65 @@ func TestServiceClubOfferCRUD(t *testing.T) {
 	offers, err := service.ListClubOffers(context.Background())
 	if err != nil || len(offers) != 1 {
 		t.Fatalf("unexpected list result len=%d err=%v", len(offers), err)
+	}
+}
+
+// TestServiceGetPaydayStatus verifies payday status is derived from config and benefits state.
+func TestServiceGetPaydayStatus(t *testing.T) {
+	stub := repositoryStub{
+		subscription: domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-48 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig: domain.PaydayConfig{IntervalDays: 31, KickbackPercentage: 10},
+		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-48 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour), CycleCreditsSpent: 50},
+	}
+	service, _ := subscriptionapplication.NewService(stub)
+	status, err := service.GetPaydayStatus(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("unexpected payday status error: %v", err)
+	}
+	if status.TotalRewardCredits != 5 {
+		t.Fatalf("expected spend reward 5, got %d", status.TotalRewardCredits)
+	}
+	if status.CurrentHCStreakDays < 2 {
+		t.Fatalf("expected HC streak days >= 2, got %d", status.CurrentHCStreakDays)
+	}
+}
+
+// TestServiceTriggerPayday verifies payday triggering grants credits.
+func TestServiceTriggerPayday(t *testing.T) {
+	stub := repositoryStub{
+		subscription: domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-40 * 24 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig: domain.PaydayConfig{IntervalDays: 31, KickbackPercentage: 10, FlatCredits: 2},
+		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-40 * 24 * time.Hour), NextPaydayAt: time.Now().Add(-1 * time.Hour), CycleCreditsSpent: 50},
+	}
+	service, _ := subscriptionapplication.NewService(stub)
+	service.SetCreditSpender(creditSpenderStub{credits: 100})
+	result, err := service.TriggerPayday(context.Background(), "", 1, false)
+	if err != nil {
+		t.Fatalf("unexpected trigger error: %v", err)
+	}
+	if result.RewardCredits != 7 {
+		t.Fatalf("expected reward 7, got %d", result.RewardCredits)
+	}
+	if result.NewCredits != 107 {
+		t.Fatalf("expected new credits 107, got %d", result.NewCredits)
+	}
+	}
+
+// TestServiceClaimClubGift verifies club gift claims deliver items.
+func TestServiceClaimClubGift(t *testing.T) {
+	stub := repositoryStub{
+		subscription: domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig: domain.PaydayConfig{IntervalDays: 31},
+		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-70 * 24 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour)},
+		clubGifts: []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", ItemDefinitionID: 26, DaysRequired: 31}},
+	}
+	service, _ := subscriptionapplication.NewService(stub)
+	service.SetItemDeliverer(itemDelivererStub{itemID: 77})
+	result, err := service.ClaimClubGift(context.Background(), "", 1, "Gray Dining Chair")
+	if err != nil {
+		t.Fatalf("unexpected club gift claim error: %v", err)
+	}
+	if result.ItemID != 77 {
+		t.Fatalf("expected delivered item 77, got %d", result.ItemID)
 	}
 }

@@ -12,6 +12,10 @@ import (
 type Service struct {
 	// repository stores subscription persistence contract implementation.
 	repository domain.Repository
+	// creditSpender stores the optional credit reward port used by payday.
+	creditSpender domain.CreditSpender
+	// itemDeliverer stores the optional furniture delivery port used by club gifts.
+	itemDeliverer domain.ItemDeliverer
 	// fire stores optional plugin event dispatch behavior.
 	fire func(sdk.Event)
 }
@@ -27,6 +31,16 @@ func NewService(repository domain.Repository) (*Service, error) {
 // SetEventFirer configures optional plugin event dispatch behavior.
 func (service *Service) SetEventFirer(fire func(sdk.Event)) {
 	service.fire = fire
+}
+
+// SetCreditSpender configures optional credit reward behavior for paydays.
+func (service *Service) SetCreditSpender(spender domain.CreditSpender) {
+	service.creditSpender = spender
+}
+
+// SetItemDeliverer configures optional furniture delivery behavior for club gifts.
+func (service *Service) SetItemDeliverer(deliverer domain.ItemDeliverer) {
+	service.itemDeliverer = deliverer
 }
 
 // FindActiveSubscription resolves active subscription for one user.

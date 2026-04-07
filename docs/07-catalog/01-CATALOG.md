@@ -144,13 +144,29 @@ These layouts trigger altered offer-count encoding on the server.
 | Layout | Offer block | Extra data |
 |--------|-------------|------------|
 | `frontpage` | Always sent as count=0 (no offers rendered) | None |
-| `club_buy` | Always sent as count=0 | None |
-| `vip_buy` | Always sent as count=0 | None |
+| `club_buy` | Always sent as count=0 in `catalog.page`; offers arrive separately in `catalog.club_offers` (2405) | Compatibility alias for older HC shop seeds |
+| `vip_buy` | Always sent as count=0 in `catalog.page`; offers arrive separately in `catalog.club_offers` (2405) | Canonical Nitro HC shop layout; footer remains `offerId=0`, `acceptSeasonCurrencyAsCredits=false`, `frontPageItems=0` |
 | `frontpage4` | Always sent as count=0 | Front-page promotions list appended after the offer block (id, caption, image, pageLink, pageId) |
 
 The `frontpage`/`club_buy`/`vip_buy` distinction means these pages are
 **navigation or marketing hubs** — they display a curated layout without
 exposing individual purchasable items through the normal offer list.
+
+For Nitro-based HC pages, the page shell and the data widgets are split:
+
+- `vip_buy` is the modern HC layout and uses `catalog.page` (804) only for the
+  layout shell, then relies on `catalog.club_offers` (2405) for the actual
+  membership offers.
+- Pixel Server still treats `club_buy` as a compatibility alias so older seeded
+  databases continue to receive the same club-offer side-channel packets.
+- Pixel Server also emits `catalog.direct_sms_club_buy` (195) with an empty
+  availability payload so Nitro receives the optional club-buy side-channel
+  event exposed in the renderer protocol tables.
+- `club_gifts` uses `catalog.page` (804) for the shell and `catalog.club_gift_info`
+  (619) for the actual gift selector entries.
+- The `catalog.page` footer should stay aligned with reference emulators:
+  `offerId = 0`, `acceptSeasonCurrencyAsCredits = false`, and a trailing
+  `frontPageItems` count (zero unless a frontpage-style payload is appended).
 
 ### Page type override
 

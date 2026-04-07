@@ -23,6 +23,8 @@ type Service struct {
 	recipientFinder domain.RecipientFinder
 	// itemDeliverer stores optional furniture item delivery port.
 	itemDeliverer domain.ItemDeliverer
+	// purchaseObserver stores optional post-purchase side effects.
+	purchaseObserver func(context.Context, int, domain.CatalogOffer, int) error
 	// fire stores optional plugin event dispatch behavior.
 	fire func(sdk.Event)
 	// redis stores optional Redis client for cache operations.
@@ -63,6 +65,11 @@ func (service *Service) SetRecipientFinder(rf domain.RecipientFinder) {
 // When set, successful purchases create an item instance in the buyer's inventory.
 func (service *Service) SetItemDeliverer(d domain.ItemDeliverer) {
 	service.itemDeliverer = d
+}
+
+// SetPurchaseObserver configures optional post-purchase side effects.
+func (service *Service) SetPurchaseObserver(observer func(context.Context, int, domain.CatalogOffer, int) error) {
+	service.purchaseObserver = observer
 }
 
 // SetEventFirer configures optional plugin event dispatch behavior.

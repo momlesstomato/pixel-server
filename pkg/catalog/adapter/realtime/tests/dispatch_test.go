@@ -15,11 +15,18 @@ import (
 )
 
 // repoStub provides deterministic catalog data.
-type repoStub struct{ offer domain.CatalogOffer }
+type repoStub struct {
+	offer      domain.CatalogOffer
+	pageLayout string
+}
 
 func (r repoStub) ListPages(_ context.Context) ([]domain.CatalogPage, error) { return nil, nil }
 func (r repoStub) FindPageByID(_ context.Context, _ int) (domain.CatalogPage, error) {
-	return domain.CatalogPage{ID: 1, PageLayout: "default_3x3", Enabled: true, Visible: true}, nil
+	pageLayout := r.pageLayout
+	if pageLayout == "" {
+		pageLayout = "default_3x3"
+	}
+	return domain.CatalogPage{ID: 1, PageLayout: pageLayout, Enabled: true, Visible: true}, nil
 }
 func (r repoStub) CreatePage(_ context.Context, p domain.CatalogPage) (domain.CatalogPage, error) {
 	return p, nil
@@ -246,6 +253,32 @@ func TestHandlePurchaseInsufficientCredits(t *testing.T) {
 	}
 	if len(transport.sent) != 1 || transport.sent[0] != catalogpacket.PurchaseErrorPacketID {
 		t.Fatalf("expected purchase_error packet 1404, got %v", transport.sent)
+	}
+}
+
+// TestHandleGetPageVipBuyTriggersClubOffers verifies vip_buy pages trigger the HC offers side-channel.
+func TestHandleGetPageVipBuyTriggersClubOffers(t *testing.T) {
+	transport := &transportStub{}
+	svc := buildService(repoStub{pageLayout: "vip_buy"})
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
+	triggered := false
+	rt.SetClubOffersSender(func(_ context.Context, connID string, userID int) error {
+		triggered = true
+		if connID != "conn1" || userID != 1 {
+			t.Fatalf("unexpected club offers sender args conn=%s user=%d", connID, userID)
+		}
+		return nil
+	})
+	body := buildPurchaseBody(1, 0)
+	handled, err := rt.Handle(context.Background(), "conn1", catalogpacket.GetPagePacketID, body)
+	if err != nil || !handled {
+		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
+	}
+	if !triggered {
+		t.Fatal("expected vip_buy page to trigger club offers sender")
+	}
+	if len(transport.sent) != 1 || transport.sent[0] != catalogpacket.PageResponsePacketID {
+		t.Fatalf("expected only catalog page packet before side-channel send, got %v", transport.sent)
 	}
 }
 

@@ -321,18 +321,21 @@ func TestHandleSitUsesLayPosture(t *testing.T) {
 	assert.False(t, hasLay)
 }
 
-// TestWalkToLayTileUsesCanonicalAnchor verifies bed clicks reroute to a single lay anchor tile.
-func TestWalkToLayTileUsesCanonicalAnchor(t *testing.T) {
+// TestWalkToLayTileUsesResolvedSlot verifies bed clicks reroute to the slot selected by the resolver.
+func TestWalkToLayTileUsesResolvedSlot(t *testing.T) {
 	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
 	inst.SetTileSeatChecker(func(_ int, x, y int) (float64, int, bool, bool) {
-		if x == 2 && y == 2 {
+		if (x == 2 && y == 2) || (x == 3 && y == 2) {
 			return 0.75, 4, false, true
 		}
 		return 0, 0, false, false
 	})
 	inst.SetSeatTargetResolver(func(_ int, x, y int) (int, int, bool) {
-		if x >= 2 && x <= 3 && y >= 2 && y <= 4 {
+		if x == 2 && y >= 2 && y <= 4 {
 			return 2, 2, true
+		}
+		if x == 3 && y >= 2 && y <= 4 {
+			return 3, 2, true
 		}
 		return 0, 0, false
 	})
@@ -349,25 +352,28 @@ func TestWalkToLayTileUsesCanonicalAnchor(t *testing.T) {
 	time.Sleep(3 * time.Second)
 	e, ok := inst.Entity(entity.VirtualID)
 	require.True(t, ok)
-	assert.Equal(t, 2, e.Position.X)
+	assert.Equal(t, 3, e.Position.X)
 	assert.Equal(t, 2, e.Position.Y)
 	assert.True(t, e.IsSitting)
 	assert.True(t, e.IsSittingAuto)
 	assert.Equal(t, "0.75", e.Statuses["lay"])
 }
 
-// TestWalkToOccupiedBedAnchorBlocked verifies a second user cannot use another row of the same occupied bed.
-func TestWalkToOccupiedBedAnchorBlocked(t *testing.T) {
+// TestWalkToSecondBedSlotAllowed verifies a second user can occupy another free slot on the same bed.
+func TestWalkToSecondBedSlotAllowed(t *testing.T) {
 	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
 	inst.SetTileSeatChecker(func(_ int, x, y int) (float64, int, bool, bool) {
-		if x == 2 && y == 2 {
+		if (x == 2 && y == 2) || (x == 3 && y == 2) {
 			return 0.75, 4, false, true
 		}
 		return 0, 0, false, false
 	})
 	inst.SetSeatTargetResolver(func(_ int, x, y int) (int, int, bool) {
-		if x >= 2 && x <= 3 && y >= 2 && y <= 4 {
+		if x == 2 && y >= 2 && y <= 4 {
 			return 2, 2, true
+		}
+		if x == 3 && y >= 2 && y <= 4 {
+			return 3, 2, true
 		}
 		return 0, 0, false
 	})
@@ -379,7 +385,7 @@ func TestWalkToOccupiedBedAnchorBlocked(t *testing.T) {
 	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: first, Reply: enterFirstReply})
 	<-enterFirstReply
 	firstWalkReply := make(chan error, 1)
-	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: first, TargetX: 3, TargetY: 4, Reply: firstWalkReply})
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: first, TargetX: 2, TargetY: 4, Reply: firstWalkReply})
 	require.NoError(t, <-firstWalkReply)
 	time.Sleep(3 * time.Second)
 	secondEntity := domain.NewPlayerEntity(0, 2, "conn-2", "SecondUser", "hr-200", "hi", "M", domain.Tile{X: 0, Y: 0, Z: 0, State: domain.TileOpen})
@@ -389,10 +395,12 @@ func TestWalkToOccupiedBedAnchorBlocked(t *testing.T) {
 	<-enterSecondReply
 	secondWalkReply := make(chan error, 1)
 	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: second, TargetX: 3, TargetY: 3, Reply: secondWalkReply})
-	assert.ErrorIs(t, <-secondWalkReply, domain.ErrPathBlocked)
+	require.NoError(t, <-secondWalkReply)
+	time.Sleep(3 * time.Second)
 	secondState, ok := inst.Entity(second.VirtualID)
 	require.True(t, ok)
-	assert.Equal(t, 0, secondState.Position.X)
-	assert.Equal(t, 0, secondState.Position.Y)
-	assert.False(t, secondState.IsSitting)
+	assert.Equal(t, 3, secondState.Position.X)
+	assert.Equal(t, 2, secondState.Position.Y)
+	assert.True(t, secondState.IsSitting)
+	assert.Equal(t, "0.75", secondState.Statuses["lay"])
 }

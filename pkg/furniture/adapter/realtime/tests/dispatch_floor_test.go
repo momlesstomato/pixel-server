@@ -434,8 +434,8 @@ func TestSendRoomFloorItemsSends1778(t *testing.T) {
 	}
 }
 
-// TestSendRoomFloorItemsCachesLayFootprint verifies multi-tile lay furniture resolves all footprint tiles to one lay anchor.
-func TestSendRoomFloorItemsCachesLayFootprint(t *testing.T) {
+// TestSendRoomFloorItemsCachesLaySlots verifies multi-tile lay furniture resolves each lane to its own lay slot.
+func TestSendRoomFloorItemsCachesLaySlots(t *testing.T) {
 	item := furnituredomain.Item{ID: 7, UserID: 1, RoomID: 5, X: 3, Y: 4, Dir: 0, DefinitionID: 3}
 	def := furnituredomain.Definition{ID: 3, SpriteID: 55, Width: 2, Length: 3, StackHeight: 1.4, CanLay: true}
 	repo := foundRepoStub{item: item, def: def, repoStub: repoStub{items: []furnituredomain.Item{item}}}
@@ -445,19 +445,26 @@ func TestSendRoomFloorItemsCachesLayFootprint(t *testing.T) {
 	if err := rt.SendRoomFloorItems(context.Background(), "conn1", 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expected := [][2]int{{3, 4}, {4, 4}, {3, 5}, {4, 5}, {3, 6}, {4, 6}}
-	for index, tile := range expected {
+	expectedTargets := map[[2]int][2]int{
+		{3, 4}: {3, 4},
+		{3, 5}: {3, 4},
+		{3, 6}: {3, 4},
+		{4, 4}: {4, 4},
+		{4, 5}: {4, 4},
+		{4, 6}: {4, 4},
+	}
+	for tile, expectedTarget := range expectedTargets {
 		_, _, canSit, canLay := rt.TileSeatCheckerFor(5, tile[0], tile[1])
 		targetX, targetY, ok := rt.ResolveSeatTargetFor(5, tile[0], tile[1])
-		if !ok || targetX != 3 || targetY != 4 {
-			t.Fatalf("expected tile %v to resolve to canonical bed anchor [3 4], got ok=%v target=[%d %d]", tile, ok, targetX, targetY)
+		if !ok || targetX != expectedTarget[0] || targetY != expectedTarget[1] {
+			t.Fatalf("expected tile %v to resolve to lay slot %v, got ok=%v target=[%d %d]", tile, expectedTarget, ok, targetX, targetY)
 		}
 		if canSit {
 			t.Fatalf("expected lay footprint tile %v to remain non-sittable", tile)
 		}
-		if index == 0 {
+		if tile == expectedTarget {
 			if !canLay {
-				t.Fatalf("expected canonical bed anchor %v to remain layable", tile)
+				t.Fatalf("expected lay slot anchor %v to remain layable", tile)
 			}
 			continue
 		}
@@ -468,6 +475,63 @@ func TestSendRoomFloorItemsCachesLayFootprint(t *testing.T) {
 	_, _, _, canLay := rt.TileSeatCheckerFor(5, 5, 6)
 	if canLay {
 		t.Fatal("expected tile outside the bed footprint to remain non-layable")
+	}
+}
+
+// TestResolveSeatTargetForLayFootprintFallsBackToFreeSlot verifies occupied bed lanes redirect to another free slot on the same item.
+func TestResolveSeatTargetForLayFootprintFallsBackToFreeSlot(t *testing.T) {
+	item := furnituredomain.Item{ID: 7, UserID: 1, RoomID: 5, X: 3, Y: 4, Dir: 0, DefinitionID: 3}
+	def := furnituredomain.Definition{ID: 3, SpriteID: 55, Width: 2, Length: 3, StackHeight: 1.4, CanLay: true}
+	repo := foundRepoStub{item: item, def: def, repoStub: repoStub{items: []furnituredomain.Item{item}}}
+	svc, _ := furnitureapplication.NewService(repo)
+	tp := &transportStub{}
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, tp, nil)
+	rt.SetRoomOccupancyChecker(func(roomID, x, y int) bool {
+		return roomID == 5 && x == 3 && y == 4
+	})
+	if err := rt.SendRoomFloorItems(context.Background(), "conn1", 5); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	targetX, targetY, ok := rt.ResolveSeatTargetFor(5, 3, 5)
+	if !ok || targetX != 4 || targetY != 4 {
+		t.Fatalf("expected occupied left slot to fall back to free right slot [4 4], got ok=%v target=[%d %d]", ok, targetX, targetY)
+	}
+}
+
+// TestSendRoomFloorItemsCachesRotatedLaySlots verifies rotation maps each bed lane to the correct rotated slot.
+func TestSendRoomFloorItemsCachesRotatedLaySlots(t *testing.T) {
+	item := furnituredomain.Item{ID: 7, UserID: 1, RoomID: 5, X: 3, Y: 4, Dir: 2, DefinitionID: 3}
+	def := furnituredomain.Definition{ID: 3, SpriteID: 55, Width: 2, Length: 3, StackHeight: 1.4, CanLay: true}
+	repo := foundRepoStub{item: item, def: def, repoStub: repoStub{items: []furnituredomain.Item{item}}}
+	svc, _ := furnitureapplication.NewService(repo)
+	tp := &transportStub{}
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, tp, nil)
+	if err := rt.SendRoomFloorItems(context.Background(), "conn1", 5); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedTargets := map[[2]int][2]int{
+		{3, 4}: {5, 4},
+		{4, 4}: {5, 4},
+		{5, 4}: {5, 4},
+		{3, 5}: {5, 5},
+		{4, 5}: {5, 5},
+		{5, 5}: {5, 5},
+	}
+	for tile, expectedTarget := range expectedTargets {
+		_, _, _, canLay := rt.TileSeatCheckerFor(5, tile[0], tile[1])
+		targetX, targetY, ok := rt.ResolveSeatTargetFor(5, tile[0], tile[1])
+		if !ok || targetX != expectedTarget[0] || targetY != expectedTarget[1] {
+			t.Fatalf("expected rotated tile %v to resolve to lay slot %v, got ok=%v target=[%d %d]", tile, expectedTarget, ok, targetX, targetY)
+		}
+		if tile == expectedTarget {
+			if !canLay {
+				t.Fatalf("expected rotated lay slot anchor %v to remain layable", tile)
+			}
+			continue
+		}
+		if canLay {
+			t.Fatalf("expected rotated non-anchor bed tile %v to redirect rather than lay in place", tile)
+		}
 	}
 }
 

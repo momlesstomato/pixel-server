@@ -260,10 +260,17 @@ Lists available wrapping paper, box, and ribbon options for gift purchases.
 | `catalog.get_gift` | 2436 | C2S | Request gift delivery details |
 | `catalog.check_giftable` | 1347 | C2S | Check if offer is giftable |
 | `catalog.get_club_offers` | 3285 | C2S | Request club subscription offers |
+| `catalog.get_club_gift_info` | 487 | C2S | Request HC monthly gift selector data |
+| `catalog.get_direct_club_buy` | 801 | C2S | Request direct/SMS club-buy availability |
+| `catalog.select_club_gift` | 2276 | C2S | Claim one HC monthly gift by name |
 | `catalog.get_product_offer` | 2594 | C2S | Request one offer by ID |
 | `catalog.get_pet_breeds` | 1756 | C2S | Request pet breed palettes |
 | `catalog.index` | 1032 | S2C | Page tree response |
 | `catalog.page` | 804 | S2C | Page content response |
+| `catalog.club_gift_info` | 619 | S2C | HC monthly gift selector payload |
+| `catalog.club_offers` | 2405 | S2C | HC subscription offer list |
+| `catalog.direct_sms_club_buy` | 195 | S2C | Direct/SMS club-buy availability payload |
+| `catalog.club_gift_selected` | 659 | S2C | Confirm one claimed HC gift |
 | `catalog.purchase_ok` | 869 | S2C | Purchase success |
 | `catalog.purchase_error` | 1404 | S2C | Purchase failure |
 | `catalog.purchase_not_allowed` | 3770 | S2C | Purchase permission denied |
@@ -280,6 +287,8 @@ related to the catalog flow.
 |-------------|-----|-----------|---------|
 | `user.get_subscription` | 3166 | C2S | Request subscription status |
 | `user.subscription` | 954 | S2C | Deliver subscription state |
+| `user.get_kickback_info` | 869 | C2S | Request HC payday snapshot |
+| `user.kickback_info` | 3277 | S2C | Deliver HC payday and streak state |
 
 ### user.subscription — s2c 954
 
@@ -302,3 +311,31 @@ When a player has no active subscription, the server sends a zero-state
 packet (`daysToPeriodEnd=0`, `memberPeriods=0`, etc.) with `responseType=1`
 rather than an error. This matches the client's expectation that a subscription
 response is always delivered on login.
+
+### user.kickback_info — s2c 3277
+
+Sent when the HC Center asks for payday status.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `currentHCStreak` | int32 | Current continuous HC age in days |
+| `firstSubscriptionDate` | string | First recorded HC join date (`YYYY-MM-DD`) |
+| `kickbackPercentage` | float64 | Percentage configured for spend kickback |
+| `totalCreditsMissed` | int32 | Lifetime cycle spend that yielded no reward |
+| `totalCreditsRewarded` | int32 | Lifetime payday credits granted |
+| `totalCreditsSpent` | int32 | Credits spent in the current payday cycle |
+| `creditRewardForStreakBonus` | int32 | Reward currently accrued from streak bonus |
+| `creditRewardForMonthlySpent` | int32 | Reward currently accrued from spend kickback |
+| `timeUntilPayday` | int32 | Seconds remaining until next payday |
+
+### catalog.club_gift_info — s2c 619
+
+Nitro expects the club-gift selector payload as:
+
+1. `daysUntilNextGift`
+2. `giftsAvailable`
+3. `CatalogPageMessageOfferData[]`
+4. trailing gift metadata map entries: `offerId`, `vipOnly`, `daysRequired`, `isSelectable`
+
+Sending only zero counters without the offer and metadata sections is not
+enough for the HC gift selector to render.

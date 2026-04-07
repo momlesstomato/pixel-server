@@ -148,6 +148,7 @@ func (transport *Transport) closeLocal(code int, reason string) error {
 	transport.mutex.Lock()
 	_ = transport.connection.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(code, reason), time.Now().Add(time.Second))
 	transport.mutex.Unlock()
+	time.Sleep(100 * time.Millisecond)
 	transport.logger.Debug("websocket connection closed", zap.String("conn_id", transport.connID), zap.Int("code", code), zap.String("reason", reason))
 	return transport.connection.Close()
 }

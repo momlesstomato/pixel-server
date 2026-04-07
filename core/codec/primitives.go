@@ -3,6 +3,7 @@ package codec
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 )
 
 // Reader provides typed reads over a packet body payload.
@@ -36,6 +37,16 @@ func (reader *Reader) ReadUint16() (uint16, error) {
 	value := binary.BigEndian.Uint16(reader.payload[reader.offset : reader.offset+2])
 	reader.offset += 2
 	return value, nil
+}
+
+// ReadFloat64 reads one big-endian IEEE-754 float64 from payload.
+func (reader *Reader) ReadFloat64() (float64, error) {
+	if reader.offset+8 > len(reader.payload) {
+		return 0, fmt.Errorf("insufficient bytes for float64")
+	}
+	bits := binary.BigEndian.Uint64(reader.payload[reader.offset : reader.offset+8])
+	reader.offset += 8
+	return math.Float64frombits(bits), nil
 }
 
 // ReadBool reads one byte and maps zero=false, non-zero=true.
@@ -89,6 +100,13 @@ func (writer *Writer) WriteInt32(value int32) {
 func (writer *Writer) WriteUint16(value uint16) {
 	buffer := make([]byte, 2)
 	binary.BigEndian.PutUint16(buffer, value)
+	writer.payload = append(writer.payload, buffer...)
+}
+
+// WriteFloat64 appends one big-endian IEEE-754 float64 to payload.
+func (writer *Writer) WriteFloat64(value float64) {
+	buffer := make([]byte, 8)
+	binary.BigEndian.PutUint64(buffer, math.Float64bits(value))
 	writer.payload = append(writer.payload, buffer...)
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/core/initializer"
+	catalogdomain "github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 	catalogrealtime "github.com/momlesstomato/pixel-server/pkg/catalog/adapter/realtime"
 	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"
 	catalogstore "github.com/momlesstomato/pixel-server/pkg/catalog/infrastructure/store"
@@ -93,6 +94,11 @@ func buildEconomyServices(runtime *initializer.Runtime) (*economyServiceBundle, 
 	if err != nil {
 		return nil, err
 	}
+	subscription.SetCreditSpender(&inventorySpender{svc: inventory})
+	subscription.SetItemDeliverer(&furnitureItemDeliverer{svc: furniture})
+	catalog.SetPurchaseObserver(func(ctx context.Context, userID int, offer catalogdomain.CatalogOffer, amount int) error {
+		return subscription.TrackCatalogSpend(ctx, userID, offer.CostCredits*amount)
+	})
 	navigatorRepo, err := navigatorstore.NewRepository(runtime.PostgreSQL)
 	if err != nil {
 		return nil, err
@@ -153,6 +159,29 @@ func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.
 	if err != nil {
 		return nil, nil, err
 	}
+	srt.SetInventoryItemSender(func(ctx context.Context, connID string, userID int, itemID int) error {
+		item, err := bundle.furniture.FindItemByID(ctx, itemID)
+		if err != nil {
+			return err
+		}
+		if item.UserID != userID || item.RoomID != 0 {
+			return nil
+		}
+		def, err := bundle.furniture.FindDefinitionByID(ctx, item.DefinitionID)
+		if err != nil {
+			return err
+		}
+		body, err := furnipacket.InventoryAddPacket{
+			ItemID: item.ID, SpriteID: def.SpriteID, ExtraData: item.ExtraData,
+			AllowRecycle: def.AllowRecycle, AllowTrade: def.AllowTrade,
+			AllowInventoryStack: def.AllowInventoryStack,
+			AllowMarketplaceSell: def.AllowMarketplaceSell,
+		}.Encode()
+		if err != nil {
+			return err
+		}
+		return transport.Send(connID, furnipacket.InventoryAddPacketID, body)
+	})
 	nrt, err := navigatorrealtime.NewRuntime(bundle.navigator, sessions, transport, logger)
 	if err != nil {
 		return nil, nil, err

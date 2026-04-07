@@ -131,6 +131,15 @@ Domain-scoped events live in `sdk/events/` subpackages.
 | `PermissionChecked` | No | UserID, Permission, Granted |
 | `UserGroupChanged` | **Yes** | UserID, OldGroupID, NewGroupID, OldGroupIDs, NewGroupIDs |
 
+### Subscription Events (`sdk/events/subscription/`)
+
+| Event | Cancellable | Fields |
+|-------|-------------|--------|
+| `PaydayTriggering` | **Yes** | ConnID, UserID, RewardCredits, CreditsSpent |
+| `PaydayTriggered` | No | ConnID, UserID, RewardCredits, CreditsSpent, NewCredits |
+| `ClubGiftClaiming` | **Yes** | ConnID, UserID, GiftID, GiftName |
+| `ClubGiftClaimed` | No | ConnID, UserID, GiftID, GiftName, ItemID |
+
 ## Dispatcher Internals
 
 The `Dispatcher` is shared across all plugins. Thread safety is provided by

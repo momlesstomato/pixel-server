@@ -252,27 +252,12 @@ func (runtime *Runtime) TileSeatCheckerFor(roomID, x, y int) (height float64, di
 	return height, dir, canSit, canLay
 }
 
-// ResolveSeatTargetFor returns the canonical target tile for a seat or lay-capable furniture tile.
+// ResolveSeatTargetFor returns the resolved target tile for a seat or lay-capable furniture tile.
 func (runtime *Runtime) ResolveSeatTargetFor(roomID, x, y int) (targetX, targetY int, ok bool) {
 	runtime.seatMu.RLock()
-	defer runtime.seatMu.RUnlock()
-	bestHeight := 0.0
-	found := false
-	for _, entry := range runtime.seatCache[roomID] {
-		if entry.x != x || entry.y != y {
-			continue
-		}
-		if !found || entry.height >= bestHeight {
-			targetX = entry.anchorX
-			targetY = entry.anchorY
-			bestHeight = entry.height
-			found = true
-		}
-	}
-	if !found {
-		return 0, 0, false
-	}
-	return targetX, targetY, true
+	entries := append([]seatEntry(nil), runtime.seatCache[roomID]...)
+	runtime.seatMu.RUnlock()
+	return runtime.resolveSeatTarget(roomID, entries, x, y)
 }
 
 // replaceSeatEntries replaces all cached seat entries for one item.

@@ -15,6 +15,9 @@ type Transport interface {
 	Send(string, uint16, []byte) error
 }
 
+// InventoryItemSender pushes one delivered furniture item delta to one connection.
+type InventoryItemSender func(ctx context.Context, connID string, userID int, itemID int) error
+
 // Runtime defines subscription realm websocket packet behavior.
 type Runtime struct {
 	// service stores subscription application behavior.
@@ -25,6 +28,8 @@ type Runtime struct {
 	transport Transport
 	// logger stores runtime logging behavior.
 	logger *zap.Logger
+	// inventoryItemSender pushes one newly delivered HC gift item to the client.
+	inventoryItemSender InventoryItemSender
 }
 
 // NewRuntime creates one subscription realtime runtime instance.
@@ -55,6 +60,11 @@ func (runtime *Runtime) userID(connID string) (int, bool) {
 
 // Dispose releases per-connection resources.
 func (runtime *Runtime) Dispose(_ string) {}
+
+// SetInventoryItemSender configures the optional callback invoked after a club gift claim.
+func (runtime *Runtime) SetInventoryItemSender(fn InventoryItemSender) {
+	runtime.inventoryItemSender = fn
+}
 
 // SendClubOffers pushes available club offers to one connection.
 // Called by external runtimes (e.g. catalog) when a club_buy page is served.

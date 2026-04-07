@@ -22,4 +22,16 @@ type Repository interface {
 	CreateClubOffer(context.Context, ClubOffer) (ClubOffer, error)
 	// DeleteClubOffer removes one club offer by identifier.
 	DeleteClubOffer(context.Context, int) error
+	// FindPaydayConfig resolves the active HC payday configuration.
+	FindPaydayConfig(context.Context) (PaydayConfig, error)
+	// SavePaydayConfig upserts the active HC payday configuration.
+	SavePaydayConfig(context.Context, PaydayConfig) (PaydayConfig, error)
+	// FindBenefitsState resolves per-user subscription benefits progress.
+	FindBenefitsState(ctx context.Context, userID int) (BenefitsState, error)
+	// SaveBenefitsState upserts per-user subscription benefits progress.
+	SaveBenefitsState(context.Context, BenefitsState) (BenefitsState, error)
+	// ListClubGifts resolves all enabled club gift options.
+	ListClubGifts(context.Context) ([]ClubGift, error)
+	// FindClubGiftByName resolves one club gift by case-insensitive name.
+	FindClubGiftByName(context.Context, string) (ClubGift, error)
 }

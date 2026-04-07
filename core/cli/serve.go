@@ -112,6 +112,7 @@ func ExecuteServe(options ServeOptions, listen ServeListenFunc) error {
 	svc.inventory.SetEventFirer(fire)
 	svc.catalog.SetEventFirer(fire)
 	svc.economy.SetEventFirer(fire)
+	svc.subscription.SetEventFirer(fire)
 	svc.navigator.SetEventFirer(fire)
 	svc.room.SetEventFirer(fire)
 	svc.moderation.SetEventFirer(fire)

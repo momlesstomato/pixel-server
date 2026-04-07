@@ -12,8 +12,8 @@ func normalizeFurnitureDir(dir int) int {
 	return dir
 }
 
-// footprintTiles returns the rectangular tile footprint covered by one placed furniture item.
-func footprintTiles(x, y, dir, width, length int) [][2]int {
+// footprintSize returns the oriented width and length for one furniture footprint.
+func footprintSize(dir, width, length int) (int, int) {
 	if width < 1 {
 		width = 1
 	}
@@ -22,8 +22,15 @@ func footprintTiles(x, y, dir, width, length int) [][2]int {
 	}
 	switch normalizeFurnitureDir(dir) {
 	case 2, 6:
-		width, length = length, width
+		return length, width
+	default:
+		return width, length
 	}
+}
+
+// footprintTiles returns the rectangular tile footprint covered by one placed furniture item.
+func footprintTiles(x, y, dir, width, length int) [][2]int {
+	width, length = footprintSize(dir, width, length)
 	tiles := make([][2]int, 0, width*length)
 	for dy := 0; dy < length; dy++ {
 		for dx := 0; dx < width; dx++ {
@@ -33,13 +40,24 @@ func footprintTiles(x, y, dir, width, length int) [][2]int {
 	return tiles
 }
 
-// layAnchorTile returns the canonical tile used for laying on a multi-tile bed.
-func layAnchorTile(x, y, dir, width, length int) [2]int {
-	tiles := footprintTiles(x, y, dir, width, length)
-	if len(tiles) == 0 {
-		return [2]int{x, y}
+// laySlotAnchorTile returns the target tile for one lay slot within a multi-tile bed.
+func laySlotAnchorTile(x, y, dir, width, length, dx, dy int) [2]int {
+	if width < 1 {
+		width = 1
 	}
-	return tiles[0]
+	if length < 1 {
+		length = 1
+	}
+	switch normalizeFurnitureDir(dir) {
+	case 2:
+		return [2]int{x + length - 1, y + dy}
+	case 4:
+		return [2]int{x + dx, y + length - 1}
+	case 6:
+		return [2]int{x, y + dy}
+	default:
+		return [2]int{x + dx, y}
+	}
 }
 
 // seatEntriesFromFootprint builds seat cache entries for every covered tile of one item.
@@ -47,14 +65,17 @@ func seatEntriesFromFootprint(itemID, x, y, dir int, height float64, width, leng
 	if !canSit && !canLay {
 		return nil
 	}
-	tiles := footprintTiles(x, y, dir, width, length)
-	anchor := [2]int{x, y}
-	if canLay {
-		anchor = layAnchorTile(x, y, dir, width, length)
-	}
-	entries := make([]seatEntry, 0, len(tiles))
-	for _, tile := range tiles {
-		entryCanLay := canLay && tile == anchor
+	footprintWidth, footprintLength := footprintSize(dir, width, length)
+	entries := make([]seatEntry, 0, footprintWidth*footprintLength)
+	for dy := 0; dy < footprintLength; dy++ {
+		for dx := 0; dx < footprintWidth; dx++ {
+			tile := [2]int{x + dx, y + dy}
+			anchor := tile
+			entryCanLay := false
+			if canLay {
+				anchor = laySlotAnchorTile(x, y, dir, width, length, dx, dy)
+				entryCanLay = tile == anchor
+			}
 		entries = append(entries, seatEntry{
 			itemID:  itemID,
 			x:       tile[0],
@@ -66,6 +87,7 @@ func seatEntriesFromFootprint(itemID, x, y, dir int, height float64, width, leng
 			canSit:  canSit,
 			canLay:  entryCanLay,
 		})
+	}
 	}
 	return entries
 }

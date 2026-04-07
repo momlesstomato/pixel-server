@@ -111,6 +111,9 @@ func (module *Module) closeWebSocketConnections() error {
 			closeErrors = append(closeErrors, err)
 		}
 	}
+	if len(connections) > 0 {
+		time.Sleep(DefaultShutdownDrainDelay)
+	}
 	return errors.Join(closeErrors...)
 }
 

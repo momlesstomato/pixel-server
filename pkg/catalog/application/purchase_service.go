@@ -59,6 +59,11 @@ func (service *Service) PurchaseOffer(ctx context.Context, connID string, userID
 			return domain.PurchaseResult{}, deliverErr
 		}
 	}
+	if service.purchaseObserver != nil {
+		if err := service.purchaseObserver(ctx, userID, offer, amount); err != nil {
+			return domain.PurchaseResult{}, err
+		}
+	}
 	if service.fire != nil {
 		service.fire(&sdkcatalog.OfferPurchaseConfirmed{ConnID: connID, UserID: userID, OfferID: offer.ID, Quantity: amount})
 	}

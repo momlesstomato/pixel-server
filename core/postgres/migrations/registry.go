@@ -57,6 +57,7 @@ func Registry() []*gormigrate.Migration {
 		economymigration.Step03TradeLogs(),
 		subscriptionmigration.Step01Subscriptions(),
 		subscriptionmigration.Step02ClubOffers(),
+		subscriptionmigration.Step03Benefits(),
 		navigatormigration.Step01NavigatorCategories(),
 		navigatormigration.Step02Rooms(),
 		navigatormigration.Step03SavedSearches(),

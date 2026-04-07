@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/subscription/adapter/realtime"
 	subapplication "github.com/momlesstomato/pixel-server/pkg/subscription/application"
@@ -21,6 +22,12 @@ type repoStub struct {
 	offers []domain.ClubOffer
 	// findErr stores the error returned by FindActiveSubscription.
 	findErr error
+	// paydayConfig stores deterministic payday config.
+	paydayConfig domain.PaydayConfig
+	// benefitsState stores deterministic benefits progress.
+	benefitsState domain.BenefitsState
+	// gifts stores deterministic club gifts.
+	gifts []domain.ClubGift
 }
 
 // FindActiveSubscription returns the stub subscription or error.
@@ -71,6 +78,47 @@ func (r repoStub) CreateClubOffer(_ context.Context, o domain.ClubOffer) (domain
 // DeleteClubOffer returns noop delete.
 func (r repoStub) DeleteClubOffer(_ context.Context, _ int) error { return nil }
 
+// FindPaydayConfig returns deterministic payday config.
+func (r repoStub) FindPaydayConfig(_ context.Context) (domain.PaydayConfig, error) {
+	if r.paydayConfig.IntervalDays == 0 {
+		return domain.PaydayConfig{}, domain.ErrPaydayConfigNotFound
+	}
+	return r.paydayConfig, nil
+}
+
+// SavePaydayConfig returns deterministic payday config.
+func (r repoStub) SavePaydayConfig(_ context.Context, cfg domain.PaydayConfig) (domain.PaydayConfig, error) {
+	return cfg, nil
+}
+
+// FindBenefitsState returns deterministic benefits state.
+func (r repoStub) FindBenefitsState(_ context.Context, _ int) (domain.BenefitsState, error) {
+	if r.benefitsState.UserID == 0 {
+		return domain.BenefitsState{}, domain.ErrBenefitsStateNotFound
+	}
+	return r.benefitsState, nil
+}
+
+// SaveBenefitsState returns deterministic benefits state.
+func (r repoStub) SaveBenefitsState(_ context.Context, state domain.BenefitsState) (domain.BenefitsState, error) {
+	return state, nil
+}
+
+// ListClubGifts returns deterministic club gifts.
+func (r repoStub) ListClubGifts(_ context.Context) ([]domain.ClubGift, error) {
+	return r.gifts, nil
+}
+
+// FindClubGiftByName resolves one deterministic club gift by name.
+func (r repoStub) FindClubGiftByName(_ context.Context, name string) (domain.ClubGift, error) {
+	for _, gift := range r.gifts {
+		if gift.Name == name {
+			return gift, nil
+		}
+	}
+	return domain.ClubGift{}, domain.ErrClubGiftNotFound
+}
+
 // sessionStub provides deterministic session lookup.
 type sessionStub struct{}
 
@@ -103,11 +151,20 @@ func (sessionStub) ListAll() ([]coreconnection.Session, error) { return nil, nil
 type transportStub struct {
 	// sent records packet identifiers in send order.
 	sent []uint16
+	// bodies records encoded packet bodies in send order.
+	bodies [][]byte
+}
+
+type giftDelivererStub struct{ itemID int }
+
+func (d giftDelivererStub) DeliverItem(_ context.Context, _ int, _ int, _ string, _ int, _ int) (int, error) {
+	return d.itemID, nil
 }
 
 // Send records the packet identifier and discards the payload.
-func (t *transportStub) Send(_ string, packetID uint16, _ []byte) error {
+func (t *transportStub) Send(_ string, packetID uint16, body []byte) error {
 	t.sent = append(t.sent, packetID)
+	t.bodies = append(t.bodies, append([]byte(nil), body...))
 	return nil
 }
 
@@ -175,8 +232,55 @@ func TestHandleGetClubOffersReturnsClubOffersPacket(t *testing.T) {
 	if err != nil || !handled {
 		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
 	}
-	if len(transport.sent) != 1 || transport.sent[0] != subpacket.ClubOffersResponsePacketID {
-		t.Fatalf("expected packet %d, got %v", subpacket.ClubOffersResponsePacketID, transport.sent)
+	if len(transport.sent) != 2 || transport.sent[0] != subpacket.ClubOffersResponsePacketID || transport.sent[1] != subpacket.DirectClubBuyAvailableResponsePacketID {
+		t.Fatalf("expected packets [%d %d], got %v", subpacket.ClubOffersResponsePacketID, subpacket.DirectClubBuyAvailableResponsePacketID, transport.sent)
+	}
+	r := codec.NewReader(transport.bodies[0])
+	count, err := r.ReadInt32()
+	if err != nil {
+		t.Fatalf("expected offers count, got %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one club offer, got %d", count)
+	}
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadString()
+	_, _ = r.ReadBool()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadBool()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadBool()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	if _, err = r.ReadInt32(); err == nil {
+		t.Fatal("expected no trailing club offers window id")
+	}
+	direct := codec.NewReader(transport.bodies[1])
+	url, err := direct.ReadString()
+	if err != nil {
+		t.Fatalf("expected direct club buy url, got %v", err)
+	}
+	if url != "" {
+		t.Fatalf("expected empty direct club buy url, got %q", url)
+	}
+	market, err := direct.ReadString()
+	if err != nil {
+		t.Fatalf("expected direct club buy market, got %v", err)
+	}
+	if market != "" {
+		t.Fatalf("expected empty direct club buy market, got %q", market)
+	}
+	days, err := direct.ReadInt32()
+	if err != nil {
+		t.Fatalf("expected direct club buy days, got %v", err)
+	}
+	if days != int32(activeOffer().Days) {
+		t.Fatalf("expected direct club buy days %d, got %d", activeOffer().Days, days)
 	}
 }
 
@@ -203,15 +307,20 @@ func TestHandleGetHCExtendOfferFallsBackToClubOffersWhenNoSubscription(t *testin
 	if err != nil || !handled {
 		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
 	}
-	if len(transport.sent) != 1 || transport.sent[0] != subpacket.ClubOffersResponsePacketID {
-		t.Fatalf("expected packet %d, got %v", subpacket.ClubOffersResponsePacketID, transport.sent)
+	if len(transport.sent) != 2 || transport.sent[0] != subpacket.ClubOffersResponsePacketID || transport.sent[1] != subpacket.DirectClubBuyAvailableResponsePacketID {
+		t.Fatalf("expected packets [%d %d], got %v", subpacket.ClubOffersResponsePacketID, subpacket.DirectClubBuyAvailableResponsePacketID, transport.sent)
 	}
 }
 
 // TestHandleGetClubGiftInfoSendsGiftInfoPacket verifies 487 returns 619.
 func TestHandleGetClubGiftInfoSendsGiftInfoPacket(t *testing.T) {
 	transport := &transportStub{}
-	svc := buildService(repoStub{})
+	svc := buildService(repoStub{
+		sub:          domain.Subscription{ID: 1, UserID: 1, SubscriptionType: domain.SubscriptionHabboClub, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig: domain.PaydayConfig{IntervalDays: 31},
+		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-70 * 24 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour)},
+		gifts:        []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", SpriteID: 26, DaysRequired: 31}},
+	})
 	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
 	handled, err := rt.Handle(context.Background(), "conn1", subpacket.GetClubGiftInfoPacketID, nil)
 	if err != nil || !handled {
@@ -219,6 +328,55 @@ func TestHandleGetClubGiftInfoSendsGiftInfoPacket(t *testing.T) {
 	}
 	if len(transport.sent) != 1 || transport.sent[0] != subpacket.ClubGiftInfoResponsePacketID {
 		t.Fatalf("expected packet %d, got %v", subpacket.ClubGiftInfoResponsePacketID, transport.sent)
+	}
+	r := codec.NewReader(transport.bodies[0])
+	_, _ = r.ReadInt32()
+	available, _ := r.ReadInt32()
+	if available < 1 {
+		t.Fatalf("expected at least one available gift, got %d", available)
+	}
+}
+
+// TestHandleGetKickbackInfoSendsPacket verifies 869 returns 3277 with deterministic HC metadata.
+func TestHandleGetKickbackInfoSendsPacket(t *testing.T) {
+	transport := &transportStub{}
+	svc := buildService(repoStub{sub: activeSub(), paydayConfig: domain.PaydayConfig{IntervalDays: 31}, benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-24 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour)}})
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
+	handled, err := rt.Handle(context.Background(), "conn1", subpacket.GetKickbackInfoPacketID, nil)
+	if err != nil || !handled {
+		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
+	}
+	if len(transport.sent) != 1 || transport.sent[0] != subpacket.KickbackInfoResponsePacketID {
+		t.Fatalf("expected packet %d, got %v", subpacket.KickbackInfoResponsePacketID, transport.sent)
+	}
+	r := codec.NewReader(transport.bodies[0])
+	streak, _ := r.ReadInt32()
+	if streak != 1 {
+		t.Fatalf("expected streak 1, got %d", streak)
+	}
+	joinedAt, err := r.ReadString()
+	if err != nil || joinedAt == "" {
+		t.Fatalf("expected joined date string, got %q err=%v", joinedAt, err)
+	}
+}
+
+// TestHandleSelectClubGiftSendsSelectedPacket verifies 2276 returns 659 and can deliver an item.
+func TestHandleSelectClubGiftSendsSelectedPacket(t *testing.T) {
+	transport := &transportStub{}
+	svc := buildService(repoStub{
+		sub:          domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig: domain.PaydayConfig{IntervalDays: 31},
+		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-70 * 24 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour)},
+		gifts:        []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", ItemDefinitionID: 26, SpriteID: 26, DaysRequired: 31}},
+	})
+	svc.SetItemDeliverer(giftDelivererStub{itemID: 99})
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
+	handled, err := rt.Handle(context.Background(), "conn1", subpacket.SelectClubGiftPacketID, buildStringBody("Gray Dining Chair"))
+	if err != nil || !handled {
+		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
+	}
+	if len(transport.sent) != 1 || transport.sent[0] != subpacket.ClubGiftSelectedResponsePacketID {
+		t.Fatalf("expected packet %d, got %v", subpacket.ClubGiftSelectedResponsePacketID, transport.sent)
 	}
 }
 

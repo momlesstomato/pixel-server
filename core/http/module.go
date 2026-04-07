@@ -48,6 +48,9 @@ const DefaultShutdownDisconnectReasonCode int32 = 19
 // DefaultShutdownTimeout defines graceful application shutdown timeout.
 const DefaultShutdownTimeout = 5 * time.Second
 
+// DefaultShutdownDrainDelay defines how long shutdown waits for final websocket frames to flush.
+const DefaultShutdownDrainDelay = 100 * time.Millisecond
+
 // Options defines configurable dependencies for the HTTP module.
 type Options struct {
 	// Logger defines the zap logger used by fiberzap middleware.

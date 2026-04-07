@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSeedSteps verifies seed step registry contents.
 func TestRegistryReturnsOrderedSeedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 22 {
-		t.Fatalf("expected twenty-two seed steps, got %d", len(steps))
+	if len(steps) != 27 {
+		t.Fatalf("expected twenty-seven seed steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260313_01_system_user" {
 		t.Fatalf("unexpected seed step metadata")
@@ -56,22 +56,37 @@ func TestRegistryReturnsOrderedSeedSteps(t *testing.T) {
 	if steps[15] == nil || steps[15].ID != "20260405_S02_hc_shop_page" {
 		t.Fatalf("unexpected seed step metadata at index 15")
 	}
-	if steps[16] == nil || steps[16].ID != "20260320_S02_club_offers" {
+	if steps[16] == nil || steps[16].ID != "20260406_S04_hc_shop_localization_backfill" {
 		t.Fatalf("unexpected seed step metadata at index 16")
 	}
-	if steps[17] == nil || steps[17].ID != "20260405_S03_subscription_users" {
+	if steps[17] == nil || steps[17].ID != "20260406_S05_club_gifts_page" {
 		t.Fatalf("unexpected seed step metadata at index 17")
 	}
-	if steps[18] == nil || steps[18].ID != "20260326_S01_nav_categories" {
+	if steps[18] == nil || steps[18].ID != "20260407_S08_hc_shop_vip_buy_backfill" {
 		t.Fatalf("unexpected seed step metadata at index 18")
 	}
-	if steps[19] == nil || steps[19].ID != "20260326_S02_nav_demo_rooms" {
+	if steps[19] == nil || steps[19].ID != "20260320_S02_club_offers" {
 		t.Fatalf("unexpected seed step metadata at index 19")
 	}
-	if steps[20] == nil || steps[20].ID != "seed_20260401_01_room_models" {
+	if steps[20] == nil || steps[20].ID != "20260405_S03_subscription_users" {
 		t.Fatalf("unexpected seed step metadata at index 20")
 	}
-	if steps[21] == nil || steps[21].ID != "20260405_09_permission_assignment_backfill" {
+	if steps[21] == nil || steps[21].ID != "20260406_S06_default_club_gifts" {
 		t.Fatalf("unexpected seed step metadata at index 21")
+	}
+	if steps[22] == nil || steps[22].ID != "20260406_S07_default_payday_config" {
+		t.Fatalf("unexpected seed step metadata at index 22")
+	}
+	if steps[23] == nil || steps[23].ID != "20260326_S01_nav_categories" {
+		t.Fatalf("unexpected seed step metadata at index 23")
+	}
+	if steps[24] == nil || steps[24].ID != "20260326_S02_nav_demo_rooms" {
+		t.Fatalf("unexpected seed step metadata at index 24")
+	}
+	if steps[25] == nil || steps[25].ID != "seed_20260401_01_room_models" {
+		t.Fatalf("unexpected seed step metadata at index 25")
+	}
+	if steps[26] == nil || steps[26].ID != "20260405_09_permission_assignment_backfill" {
+		t.Fatalf("unexpected seed step metadata at index 26")
 	}
 }

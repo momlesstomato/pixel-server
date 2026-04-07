@@ -20,6 +20,7 @@ func RegisterRoutes(module *corehttp.Module, service Service) error {
 		return fmt.Errorf("subscription service is required")
 	}
 	registerSubscriptionRoutes(module, service)
+	registerPaydayRoutes(module, service)
 	registerClubOfferRoutes(module, service)
 	return nil
 }
@@ -36,6 +37,59 @@ func registerSubscriptionRoutes(module *corehttp.Module, service Service) {
 			return mapSubscriptionError(findErr)
 		}
 		return ctx.JSON(sub)
+	})
+}
+
+// registerPaydayRoutes registers HC payday configuration and trigger routes.
+func registerPaydayRoutes(module *corehttp.Module, service Service) {
+	module.RegisterGET("/api/v1/subscriptions/payday/config", func(ctx *fiber.Ctx) error {
+		cfg, err := service.GetPaydayConfig(ctx.UserContext())
+		if err != nil {
+			return mapSubscriptionError(err)
+		}
+		return ctx.JSON(cfg)
+	})
+	module.RegisterPATCH("/api/v1/subscriptions/payday/config", func(ctx *fiber.Ctx) error {
+		var payload domain.PaydayConfig
+		if parseErr := ctx.BodyParser(&payload); parseErr != nil {
+			return fiber.NewError(http.StatusBadRequest, "invalid request body")
+		}
+		cfg, err := service.UpdatePaydayConfig(ctx.UserContext(), payload)
+		if err != nil {
+			return mapSubscriptionError(err)
+		}
+		return ctx.JSON(cfg)
+	})
+	module.RegisterGET("/api/v1/subscriptions/user/:userId/payday", func(ctx *fiber.Ctx) error {
+		userID, err := parsePositiveID(ctx.Params("userId"))
+		if err != nil {
+			return fiber.NewError(http.StatusBadRequest, err.Error())
+		}
+		status, getErr := service.GetPaydayStatus(ctx.UserContext(), userID)
+		if getErr != nil {
+			return mapSubscriptionError(getErr)
+		}
+		return ctx.JSON(status)
+	})
+	module.RegisterPOST("/api/v1/subscriptions/user/:userId/payday/trigger", func(ctx *fiber.Ctx) error {
+		userID, err := parsePositiveID(ctx.Params("userId"))
+		if err != nil {
+			return fiber.NewError(http.StatusBadRequest, err.Error())
+		}
+		payload := struct {
+			ConnID string `json:"conn_id"`
+			Force  bool   `json:"force"`
+		}{}
+		if len(ctx.Body()) > 0 {
+			if parseErr := ctx.BodyParser(&payload); parseErr != nil {
+				return fiber.NewError(http.StatusBadRequest, "invalid request body")
+			}
+		}
+		result, triggerErr := service.TriggerPayday(ctx.UserContext(), payload.ConnID, userID, payload.Force)
+		if triggerErr != nil {
+			return mapSubscriptionError(triggerErr)
+		}
+		return ctx.JSON(result)
 	})
 }
 
@@ -96,6 +150,8 @@ func mapSubscriptionError(err error) error {
 	switch err {
 	case domain.ErrSubscriptionNotFound, domain.ErrClubOfferNotFound:
 		return fiber.NewError(http.StatusNotFound, err.Error())
+	case domain.ErrPaydayNotReady, domain.ErrClubGiftUnavailable:
+		return fiber.NewError(http.StatusConflict, err.Error())
 	case domain.ErrPurchaseLimitReached:
 		return fiber.NewError(http.StatusConflict, err.Error())
 	}

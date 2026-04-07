@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"context"
+	"strings"
 
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/catalog/packet"
@@ -65,10 +66,20 @@ func (runtime *Runtime) handleGetPage(ctx context.Context, connID string, userID
 	if err := runtime.sendPacket(connID, buildPagePacket(page, offers, catalogType)); err != nil {
 		return err
 	}
-	if page.PageLayout == "club_buy" && runtime.clubOffersSender != nil {
+	if isClubShopLayout(page.PageLayout) && runtime.clubOffersSender != nil {
 		return runtime.clubOffersSender(ctx, connID, userID)
 	}
 	return nil
+}
+
+// isClubShopLayout reports whether the catalog page layout should trigger club-offer side-channel packets.
+func isClubShopLayout(layout string) bool {
+	switch strings.ToLower(layout) {
+	case "club_buy", "vip_buy":
+		return true
+	default:
+		return false
+	}
 }
 
 // parseCatalogType reads the catalog mode string from a get_index body.

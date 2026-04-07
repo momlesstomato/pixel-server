@@ -91,8 +91,9 @@ func (p PagePacket) Encode() ([]byte, error) {
 			return nil, err
 		}
 	}
-	w.WriteInt32(-1)
+	w.WriteInt32(0)
 	w.WriteBool(false)
+	w.WriteInt32(0)
 	return w.Bytes(), nil
 }
 
