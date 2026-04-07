@@ -7,9 +7,9 @@ import (
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/core/initializer"
-	catalogdomain "github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 	catalogrealtime "github.com/momlesstomato/pixel-server/pkg/catalog/adapter/realtime"
 	catalogapplication "github.com/momlesstomato/pixel-server/pkg/catalog/application"
+	catalogdomain "github.com/momlesstomato/pixel-server/pkg/catalog/domain"
 	catalogstore "github.com/momlesstomato/pixel-server/pkg/catalog/infrastructure/store"
 	economyrealtime "github.com/momlesstomato/pixel-server/pkg/economy/adapter/realtime"
 	economyapplication "github.com/momlesstomato/pixel-server/pkg/economy/application"
@@ -174,7 +174,7 @@ func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.
 		body, err := furnipacket.InventoryAddPacket{
 			ItemID: item.ID, SpriteID: def.SpriteID, ExtraData: item.ExtraData,
 			AllowRecycle: def.AllowRecycle, AllowTrade: def.AllowTrade,
-			AllowInventoryStack: def.AllowInventoryStack,
+			AllowInventoryStack:  def.AllowInventoryStack,
 			AllowMarketplaceSell: def.AllowMarketplaceSell,
 		}.Encode()
 		if err != nil {

@@ -118,8 +118,8 @@ func TestServiceClubOfferCRUD(t *testing.T) {
 // TestServiceGetPaydayStatus verifies payday status is derived from config and benefits state.
 func TestServiceGetPaydayStatus(t *testing.T) {
 	stub := repositoryStub{
-		subscription: domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-48 * time.Hour), DurationDays: 365, Active: true},
-		paydayConfig: domain.PaydayConfig{IntervalDays: 31, KickbackPercentage: 10},
+		subscription:  domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-48 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig:  domain.PaydayConfig{IntervalDays: 31, KickbackPercentage: 10},
 		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-48 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour), CycleCreditsSpent: 50},
 	}
 	service, _ := subscriptionapplication.NewService(stub)
@@ -138,8 +138,8 @@ func TestServiceGetPaydayStatus(t *testing.T) {
 // TestServiceTriggerPayday verifies payday triggering grants credits.
 func TestServiceTriggerPayday(t *testing.T) {
 	stub := repositoryStub{
-		subscription: domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-40 * 24 * time.Hour), DurationDays: 365, Active: true},
-		paydayConfig: domain.PaydayConfig{IntervalDays: 31, KickbackPercentage: 10, FlatCredits: 2},
+		subscription:  domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-40 * 24 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig:  domain.PaydayConfig{IntervalDays: 31, KickbackPercentage: 10, FlatCredits: 2},
 		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-40 * 24 * time.Hour), NextPaydayAt: time.Now().Add(-1 * time.Hour), CycleCreditsSpent: 50},
 	}
 	service, _ := subscriptionapplication.NewService(stub)
@@ -154,15 +154,15 @@ func TestServiceTriggerPayday(t *testing.T) {
 	if result.NewCredits != 107 {
 		t.Fatalf("expected new credits 107, got %d", result.NewCredits)
 	}
-	}
+}
 
 // TestServiceClaimClubGift verifies club gift claims deliver items.
 func TestServiceClaimClubGift(t *testing.T) {
 	stub := repositoryStub{
-		subscription: domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
-		paydayConfig: domain.PaydayConfig{IntervalDays: 31},
+		subscription:  domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig:  domain.PaydayConfig{IntervalDays: 31},
 		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-70 * 24 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour)},
-		clubGifts: []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", ItemDefinitionID: 26, DaysRequired: 31}},
+		clubGifts:     []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", ItemDefinitionID: 26, DaysRequired: 31}},
 	}
 	service, _ := subscriptionapplication.NewService(stub)
 	service.SetItemDeliverer(itemDelivererStub{itemID: 77})

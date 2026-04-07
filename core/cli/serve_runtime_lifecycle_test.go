@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	gws "github.com/gorilla/websocket"
 	fws "github.com/gofiber/contrib/websocket"
+	gws "github.com/gorilla/websocket"
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
 	"github.com/momlesstomato/pixel-server/core/initializer"
 	corelogging "github.com/momlesstomato/pixel-server/core/logging"

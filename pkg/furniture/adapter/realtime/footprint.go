@@ -76,18 +76,18 @@ func seatEntriesFromFootprint(itemID, x, y, dir int, height float64, width, leng
 				anchor = laySlotAnchorTile(x, y, dir, width, length, dx, dy)
 				entryCanLay = tile == anchor
 			}
-		entries = append(entries, seatEntry{
-			itemID:  itemID,
-			x:       tile[0],
-			y:       tile[1],
-			anchorX: anchor[0],
-			anchorY: anchor[1],
-			height:  height,
-			dir:     dir,
-			canSit:  canSit,
-			canLay:  entryCanLay,
-		})
-	}
+			entries = append(entries, seatEntry{
+				itemID:  itemID,
+				x:       tile[0],
+				y:       tile[1],
+				anchorX: anchor[0],
+				anchorY: anchor[1],
+				height:  height,
+				dir:     dir,
+				canSit:  canSit,
+				canLay:  entryCanLay,
+			})
+		}
 	}
 	return entries
 }

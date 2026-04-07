@@ -53,15 +53,15 @@ func subscriptionSchema() map[string]any {
 
 func clubOfferSchema() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{
-		"id":           map[string]any{"type": "integer"},
-		"name":         map[string]any{"type": "string"},
-		"days":         map[string]any{"type": "integer"},
-		"credits":      map[string]any{"type": "integer"},
-		"points":       map[string]any{"type": "integer"},
-		"points_type":  map[string]any{"type": "integer"},
-		"offer_type":   map[string]any{"type": "string", "enum": []string{"HC", "VIP"}},
-		"giftable":     map[string]any{"type": "boolean"},
-		"enabled":      map[string]any{"type": "boolean"},
+		"id":          map[string]any{"type": "integer"},
+		"name":        map[string]any{"type": "string"},
+		"days":        map[string]any{"type": "integer"},
+		"credits":     map[string]any{"type": "integer"},
+		"points":      map[string]any{"type": "integer"},
+		"points_type": map[string]any{"type": "integer"},
+		"offer_type":  map[string]any{"type": "string", "enum": []string{"HC", "VIP"}},
+		"giftable":    map[string]any{"type": "boolean"},
+		"enabled":     map[string]any{"type": "boolean"},
 	}}
 }
 

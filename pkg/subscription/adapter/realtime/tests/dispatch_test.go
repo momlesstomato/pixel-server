@@ -316,10 +316,10 @@ func TestHandleGetHCExtendOfferFallsBackToClubOffersWhenNoSubscription(t *testin
 func TestHandleGetClubGiftInfoSendsGiftInfoPacket(t *testing.T) {
 	transport := &transportStub{}
 	svc := buildService(repoStub{
-		sub:          domain.Subscription{ID: 1, UserID: 1, SubscriptionType: domain.SubscriptionHabboClub, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
-		paydayConfig: domain.PaydayConfig{IntervalDays: 31},
+		sub:           domain.Subscription{ID: 1, UserID: 1, SubscriptionType: domain.SubscriptionHabboClub, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig:  domain.PaydayConfig{IntervalDays: 31},
 		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-70 * 24 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour)},
-		gifts:        []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", SpriteID: 26, DaysRequired: 31}},
+		gifts:         []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", SpriteID: 26, DaysRequired: 31}},
 	})
 	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
 	handled, err := rt.Handle(context.Background(), "conn1", subpacket.GetClubGiftInfoPacketID, nil)
@@ -364,10 +364,10 @@ func TestHandleGetKickbackInfoSendsPacket(t *testing.T) {
 func TestHandleSelectClubGiftSendsSelectedPacket(t *testing.T) {
 	transport := &transportStub{}
 	svc := buildService(repoStub{
-		sub:          domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
-		paydayConfig: domain.PaydayConfig{IntervalDays: 31},
+		sub:           domain.Subscription{ID: 1, UserID: 1, StartedAt: time.Now().Add(-70 * 24 * time.Hour), DurationDays: 365, Active: true},
+		paydayConfig:  domain.PaydayConfig{IntervalDays: 31},
 		benefitsState: domain.BenefitsState{UserID: 1, FirstSubscriptionAt: time.Now().Add(-70 * 24 * time.Hour), NextPaydayAt: time.Now().Add(24 * time.Hour)},
-		gifts:        []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", ItemDefinitionID: 26, SpriteID: 26, DaysRequired: 31}},
+		gifts:         []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", ItemDefinitionID: 26, SpriteID: 26, DaysRequired: 31}},
 	})
 	svc.SetItemDeliverer(giftDelivererStub{itemID: 99})
 	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)

@@ -37,12 +37,12 @@ func (store *Store) FindPaydayConfig(ctx context.Context) (domain.PaydayConfig, 
 // SavePaydayConfig upserts the active HC payday configuration.
 func (store *Store) SavePaydayConfig(ctx context.Context, cfg domain.PaydayConfig) (domain.PaydayConfig, error) {
 	row := submodel.PaydayConfig{
-		ID:                 1,
-		IntervalDays:       cfg.IntervalDays,
-		KickbackPercentage: cfg.KickbackPercentage,
-		FlatCredits:        cfg.FlatCredits,
+		ID:                  1,
+		IntervalDays:        cfg.IntervalDays,
+		KickbackPercentage:  cfg.KickbackPercentage,
+		FlatCredits:         cfg.FlatCredits,
 		MinimumCreditsSpent: cfg.MinimumCreditsSpent,
-		StreakBonusCredits: cfg.StreakBonusCredits,
+		StreakBonusCredits:  cfg.StreakBonusCredits,
 	}
 	if err := store.database.WithContext(ctx).Clauses(clause.OnConflict{UpdateAll: true}).Create(&row).Error; err != nil {
 		return domain.PaydayConfig{}, err
@@ -84,7 +84,7 @@ func (store *Store) SaveBenefitsState(ctx context.Context, state domain.Benefits
 // ListClubGifts resolves all enabled club gift options.
 func (store *Store) ListClubGifts(ctx context.Context) ([]domain.ClubGift, error) {
 	var rows []resolvedClubGift
-	if err := store.database.WithContext(ctx).Raw(clubGiftWithSprite+"WHERE cg.enabled = true ORDER BY cg.order_num ASC, cg.id ASC").Scan(&rows).Error; err != nil {
+	if err := store.database.WithContext(ctx).Raw(clubGiftWithSprite + "WHERE cg.enabled = true ORDER BY cg.order_num ASC, cg.id ASC").Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	result := make([]domain.ClubGift, len(rows))
