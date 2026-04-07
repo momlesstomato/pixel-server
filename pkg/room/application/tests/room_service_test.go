@@ -140,6 +140,26 @@ func TestCheckAccess_Locked_DeniedForNonOwner(t *testing.T) {
 	assert.ErrorIs(t, svc.CheckAccess(context.Background(), room, "", 99), domain.ErrAccessDenied)
 }
 
+// TestCheckAccess_Locked_RightsHolderBypasses verifies rights holders enter locked rooms without doorbell.
+func TestCheckAccess_Locked_RightsHolderBypasses(t *testing.T) {
+	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcaster)
+	rights := &rightsRepoStub{rights: map[[2]int]bool{{1, 42}: true}}
+	svc, err := application.NewService(newModelRepo(), &banRepoStub{}, rights, mgr, zap.NewNop())
+	require.NoError(t, err)
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessLocked}
+	assert.NoError(t, svc.CheckAccess(context.Background(), room, "", 42))
+}
+
+// TestCheckAccess_Locked_NonRightsHolderDenied verifies users without rights still hit the doorbell.
+func TestCheckAccess_Locked_NonRightsHolderDenied(t *testing.T) {
+	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcaster)
+	rights := &rightsRepoStub{rights: map[[2]int]bool{{1, 42}: true}}
+	svc, err := application.NewService(newModelRepo(), &banRepoStub{}, rights, mgr, zap.NewNop())
+	require.NoError(t, err)
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessLocked}
+	assert.ErrorIs(t, svc.CheckAccess(context.Background(), room, "", 99), domain.ErrAccessDenied)
+}
+
 // TestCheckAccess_Password_Valid verifies valid password admits non-owner entry.
 func TestCheckAccess_Password_Valid(t *testing.T) {
 	svc := newService(t)

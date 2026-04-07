@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 
+	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 )
 
@@ -73,3 +74,58 @@ func (m *rightsRepoStub) ListRightsByRoom(_ context.Context, _ int) ([]int, erro
 
 // RevokeAllRights removes all rights for one room.
 func (m *rightsRepoStub) RevokeAllRights(_ context.Context, _ int) error { return nil }
+
+// roomRepoStub provides deterministic room data for tests.
+type roomRepoStub struct{ rooms map[int]domain.Room }
+
+// FindByID resolves one room by identifier.
+func (s *roomRepoStub) FindByID(_ context.Context, id int) (domain.Room, error) {
+	r, ok := s.rooms[id]
+	if !ok {
+		return domain.Room{}, domain.ErrRoomNotFound
+	}
+	return r, nil
+}
+
+// SaveSettings is a no-op stub.
+func (s *roomRepoStub) SaveSettings(_ context.Context, _ domain.Room) error { return nil }
+
+// SoftDelete is a no-op stub.
+func (s *roomRepoStub) SoftDelete(_ context.Context, _ int) error { return nil }
+
+// permissionCheckerStub provides deterministic permission lookup for tests.
+type permissionCheckerStub struct{ allowed map[string]bool }
+
+// HasPermission reports whether the given scope is allowed.
+func (p *permissionCheckerStub) HasPermission(_ context.Context, _ int, scope string) (bool, error) {
+	if p.allowed == nil {
+		return false, nil
+	}
+	return p.allowed[scope], nil
+}
+
+// multiSessionStub supports lookup for multiple connections.
+type multiSessionStub struct{ sessions map[string]coreconnection.Session }
+
+// Register is a no-op stub.
+func (m *multiSessionStub) Register(coreconnection.Session) error { return nil }
+
+// FindByConnID returns the session for the given connection identifier.
+func (m *multiSessionStub) FindByConnID(id string) (coreconnection.Session, bool) {
+	s, ok := m.sessions[id]
+	return s, ok
+}
+
+// FindByUserID is a no-op stub.
+func (m *multiSessionStub) FindByUserID(int) (coreconnection.Session, bool) {
+	return coreconnection.Session{}, false
+}
+
+// Touch is a no-op stub.
+func (m *multiSessionStub) Touch(string) error { return nil }
+
+// Remove is a no-op stub.
+func (m *multiSessionStub) Remove(string) {}
+
+// ListAll is a no-op stub.
+func (m *multiSessionStub) ListAll() ([]coreconnection.Session, error) { return nil, nil }
