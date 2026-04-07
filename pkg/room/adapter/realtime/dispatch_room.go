@@ -56,6 +56,7 @@ func (rt *Runtime) handleLetUserIn(ctx context.Context, connID string, userID in
 		return rt.sendPacket(entry.connID, packet.CantConnectComposer{ErrorCode: 1})
 	}
 	if room.OwnerID != userID && !rt.service.HasRights(ctx, entry.roomID, userID) {
+		rt.logger.Warn("unauthorized doorbell approval attempt", zap.Int("user_id", userID), zap.Int("room_id", entry.roomID))
 		return nil
 	}
 	delete(rt.pendingDoorbell, pkt.Username)

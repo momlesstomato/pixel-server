@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/momlesstomato/pixel-server/core/codec"
@@ -142,7 +143,7 @@ func (rt *Runtime) checkRoomPassword(ctx context.Context, connID, password strin
 		if time.Now().Before(cooldown) {
 			remaining := time.Until(cooldown).Round(time.Second)
 			_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{
-				Message: "Too many incorrect attempts. Please wait " + remaining.String() + ".",
+				Message: fmt.Sprintf("Too many incorrect attempts. Please wait %s.", remaining),
 			})
 			return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 6})
 		}
@@ -161,7 +162,7 @@ func (rt *Runtime) checkRoomPassword(ctx context.Context, connID, password strin
 		rt.passwordCooldown[connID] = time.Now().Add(passwordCooldownDuration)
 		delete(rt.passwordAttempts, connID)
 		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{
-			Message: "Too many incorrect attempts. You are blocked for " + passwordCooldownDuration.String() + ".",
+			Message: fmt.Sprintf("Too many incorrect attempts. You are blocked for %s.", passwordCooldownDuration),
 		})
 	} else {
 		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "Incorrect room password!"})
