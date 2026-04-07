@@ -12,27 +12,32 @@ import (
 	"go.uber.org/zap"
 )
 
-// triggerDoorbell sends a doorbell notification to the room owner and parks the visitor.
-func (rt *Runtime) triggerDoorbell(_ context.Context, connID string, username string, room domain.Room) error {
+// triggerDoorbell sends a doorbell notification to the room owner and rights holders, and parks the visitor.
+func (rt *Runtime) triggerDoorbell(ctx context.Context, connID string, username string, room domain.Room) error {
 	rt.pendingDoorbell[username] = doorbellEntry{connID: connID, roomID: room.ID}
 	inst, ok := rt.service.Manager().Get(room.ID)
 	if !ok {
+		delete(rt.pendingDoorbell, username)
 		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
 	}
+	found := false
 	for _, entity := range inst.Entities() {
-		if entity.UserID != room.OwnerID {
+		if entity.UserID != room.OwnerID && !rt.service.HasRights(ctx, room.ID, entity.UserID) {
 			continue
 		}
 		if err := rt.sendPacket(entity.ConnID, packet.DoorbellComposer{Username: username}); err != nil {
 			rt.logger.Warn("doorbell notify failed", zap.String("conn_id", entity.ConnID), zap.Error(err))
 		}
-		return nil
+		found = true
 	}
-	delete(rt.pendingDoorbell, username)
-	return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
+	if !found {
+		delete(rt.pendingDoorbell, username)
+		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
+	}
+	return nil
 }
 
-// handleLetUserIn processes room owner doorbell approval or denial.
+// handleLetUserIn processes room owner or rights-holder doorbell approval or denial.
 func (rt *Runtime) handleLetUserIn(ctx context.Context, connID string, userID int, body []byte) error {
 	var pkt packet.LetUserInPacket
 	if err := pkt.Decode(body); err != nil {
@@ -42,17 +47,20 @@ func (rt *Runtime) handleLetUserIn(ctx context.Context, connID string, userID in
 	if !ok {
 		return nil
 	}
-	delete(rt.pendingDoorbell, pkt.Username)
-	if !pkt.Let {
-		return rt.sendPacket(entry.connID, packet.FlatAccessibleComposer{Username: pkt.Username, Accessible: false})
-	}
-	roomID, ownerRoomID := rt.connRooms[connID]
-	if !ownerRoomID || roomID != entry.roomID {
-		return rt.sendPacket(entry.connID, packet.CantConnectComposer{ErrorCode: 1})
+	roomID, inRoom := rt.connRooms[connID]
+	if !inRoom || roomID != entry.roomID {
+		return nil
 	}
 	room, err := rt.service.FindRoom(ctx, entry.roomID)
 	if err != nil {
 		return rt.sendPacket(entry.connID, packet.CantConnectComposer{ErrorCode: 1})
+	}
+	if room.OwnerID != userID && !rt.service.HasRights(ctx, entry.roomID, userID) {
+		return nil
+	}
+	delete(rt.pendingDoorbell, pkt.Username)
+	if !pkt.Let {
+		return rt.sendPacket(entry.connID, packet.FlatAccessibleComposer{Username: pkt.Username, Accessible: false})
 	}
 	inst, ok := rt.service.Manager().Get(entry.roomID)
 	if !ok {
@@ -64,15 +72,16 @@ func (rt *Runtime) handleLetUserIn(ctx context.Context, connID string, userID in
 	if err := rt.sendPacket(entry.connID, packet.OpenConnectionComposer{}); err != nil {
 		return err
 	}
+	rt.leaveCurrentRoom(entry.connID)
 	rt.connRooms[entry.connID] = entry.roomID
 	visitorID, visitorFound := rt.userID(entry.connID)
 	if !visitorFound {
 		return nil
 	}
-	if err := rt.sendRoomData(entry.connID, visitorID, inst, room); err != nil {
-		return err
+	if rt.visitRecorder != nil {
+		_ = rt.visitRecorder.RecordVisit(ctx, visitorID, entry.roomID)
 	}
-	return nil
+	return rt.sendRoomData(entry.connID, visitorID, inst, room)
 }
 
 // handleGetRoomSettings sends room settings to the requesting owner.

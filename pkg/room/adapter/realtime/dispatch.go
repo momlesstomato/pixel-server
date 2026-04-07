@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"context"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
@@ -9,8 +10,15 @@ import (
 	"github.com/momlesstomato/pixel-server/pkg/room/heightmap"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
 	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+	notificationpacket "github.com/momlesstomato/pixel-server/pkg/session/packet/notification"
 	"go.uber.org/zap"
 )
+
+// maxPasswordAttempts defines the number of wrong attempts before a cooldown is imposed.
+const maxPasswordAttempts = 3
+
+// passwordCooldownDuration defines how long a connection is blocked after too many wrong attempts.
+const passwordCooldownDuration = 30 * time.Second
 
 // Handle dispatches one authenticated room packet payload.
 func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, body []byte) (bool, error) {
@@ -100,13 +108,17 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 	if room.ForwardRoomID > 0 {
 		return rt.sendPacket(connID, packet.RoomForwardComposer{RoomID: int32(room.ForwardRoomID)})
 	}
-	if accessErr := rt.service.CheckAccess(ctx, room, pkt.Password, userID); accessErr != nil {
-		if accessErr == domain.ErrInvalidPassword {
-			return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 6})
-		}
-		username := rt.resolveUsername(ctx, userID)
-		return rt.triggerDoorbell(ctx, connID, username, room)
+	bypass := false
+	if rt.permissions != nil {
+		bypass, _ = rt.permissions.HasPermission(ctx, userID, "room.enter.bypass")
 	}
+	if !bypass {
+		if err := rt.checkRoomPassword(ctx, connID, pkt.Password, room, userID); err != nil {
+			return err
+		}
+	}
+	delete(rt.passwordAttempts, connID)
+	delete(rt.passwordCooldown, connID)
 	inst, err := rt.service.LoadRoom(ctx, room)
 	if err != nil {
 		rt.logger.Warn("room load failed", zap.Int("room_id", roomID), zap.Error(err))
@@ -121,6 +133,40 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 		_ = rt.visitRecorder.RecordVisit(ctx, userID, roomID)
 	}
 	return rt.sendRoomData(connID, userID, inst, room)
+}
+
+// checkRoomPassword enforces access control, password attempt tracking, and cooldown.
+// It returns nil when the requester may proceed with room entry, or an error response otherwise.
+func (rt *Runtime) checkRoomPassword(ctx context.Context, connID, password string, room domain.Room, userID int) error {
+	if cooldown, ok := rt.passwordCooldown[connID]; ok {
+		if time.Now().Before(cooldown) {
+			remaining := time.Until(cooldown).Round(time.Second)
+			_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{
+				Message: "Too many incorrect attempts. Please wait " + remaining.String() + ".",
+			})
+			return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 6})
+		}
+		delete(rt.passwordCooldown, connID)
+	}
+	accessErr := rt.service.CheckAccess(ctx, room, password, userID)
+	if accessErr == nil {
+		return nil
+	}
+	if accessErr != domain.ErrInvalidPassword {
+		username := rt.resolveUsername(ctx, userID)
+		return rt.triggerDoorbell(ctx, connID, username, room)
+	}
+	rt.passwordAttempts[connID]++
+	if rt.passwordAttempts[connID] >= maxPasswordAttempts {
+		rt.passwordCooldown[connID] = time.Now().Add(passwordCooldownDuration)
+		delete(rt.passwordAttempts, connID)
+		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{
+			Message: "Too many incorrect attempts. You are blocked for " + passwordCooldownDuration.String() + ".",
+		})
+	} else {
+		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "Incorrect room password!"})
+	}
+	return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 6})
 }
 
 // handleGetEntryData sends room geometry and entity data.

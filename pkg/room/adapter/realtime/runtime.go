@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	"github.com/momlesstomato/pixel-server/core/codec"
@@ -53,6 +54,10 @@ type Runtime struct {
 	connRooms map[string]int
 	// pendingDoorbell tracks visitor connections waiting for doorbell approval.
 	pendingDoorbell map[string]doorbellEntry
+	// passwordAttempts tracks consecutive wrong password attempts per connection.
+	passwordAttempts map[string]int
+	// passwordCooldown tracks when the password cooldown expires per connection.
+	passwordCooldown map[string]time.Time
 	// usernameResolver resolves display names for user identifiers.
 	usernameResolver UsernameResolver
 	// profileResolver resolves full user profile for entity creation.
@@ -102,7 +107,9 @@ func NewRuntime(service *roomapplication.Service, entitySvc *roomapplication.Ent
 		service: service, entitySvc: entitySvc, chatSvc: chatSvc,
 		sessions: sessions, transport: transport, broadcaster: broadcaster,
 		logger: logger, connRooms: make(map[string]int),
-		pendingDoorbell: make(map[string]doorbellEntry),
+		pendingDoorbell:  make(map[string]doorbellEntry),
+		passwordAttempts: make(map[string]int),
+		passwordCooldown: make(map[string]time.Time),
 	}, nil
 }
 
@@ -178,6 +185,13 @@ func (rt *Runtime) leaveCurrentRoom(connID string) {
 
 // Dispose releases per-connection resources and removes the entity from its room.
 func (rt *Runtime) Dispose(connID string) {
+	for username, entry := range rt.pendingDoorbell {
+		if entry.connID == connID {
+			delete(rt.pendingDoorbell, username)
+		}
+	}
+	delete(rt.passwordAttempts, connID)
+	delete(rt.passwordCooldown, connID)
 	rt.leaveCurrentRoom(connID)
 }
 

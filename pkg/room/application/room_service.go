@@ -164,8 +164,11 @@ func (s *Service) FindRoom(ctx context.Context, roomID int) (domain.Room, error)
 }
 
 // CheckAccess validates whether a requester may enter a room.
-func (s *Service) CheckAccess(_ context.Context, room domain.Room, password string, requesterID int) error {
+func (s *Service) CheckAccess(ctx context.Context, room domain.Room, password string, requesterID int) error {
 	if room.OwnerID == requesterID {
+		return nil
+	}
+	if room.State == domain.AccessLocked && s.HasRights(ctx, room.ID, requesterID) {
 		return nil
 	}
 	switch room.State {
