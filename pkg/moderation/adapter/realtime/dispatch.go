@@ -32,7 +32,25 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 	case packet.ModAlertUserPacketID:
 		return true, rt.handleModAlert(ctx, connID, userID, body)
 	case packet.ModRoomAlertPacketID:
-		return true, rt.handleModRoomAlert(ctx, connID, userID, body)
+		return rt.handleModRoomAlertOrPass(ctx, connID, userID, body)
+	case packet.RoomAmbassadorAlertPacketID:
+		return true, rt.handleRoomAmbassadorAlert(ctx, connID, userID, body)
+	case packet.ModToolRequestRoomInfoPacketID:
+		return true, rt.handleModToolRequestRoomInfo(ctx, connID, userID, body)
+	case packet.ModToolChangeRoomSettingsPacketID:
+		return true, rt.handleModToolChangeRoomSettings(ctx, connID, userID, body)
+	case packet.ModToolRequestRoomChatlogPacketID:
+		return true, rt.handleModToolRequestRoomChatlog(ctx, connID, userID, body)
+	case packet.ModToolUserInfoPacketID:
+		return true, rt.handleModToolUserInfo(ctx, connID, userID, body)
+	case packet.GetPendingCallsForHelpPacketID:
+		return true, rt.handleGetPendingCallsForHelp(ctx, connID, userID)
+	case packet.GetCFHChatlogPacketID:
+		return true, rt.handleGetCFHChatlog(ctx, connID, userID, body)
+	case packet.ModToolPreferencesPacketID:
+		return true, rt.handleModToolPreferences(ctx, connID, userID)
+	case packet.RoomMutePacketID:
+		return true, rt.handleRoomMute(ctx, connID, userID)
 	case packet.SanctionTradeLockPacketID:
 		return true, rt.handleTradeLock(ctx, connID, userID, body)
 	case packet.CallForHelpPacketID:
@@ -194,10 +212,33 @@ func (rt *Runtime) handleModRoomAlert(ctx context.Context, connID string, issuer
 		return nil
 	}
 	message := rt.actionReason(ctx, issuerID, pkt.Message, "room alert")
+	if rt.currentRoomID != nil {
+		if roomID, ok := rt.currentRoomID(connID); ok {
+			action := &domain.Action{
+				Scope:      domain.ScopeRoom,
+				ActionType: domain.TypeWarn,
+				IssuerID:   issuerID,
+				RoomID:     roomID,
+				Reason:     message,
+			}
+			if err := rt.service.Create(ctx, action); err != nil {
+				rt.logger.Warn("mod room alert registry failed", zap.Int("issuer", issuerID), zap.Int("room_id", roomID), zap.Error(err))
+			}
+		}
+	}
 	if err := rt.roomAlertSender(ctx, connID, message); err != nil {
 		rt.logger.Warn("mod room alert failed", zap.Int("issuer", issuerID), zap.Error(err))
 	}
 	return nil
+}
+
+// handleModRoomAlertOrPass only claims packet 3842 when it decodes as a moderation room alert.
+func (rt *Runtime) handleModRoomAlertOrPass(ctx context.Context, connID string, issuerID int, body []byte) (bool, error) {
+	var pkt packet.ModRoomAlertPacket
+	if err := pkt.Decode(body); err != nil {
+		return false, nil
+	}
+	return true, rt.handleModRoomAlert(ctx, connID, issuerID, body)
 }
 
 // sendCautionToUser sends a ModerationCaution packet to a target user.

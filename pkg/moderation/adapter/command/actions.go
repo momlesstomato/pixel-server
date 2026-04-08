@@ -185,6 +185,61 @@ func newHistoryCommand(deps Dependencies, opts *options) *cobra.Command {
 	return cmd
 }
 
+// newAlertsCommand creates the moderation alerts registry subcommand.
+func newAlertsCommand(deps Dependencies, opts *options) *cobra.Command {
+	var scope string
+	var issuerID int
+	var userID int
+	var roomID int
+	var active bool
+	cmd := &cobra.Command{
+		Use:   "alerts",
+		Short: "List moderation alert registry entries",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			s, cleanup, err := openStore(opts)
+			if err != nil {
+				return err
+			}
+			defer cleanup()
+			filter := domain.ListFilter{ActionType: domain.TypeWarn, Limit: 50}
+			if scope != "" {
+				filter.Scope = domain.ActionScope(scope)
+			}
+			if issuerID > 0 {
+				filter.IssuerID = issuerID
+			}
+			if userID > 0 {
+				filter.TargetUserID = userID
+			}
+			if roomID > 0 {
+				filter.RoomID = roomID
+			}
+			if active {
+				b := true
+				filter.Active = &b
+			}
+			actions, err := s.List(context.Background(), filter)
+			if err != nil {
+				return err
+			}
+			for _, action := range actions {
+				fmt.Fprintf(deps.Output, "[%d] %s target=%d room=%d issuer=%d active=%t reason=%q created=%s\n",
+					action.ID, action.Scope, action.TargetUserID, action.RoomID, action.IssuerID, action.Active, action.Reason, action.CreatedAt.Format(time.RFC3339))
+			}
+			if len(actions) == 0 {
+				fmt.Fprintln(deps.Output, "No moderation alerts found.")
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&scope, "scope", "", "Filter by scope (room/hotel)")
+	cmd.Flags().IntVar(&issuerID, "issuer-id", 0, "Filter by issuer user ID")
+	cmd.Flags().IntVar(&userID, "user-id", 0, "Filter by target user ID")
+	cmd.Flags().IntVar(&roomID, "room-id", 0, "Filter by room ID")
+	cmd.Flags().BoolVar(&active, "active", false, "Show only active alerts")
+	return cmd
+}
+
 // parsePositiveInt parses a string to a positive integer.
 func parsePositiveInt(s string) (int, error) {
 	n, err := strconv.Atoi(s)

@@ -167,7 +167,6 @@ func (p UserRemoveComposer) Encode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-
 // DecodeMoveAvatar extracts walk destination from packet body.
 func DecodeMoveAvatar(body []byte) []int {
 	r := codec.NewReader(body)

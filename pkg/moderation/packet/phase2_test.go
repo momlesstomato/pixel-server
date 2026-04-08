@@ -82,11 +82,21 @@ func TestSanctionTradeLockPacketDecode(t *testing.T) {
 
 // TestCFHPendingPacketEncode verifies pending packet encoding.
 func TestCFHPendingPacketEncode(t *testing.T) {
-	pkt := CFHPendingPacket{Count: 5}
+	pkt := CFHPendingPacket{Entries: []CFHPendingEntry{{CallID: "5", Timestamp: "10:00", Message: "Need help"}}}
 	assert.Equal(t, CFHPendingPacketID, pkt.PacketID())
 	body, err := pkt.Encode()
 	require.NoError(t, err)
 	r := codec.NewReader(body)
-	count, _ := r.ReadInt32()
-	assert.Equal(t, int32(5), count)
+	count, err := r.ReadInt32()
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), count)
+	callID, err := r.ReadString()
+	require.NoError(t, err)
+	assert.Equal(t, "5", callID)
+	timestamp, err := r.ReadString()
+	require.NoError(t, err)
+	assert.Equal(t, "10:00", timestamp)
+	message, err := r.ReadString()
+	require.NoError(t, err)
+	assert.Equal(t, "Need help", message)
 }

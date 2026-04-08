@@ -210,6 +210,7 @@ func TestSaveSettings_OwnerCanSave(t *testing.T) {
 	repo := &roomRepoStub{rooms: map[int]domain.Room{1: {ID: 1, OwnerID: 10}}}
 	svc.SetRoomRepository(repo)
 	assert.NoError(t, svc.SaveSettings(context.Background(), 1, 10, domain.Room{Name: "New"}))
+	assert.Equal(t, "New", repo.rooms[1].Name)
 }
 
 // TestSaveSettings_NonOwnerDenied verifies non-owner cannot update room settings.
@@ -218,4 +219,15 @@ func TestSaveSettings_NonOwnerDenied(t *testing.T) {
 	repo := &roomRepoStub{rooms: map[int]domain.Room{1: {ID: 1, OwnerID: 10}}}
 	svc.SetRoomRepository(repo)
 	assert.ErrorIs(t, svc.SaveSettings(context.Background(), 1, 99, domain.Room{Name: "New"}), domain.ErrAccessDenied)
+}
+
+// TestModerateSettings_BypassesOwnership verifies moderator room updates do not require ownership.
+func TestModerateSettings_BypassesOwnership(t *testing.T) {
+	svc := newService(t)
+	repo := &roomRepoStub{rooms: map[int]domain.Room{1: {ID: 1, OwnerID: 10, Name: "Old", State: domain.AccessOpen, MaxUsers: 25}}}
+	svc.SetRoomRepository(repo)
+	err := svc.ModerateSettings(context.Background(), domain.Room{ID: 1, OwnerID: 10, Name: "Inappropriate to hotel staff", State: domain.AccessLocked, MaxUsers: 25})
+	assert.NoError(t, err)
+	assert.Equal(t, "Inappropriate to hotel staff", repo.rooms[1].Name)
+	assert.Equal(t, domain.AccessLocked, repo.rooms[1].State)
 }

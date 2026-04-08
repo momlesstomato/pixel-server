@@ -73,16 +73,54 @@ func (p *SanctionTradeLockPacket) Decode(body []byte) error {
 
 // CFHPendingPacket composes the pending tickets list (s2c 1121).
 type CFHPendingPacket struct {
-	// Count stores the number of pending tickets.
-	Count int32
+	// Entries stores pending calls displayed in the moderator tool.
+	Entries []CFHPendingEntry
+}
+
+// CFHPendingEntry stores one pending CFH list row.
+type CFHPendingEntry struct {
+	// CallID stores the ticket identifier shown by Nitro.
+	CallID string
+	// Timestamp stores the human-readable submission time.
+	Timestamp string
+	// Message stores the ticket message preview.
+	Message string
 }
 
 // PacketID returns protocol packet identifier.
 func (p CFHPendingPacket) PacketID() uint16 { return CFHPendingPacketID }
 
-// Encode serializes the pending count.
+// Encode serializes the pending ticket list.
 func (p CFHPendingPacket) Encode() ([]byte, error) {
 	w := codec.NewWriter()
-	w.WriteInt32(p.Count)
+	w.WriteInt32(int32(len(p.Entries)))
+	for _, entry := range p.Entries {
+		if err := w.WriteString(entry.CallID); err != nil {
+			return nil, err
+		}
+		if err := w.WriteString(entry.Timestamp); err != nil {
+			return nil, err
+		}
+		if err := w.WriteString(entry.Message); err != nil {
+			return nil, err
+		}
+	}
 	return w.Bytes(), nil
+}
+
+// GetCFHChatlogPacket decodes a moderator CFH chatlog request.
+type GetCFHChatlogPacket struct {
+	// TicketID stores the target ticket identifier.
+	TicketID int32
+}
+
+// Decode reads fields from the packet body.
+func (p *GetCFHChatlogPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	ticketID, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.TicketID = ticketID
+	return nil
 }

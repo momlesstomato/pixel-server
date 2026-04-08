@@ -46,7 +46,7 @@ func (s *Service) SetAmbassadorNotifier(notifier AmbassadorNotifier) {
 
 // Create records a new moderation action.
 func (s *Service) Create(ctx context.Context, action *domain.Action) error {
-	if action.TargetUserID <= 0 {
+	if action.TargetUserID <= 0 && !allowsTargetlessWarn(action) {
 		return domain.ErrMissingTarget
 	}
 	if action.Scope != domain.ScopeRoom && action.Scope != domain.ScopeHotel {
@@ -183,6 +183,9 @@ func (s *Service) fireCreateBefore(action *domain.Action) error {
 			return fmt.Errorf("moderation ban cancelled by plugin")
 		}
 	case domain.TypeWarn:
+		if action.TargetUserID <= 0 {
+			return nil
+		}
 		event := &sdkmoderation.UserWarning{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Message: action.Reason}
 		s.fireSafe(event)
 		if event.Cancelled() {
@@ -203,6 +206,13 @@ func (s *Service) fireCreateAfter(action *domain.Action) {
 	case domain.TypeBan:
 		s.fireSafe(&sdkmoderation.UserBanned{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Scope: scope, Reason: action.Reason, DurationMinutes: action.DurationMinutes})
 	case domain.TypeWarn:
+		if action.TargetUserID <= 0 {
+			return
+		}
 		s.fireSafe(&sdkmoderation.UserWarned{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Message: action.Reason})
 	}
+}
+
+func allowsTargetlessWarn(action *domain.Action) bool {
+	return action != nil && action.ActionType == domain.TypeWarn && action.Scope == domain.ScopeRoom && action.RoomID > 0
 }

@@ -187,7 +187,7 @@ func TestYouAreOwnerComposer_Encode(t *testing.T) {
 // TestRoomRightsListComposer_Encode verifies rights list encoding.
 func TestRoomRightsListComposer_Encode(t *testing.T) {
 	pkt := packet.RoomRightsListComposer{
-		RoomID: 5,
+		RoomID:  5,
 		Entries: []packet.RightsEntry{{UserID: 10, Username: "alice"}, {UserID: 11, Username: "bob"}},
 	}
 	body, err := pkt.Encode()

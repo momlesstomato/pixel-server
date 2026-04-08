@@ -52,6 +52,9 @@ func applyFilter(q *gorm.DB, f domain.ListFilter) *gorm.DB {
 	if f.ActionType != "" {
 		q = q.Where("action_type = ?", string(f.ActionType))
 	}
+	if f.IssuerID > 0 {
+		q = q.Where("issuer_id = ?", f.IssuerID)
+	}
 	if f.TargetUserID > 0 {
 		q = q.Where("target_user_id = ?", f.TargetUserID)
 	}

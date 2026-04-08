@@ -28,6 +28,25 @@ func OpenAPIPaths() map[string]any {
 				},
 			},
 		},
+		"/api/v1/moderation/alerts": map[string]any{
+			"get": map[string]any{
+				"tags":        []string{"Moderation"},
+				"summary":     "List moderation alerts registry",
+				"operationId": "listModerationAlerts",
+				"security":    apiKey,
+				"responses": map[string]any{
+					"200": map[string]any{
+						"description": "Alert list",
+						"content": map[string]any{
+							"application/json": map[string]any{
+								"schema": map[string]any{"type": "array", "items": actionSchema()},
+							},
+						},
+					},
+					"500": map[string]any{"description": "Internal error", "content": errContent},
+				},
+			},
+		},
 		"/api/v1/moderation/actions/{id}": map[string]any{
 			"get": map[string]any{
 				"tags":        []string{"Moderation"},

@@ -87,7 +87,13 @@ func (s *roomRepoStub) FindByID(_ context.Context, id int) (domain.Room, error) 
 }
 
 // SaveSettings persists updated room settings.
-func (s *roomRepoStub) SaveSettings(_ context.Context, _ domain.Room) error { return nil }
+func (s *roomRepoStub) SaveSettings(_ context.Context, room domain.Room) error {
+	if s.rooms == nil {
+		s.rooms = map[int]domain.Room{}
+	}
+	s.rooms[room.ID] = room
+	return nil
+}
 
 // SoftDelete marks one room as deleted.
 func (s *roomRepoStub) SoftDelete(_ context.Context, _ int) error { return nil }

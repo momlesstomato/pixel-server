@@ -8,6 +8,8 @@ type ListFilter struct {
 	Scope ActionScope
 	// ActionType filters by action type.
 	ActionType ActionType
+	// IssuerID filters by issuing staff user.
+	IssuerID int
 	// TargetUserID filters by target user.
 	TargetUserID int
 	// RoomID filters by room identifier.

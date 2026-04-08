@@ -18,6 +18,33 @@ const ModAlertUserPacketID uint16 = 229
 // ModRoomAlertPacketID defines moderator current-room alert (c2s 3842).
 const ModRoomAlertPacketID uint16 = 3842
 
+// RoomAmbassadorAlertPacketID defines targeted ambassador alert (c2s 2996).
+const RoomAmbassadorAlertPacketID uint16 = 2996
+
+// ModToolRequestRoomInfoPacketID defines moderator room info request (c2s 707).
+const ModToolRequestRoomInfoPacketID uint16 = 707
+
+// ModToolChangeRoomSettingsPacketID defines moderator room settings action request (c2s 3260).
+const ModToolChangeRoomSettingsPacketID uint16 = 3260
+
+// ModToolRequestRoomChatlogPacketID defines moderator room chatlog request (c2s 2587).
+const ModToolRequestRoomChatlogPacketID uint16 = 2587
+
+// ModToolUserInfoPacketID defines moderator user info request (c2s 3295).
+const ModToolUserInfoPacketID uint16 = 3295
+
+// GetPendingCallsForHelpPacketID defines pending CFH request (c2s 3267).
+const GetPendingCallsForHelpPacketID uint16 = 3267
+
+// GetCFHChatlogPacketID defines CFH chatlog request (c2s 211).
+const GetCFHChatlogPacketID uint16 = 211
+
+// ModToolPreferencesPacketID defines moderator tool preferences request (c2s 31).
+const ModToolPreferencesPacketID uint16 = 31
+
+// RoomMutePacketID defines moderator room-wide mute toggle (c2s 3637).
+const RoomMutePacketID uint16 = 3637
+
 // SanctionTradeLockPacketID defines trade lock sanction (c2s 3742).
 const SanctionTradeLockPacketID uint16 = 3742
 
@@ -38,3 +65,21 @@ const CFHPendingPacketID uint16 = 1121
 
 // CFHResultPacketID defines call-for-help result (s2c 3635).
 const CFHResultPacketID uint16 = 3635
+
+// ModToolRoomInfoComposerID defines moderator room info payload (s2c 1333).
+const ModToolRoomInfoComposerID uint16 = 1333
+
+// ModToolRoomChatlogComposerID defines moderator room chatlog payload (s2c 3434).
+const ModToolRoomChatlogComposerID uint16 = 3434
+
+// ModeratorUserInfoComposerID defines moderator user info payload (s2c 2866).
+const ModeratorUserInfoComposerID uint16 = 2866
+
+// ModeratorCFHChatlogPacketID defines moderator CFH chatlog payload (s2c 607).
+const ModeratorCFHChatlogPacketID uint16 = 607
+
+// ModeratorToolPreferencesComposerID defines moderator tool preferences payload (s2c 1576).
+const ModeratorToolPreferencesComposerID uint16 = 1576
+
+// RoomMutedComposerID defines room mute state payload (s2c 2533).
+const RoomMutedComposerID uint16 = 2533

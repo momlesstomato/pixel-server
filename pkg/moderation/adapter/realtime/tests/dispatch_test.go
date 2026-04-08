@@ -3,14 +3,17 @@ package tests
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/core/connection"
-	moderationapplication "github.com/momlesstomato/pixel-server/pkg/moderation/application"
 	moderationrealtime "github.com/momlesstomato/pixel-server/pkg/moderation/adapter/realtime"
+	moderationapplication "github.com/momlesstomato/pixel-server/pkg/moderation/application"
 	"github.com/momlesstomato/pixel-server/pkg/moderation/domain"
 	"github.com/momlesstomato/pixel-server/pkg/moderation/packet"
+	roomdomain "github.com/momlesstomato/pixel-server/pkg/room/domain"
+	userdomain "github.com/momlesstomato/pixel-server/pkg/user/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -30,8 +33,24 @@ func (repo *actionRepoStub) FindByID(_ context.Context, _ int64) (*domain.Action
 	return nil, domain.ErrActionNotFound
 }
 
-func (repo *actionRepoStub) List(_ context.Context, _ domain.ListFilter) ([]domain.Action, error) {
-	return nil, nil
+func (repo *actionRepoStub) List(_ context.Context, filter domain.ListFilter) ([]domain.Action, error) {
+	out := make([]domain.Action, 0, len(repo.actions))
+	for _, action := range repo.actions {
+		if filter.ActionType != "" && action.ActionType != filter.ActionType {
+			continue
+		}
+		if filter.IssuerID > 0 && action.IssuerID != filter.IssuerID {
+			continue
+		}
+		if filter.TargetUserID > 0 && action.TargetUserID != filter.TargetUserID {
+			continue
+		}
+		if filter.RoomID > 0 && action.RoomID != filter.RoomID {
+			continue
+		}
+		out = append(out, *action)
+	}
+	return out, nil
 }
 
 func (repo *actionRepoStub) Deactivate(_ context.Context, _ int64, _ int) error {
@@ -68,6 +87,8 @@ func (sessionRegistryStub) FindByConnID(connID string) (connection.Session, bool
 		return connection.Session{ConnID: "conn1", UserID: 1}, true
 	case "conn2":
 		return connection.Session{ConnID: "conn2", UserID: 2}, true
+	case "conn3":
+		return connection.Session{ConnID: "conn3", UserID: 3}, true
 	default:
 		return connection.Session{}, false
 	}
@@ -79,6 +100,8 @@ func (sessionRegistryStub) FindByUserID(userID int) (connection.Session, bool) {
 		return connection.Session{ConnID: "conn1", UserID: 1}, true
 	case 2:
 		return connection.Session{ConnID: "conn2", UserID: 2}, true
+	case 3:
+		return connection.Session{ConnID: "conn3", UserID: 3}, true
 	default:
 		return connection.Session{}, false
 	}
@@ -89,15 +112,21 @@ func (sessionRegistryStub) Touch(string) error { return nil }
 func (sessionRegistryStub) Remove(string) {}
 
 func (sessionRegistryStub) ListAll() ([]connection.Session, error) {
-	return []connection.Session{{ConnID: "conn1", UserID: 1}, {ConnID: "conn2", UserID: 2}}, nil
+	return []connection.Session{{ConnID: "conn1", UserID: 1}, {ConnID: "conn2", UserID: 2}, {ConnID: "conn3", UserID: 3}}, nil
 }
 
 type transportStub struct {
 	packetIDs []uint16
+	bodies    map[uint16][][]byte
 }
 
-func (transport *transportStub) Send(_ string, packetID uint16, _ []byte) error {
+func (transport *transportStub) Send(_ string, packetID uint16, body []byte) error {
 	transport.packetIDs = append(transport.packetIDs, packetID)
+	if transport.bodies == nil {
+		transport.bodies = map[uint16][][]byte{}
+	}
+	copy := append([]byte(nil), body...)
+	transport.bodies[packetID] = append(transport.bodies[packetID], copy)
 	return nil
 }
 
@@ -127,12 +156,48 @@ func (permissionStub) HasPermission(_ context.Context, userID int, scope string)
 		return false, nil
 	}
 	switch scope {
-	case domain.PermKick, domain.PermMute, domain.PermWarn, domain.PermAmbassador:
+	case domain.PermKick, domain.PermMute, domain.PermWarn, domain.PermAmbassador, domain.PermTool, domain.PermHistory:
 		return true, nil
 	default:
 		return false, nil
 	}
 }
+
+type roomLookupStub struct{}
+
+func (roomLookupStub) FindRoom(_ context.Context, roomID int) (roomdomain.Room, error) {
+	return roomdomain.Room{ID: roomID, OwnerID: 2, OwnerName: "beta", Name: "Blue Room", Description: "Testing", State: roomdomain.AccessOpen, Tags: []string{"test"}, MaxUsers: 25}, nil
+}
+
+type userLookupStub struct{}
+
+func (userLookupStub) FindByID(_ context.Context, id int) (userdomain.User, error) {
+	return userdomain.User{ID: id, Username: "beta", Figure: "hr-1", GroupID: 4}, nil
+}
+
+type chatLogLookupStub struct{}
+
+func (chatLogLookupStub) ListByRoom(_ context.Context, roomID int, _ time.Time, _ time.Time) ([]roomdomain.ChatLogEntry, error) {
+	return []roomdomain.ChatLogEntry{{RoomID: roomID, UserID: 2, Username: "beta", Message: "hello", CreatedAt: time.Unix(1710000000, 0)}}, nil
+}
+
+type ticketRepoStub struct{}
+
+func (ticketRepoStub) Create(_ context.Context, _ *domain.Ticket) error { return nil }
+
+func (ticketRepoStub) FindByID(_ context.Context, id int64) (*domain.Ticket, error) {
+	return &domain.Ticket{ID: id, ReporterID: 2, ReportedID: 3, RoomID: 77, Message: "Need help", CreatedAt: time.Unix(1710000000, 0)}, nil
+}
+
+func (ticketRepoStub) List(_ context.Context, _ domain.TicketStatus, _ int) ([]domain.Ticket, error) {
+	return []domain.Ticket{{ID: 5, ReporterID: 2, ReportedID: 3, RoomID: 77, Message: "Need help", CreatedAt: time.Unix(1710000000, 0)}}, nil
+}
+
+func (ticketRepoStub) UpdateStatus(_ context.Context, _ int64, _ domain.TicketStatus, _ int) error {
+	return nil
+}
+
+func (ticketRepoStub) Delete(_ context.Context, _ int64) error { return nil }
 
 // TestHandleModKickUsesFallbackReasonAndLeavesRoom verifies empty-message kicks still persist, remove the room entity, and close the target session.
 func TestHandleModKickUsesFallbackReasonAndLeavesRoom(t *testing.T) {
@@ -167,6 +232,12 @@ func TestHandleModRoomAlertForwardsToRoomSender(t *testing.T) {
 	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, &transportStub{}, broadcasterStub{}, &closerStub{}, zap.NewNop())
 	require.NoError(t, err)
 	rt.SetPermissionChecker(permissionStub{})
+	rt.SetCurrentRoomIDResolver(func(connID string) (int, bool) {
+		if connID == "conn1" {
+			return 77, true
+		}
+		return 0, false
+	})
 	called := false
 	message := ""
 	rt.SetRoomAlertSender(func(_ context.Context, connID string, value string) error {
@@ -182,6 +253,10 @@ func TestHandleModRoomAlertForwardsToRoomSender(t *testing.T) {
 	assert.True(t, handled)
 	assert.True(t, called)
 	assert.Equal(t, "ambassador room alert", message)
+	require.Len(t, repo.actions, 1)
+	assert.Equal(t, domain.ScopeRoom, repo.actions[0].Scope)
+	assert.Equal(t, 77, repo.actions[0].RoomID)
+	assert.Equal(t, 0, repo.actions[0].TargetUserID)
 }
 
 // TestHandleModMuteSendsDirectCaution verifies mute actions immediately notify a local target connection.
@@ -203,4 +278,202 @@ func TestHandleModMuteSendsDirectCaution(t *testing.T) {
 	require.Len(t, repo.actions, 1)
 	assert.Equal(t, domain.TypeMute, repo.actions[0].ActionType)
 	assert.Contains(t, transport.packetIDs, uint16(1890))
+}
+
+// TestHandleRoomAmbassadorAlertSendsTargetedCaution verifies the ambassador alert targets a single user.
+func TestHandleRoomAmbassadorAlertSendsTargetedCaution(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	w := codec.NewWriter()
+	w.WriteInt32(2)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.RoomAmbassadorAlertPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	require.Len(t, repo.actions, 1)
+	assert.Equal(t, 2, repo.actions[0].TargetUserID)
+	assert.Contains(t, transport.packetIDs, uint16(1890))
+}
+
+// TestHandleModToolRequestRoomInfoSendsPacket verifies room info scene requests return Nitro room info payloads.
+func TestHandleModToolRequestRoomInfoSendsPacket(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	rt.SetRoomLookup(roomLookupStub{})
+	rt.SetRoomUserCounter(func(roomID int) int {
+		if roomID == 77 {
+			return 4
+		}
+		return 0
+	})
+	rt.SetCurrentRoomIDResolver(func(connID string) (int, bool) {
+		if connID == "conn2" {
+			return 77, true
+		}
+		return 0, false
+	})
+	w := codec.NewWriter()
+	w.WriteInt32(77)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.ModToolRequestRoomInfoPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Contains(t, transport.packetIDs, packet.ModToolRoomInfoComposerID)
+}
+
+// TestHandleModToolRequestRoomChatlogSendsPacket verifies room chatlog scene requests return Nitro chatlog payloads.
+func TestHandleModToolRequestRoomChatlogSendsPacket(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	rt.SetRoomLookup(roomLookupStub{})
+	rt.SetRoomChatLogLookup(chatLogLookupStub{})
+	w := codec.NewWriter()
+	w.WriteInt32(0)
+	w.WriteInt32(77)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.ModToolRequestRoomChatlogPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Contains(t, transport.packetIDs, packet.ModToolRoomChatlogComposerID)
+}
+
+// TestHandleModToolUserInfoSendsPacket verifies user info scene requests return Nitro user info payloads.
+func TestHandleModToolUserInfoSendsPacket(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	rt.SetUserLookup(userLookupStub{})
+	w := codec.NewWriter()
+	w.WriteInt32(2)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.ModToolUserInfoPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Contains(t, transport.packetIDs, packet.ModeratorUserInfoComposerID)
+}
+
+// TestHandleGetPendingCallsForHelpSendsPacket verifies pending CFH scene requests return ticket list payloads.
+func TestHandleGetPendingCallsForHelpSendsPacket(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	ticketSvc, err := moderationapplication.NewTicketService(ticketRepoStub{})
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	rt.SetTicketService(ticketSvc)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.GetPendingCallsForHelpPacketID, nil)
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Contains(t, transport.packetIDs, packet.CFHPendingPacketID)
+}
+
+// TestHandleGetCFHChatlogSendsPacket verifies CFH chatlog scene requests return Nitro chatlog payloads.
+func TestHandleGetCFHChatlogSendsPacket(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	ticketSvc, err := moderationapplication.NewTicketService(ticketRepoStub{})
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	rt.SetTicketService(ticketSvc)
+	rt.SetRoomLookup(roomLookupStub{})
+	rt.SetRoomChatLogLookup(chatLogLookupStub{})
+	w := codec.NewWriter()
+	w.WriteInt32(5)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.GetCFHChatlogPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Contains(t, transport.packetIDs, packet.ModeratorCFHChatlogPacketID)
+}
+
+// TestHandleModToolPreferencesSendsPacket verifies preferences scene requests return a preferences payload.
+func TestHandleModToolPreferencesSendsPacket(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	handled, err := rt.Handle(context.Background(), "conn1", packet.ModToolPreferencesPacketID, nil)
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Contains(t, transport.packetIDs, packet.ModeratorToolPreferencesComposerID)
+}
+
+// TestHandleRoomMuteCallsToggler verifies room mute scene requests toggle the room mute state.
+func TestHandleRoomMuteCallsToggler(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, &transportStub{}, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	rt.SetCurrentRoomIDResolver(func(connID string) (int, bool) {
+		if connID == "conn1" {
+			return 77, true
+		}
+		return 0, false
+	})
+	called := 0
+	rt.SetRoomMuteToggler(func(_ context.Context, roomID int) (bool, error) {
+		called++
+		assert.Equal(t, 77, roomID)
+		return true, nil
+	})
+	handled, err := rt.Handle(context.Background(), "conn1", packet.RoomMutePacketID, nil)
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Equal(t, 1, called)
+}
+
+// TestHandleModToolChangeRoomSettingsUpdatesTitleAndDoorMode verifies moderator room settings apply title and locked-door changes.
+func TestHandleModToolChangeRoomSettingsUpdatesTitleAndDoorMode(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, &transportStub{}, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetPermissionChecker(permissionStub{})
+	rt.SetRoomLookup(roomLookupStub{})
+	var saved roomdomain.Room
+	called := 0
+	rt.SetRoomSettingsUpdater(func(_ context.Context, room roomdomain.Room) error {
+		called++
+		saved = room
+		return nil
+	})
+	w := codec.NewWriter()
+	w.WriteInt32(77)
+	w.WriteInt32(1)
+	w.WriteInt32(1)
+	w.WriteInt32(0)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.ModToolChangeRoomSettingsPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Equal(t, 1, called)
+	assert.Equal(t, 77, saved.ID)
+	assert.Equal(t, roomdomain.AccessLocked, saved.State)
+	assert.Equal(t, "Inappropriate to hotel staff", saved.Name)
 }

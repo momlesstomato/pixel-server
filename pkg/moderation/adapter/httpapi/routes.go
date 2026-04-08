@@ -26,6 +26,11 @@ func RegisterRoutes(module *corehttp.Module, svc ModerationService) error {
 		if v := ctx.Query("action_type"); v != "" {
 			filter.ActionType = domain.ActionType(v)
 		}
+		if v := ctx.Query("issuer_id"); v != "" {
+			if id, err := strconv.Atoi(v); err == nil && id > 0 {
+				filter.IssuerID = id
+			}
+		}
 		if v := ctx.Query("target_user_id"); v != "" {
 			if id, err := strconv.Atoi(v); err == nil && id > 0 {
 				filter.TargetUserID = id
@@ -50,6 +55,46 @@ func RegisterRoutes(module *corehttp.Module, svc ModerationService) error {
 			return fiber.NewError(http.StatusInternalServerError, "failed to list actions")
 		}
 		return ctx.JSON(actions)
+	})
+	module.RegisterGET("/api/v1/moderation/alerts", func(ctx *fiber.Ctx) error {
+		filter := domain.ListFilter{ActionType: domain.TypeWarn, Limit: 50}
+		if v := ctx.Query("scope"); v != "" {
+			filter.Scope = domain.ActionScope(v)
+		}
+		if v := ctx.Query("issuer_id"); v != "" {
+			if id, err := strconv.Atoi(v); err == nil && id > 0 {
+				filter.IssuerID = id
+			}
+		}
+		if v := ctx.Query("target_user_id"); v != "" {
+			if id, err := strconv.Atoi(v); err == nil && id > 0 {
+				filter.TargetUserID = id
+			}
+		}
+		if v := ctx.Query("room_id"); v != "" {
+			if id, err := strconv.Atoi(v); err == nil && id > 0 {
+				filter.RoomID = id
+			}
+		}
+		if v := ctx.Query("active"); v != "" {
+			b := v == "true"
+			filter.Active = &b
+		}
+		if v := ctx.Query("limit"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
+				filter.Limit = n
+			}
+		}
+		if v := ctx.Query("page"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				filter.Offset = (n - 1) * filter.Limit
+			}
+		}
+		alerts, err := svc.List(ctx.UserContext(), filter)
+		if err != nil {
+			return fiber.NewError(http.StatusInternalServerError, "failed to list alerts")
+		}
+		return ctx.JSON(alerts)
 	})
 	module.RegisterGET("/api/v1/moderation/actions/:id", func(ctx *fiber.Ctx) error {
 		id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)

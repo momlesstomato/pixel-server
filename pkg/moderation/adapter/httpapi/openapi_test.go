@@ -10,6 +10,7 @@ import (
 func TestOpenAPIPathsReturnsExpectedRoutes(t *testing.T) {
 	paths := OpenAPIPaths()
 	assert.Contains(t, paths, "/api/v1/moderation/actions")
+	assert.Contains(t, paths, "/api/v1/moderation/alerts")
 	assert.Contains(t, paths, "/api/v1/moderation/actions/{id}")
 	assert.Contains(t, paths, "/api/v1/moderation/users/{userId}/actions")
 	assert.Contains(t, paths, "/api/v1/moderation/actions/{id}/deactivate")

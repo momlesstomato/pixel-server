@@ -22,7 +22,9 @@ import (
 	moderationhttpapi "github.com/momlesstomato/pixel-server/pkg/moderation/adapter/httpapi"
 	moderationrealtime "github.com/momlesstomato/pixel-server/pkg/moderation/adapter/realtime"
 	moderationapplication "github.com/momlesstomato/pixel-server/pkg/moderation/application"
+	moderationpacket "github.com/momlesstomato/pixel-server/pkg/moderation/packet"
 	navigatorhttpapi "github.com/momlesstomato/pixel-server/pkg/navigator/adapter/httpapi"
+	navigatorpacket "github.com/momlesstomato/pixel-server/pkg/navigator/packet"
 	permissionhttpapi "github.com/momlesstomato/pixel-server/pkg/permission/adapter/httpapi"
 	permissionapplication "github.com/momlesstomato/pixel-server/pkg/permission/application"
 	roomhttpapi "github.com/momlesstomato/pixel-server/pkg/room/adapter/httpapi"
@@ -197,6 +199,11 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		modRT.SetPresetService(services.presetService)
 		modRT.SetVisitService(services.visitService)
 		modRT.SetPermissionChecker(&permissionCheckerAdapter{svc: services.permissions})
+		modRT.SetUserLookup(services.users)
+		modRT.SetRoomLookup(services.room)
+		modRT.SetRoomChatLogLookup(services.chatLogStore)
+		modRT.SetCurrentRoomIDResolver(roomRT.ConnRoomID)
+		modRT.SetRoomUserCounter(liveRoomCount)
 		modRT.SetRoomLeaveNotifier(roomRT.Dispose)
 		modRT.SetRoomAlertSender(func(ctx context.Context, connID string, message string) error {
 			roomID, ok := roomRT.ConnRoomID(connID)
@@ -213,6 +220,62 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 				return err
 			}
 			frame := codec.EncodeFrame(notificationpacket.ModerationCautionPacketID, body)
+			issuerUserID := 0
+			if session, found := services.registry.FindByConnID(connID); found {
+				issuerUserID = session.UserID
+			}
+			for _, entity := range inst.Entities() {
+				if entity.Type != roomdomain.EntityPlayer || entity.UserID == 0 {
+					continue
+				}
+				if issuerUserID > 0 && entity.UserID == issuerUserID {
+					continue
+				}
+				if err := services.broadcaster.Publish(ctx, sessionnotification.UserChannel(entity.UserID), frame); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		modRT.SetRoomMuteToggler(func(ctx context.Context, roomID int) (bool, error) {
+			inst, ok := services.room.Manager().Get(roomID)
+			if !ok {
+				return false, nil
+			}
+			inst.SetMuted(!inst.Muted())
+			pkt := moderationpacket.RoomMutedPacket{Muted: inst.Muted()}
+			body, err := pkt.Encode()
+			if err != nil {
+				return inst.Muted(), err
+			}
+			frame := codec.EncodeFrame(pkt.PacketID(), body)
+			for _, entity := range inst.Entities() {
+				if entity.Type != roomdomain.EntityPlayer || entity.UserID == 0 {
+					continue
+				}
+				if err := services.broadcaster.Publish(ctx, sessionnotification.UserChannel(entity.UserID), frame); err != nil {
+					return inst.Muted(), err
+				}
+			}
+			return inst.Muted(), nil
+		})
+		modRT.SetRoomSettingsUpdater(func(ctx context.Context, room roomdomain.Room) error {
+			if err := services.room.ModerateSettings(ctx, room); err != nil {
+				return err
+			}
+			inst, ok := services.room.Manager().Get(room.ID)
+			if !ok {
+				return nil
+			}
+			navRoom, err := services.navigator.FindRoomByID(ctx, room.ID)
+			if err != nil {
+				return nil
+			}
+			body, err := navigatorpacket.GuestRoomDataPacket{Room: navRoom, Forward: false}.Encode()
+			if err != nil {
+				return err
+			}
+			frame := codec.EncodeFrame(navigatorpacket.GuestRoomDataPacketID, body)
 			for _, entity := range inst.Entities() {
 				if entity.Type != roomdomain.EntityPlayer || entity.UserID == 0 {
 					continue

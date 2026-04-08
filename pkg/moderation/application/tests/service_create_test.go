@@ -40,3 +40,15 @@ func TestCreateHonorsCancelledKickEvent(t *testing.T) {
 	assert.Error(t, err)
 	assert.Empty(t, repo.actions)
 }
+
+// TestCreateAllowsRoomAlertRegistry verifies room alert warn records can be stored without a target user.
+func TestCreateAllowsRoomAlertRegistry(t *testing.T) {
+	svc, _ := createService(t)
+	action := &domain.Action{Scope: domain.ScopeRoom, ActionType: domain.TypeWarn, RoomID: 9, IssuerID: 4, Reason: "room alert"}
+	require.NoError(t, svc.Create(context.Background(), action))
+	stored, err := svc.List(context.Background(), domain.ListFilter{RoomID: 9, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, stored, 1)
+	assert.Equal(t, 0, stored[0].TargetUserID)
+	assert.Equal(t, 9, stored[0].RoomID)
+}

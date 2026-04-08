@@ -11,7 +11,7 @@ import (
 func TestNewModerationCommand(t *testing.T) {
 	cmd := NewModerationCommand(Dependencies{Output: &bytes.Buffer{}})
 	assert.Equal(t, "moderation", cmd.Use)
-	assert.Len(t, cmd.Commands(), 6)
+	assert.Len(t, cmd.Commands(), 7)
 }
 
 // TestNewModerationCommandSubcommands verifies subcommand names.
@@ -25,4 +25,5 @@ func TestNewModerationCommandSubcommands(t *testing.T) {
 	assert.Contains(t, names, "ban")
 	assert.Contains(t, names, "unban")
 	assert.Contains(t, names, "history")
+	assert.Contains(t, names, "alerts")
 }

@@ -33,6 +33,7 @@ func NewModerationCommand(deps Dependencies) *cobra.Command {
 	cmd.AddCommand(newBanCommand(deps, opts))
 	cmd.AddCommand(newUnbanCommand(deps, opts))
 	cmd.AddCommand(newHistoryCommand(deps, opts))
+	cmd.AddCommand(newAlertsCommand(deps, opts))
 	cmd.AddCommand(newWordFilterCommand(deps, opts))
 	cmd.AddCommand(newPresetCommand(deps, opts))
 	return cmd
