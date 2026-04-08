@@ -2,9 +2,11 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	sdk "github.com/momlesstomato/pixel-sdk"
+	sdkmoderation "github.com/momlesstomato/pixel-sdk/events/moderation"
 	"github.com/momlesstomato/pixel-server/pkg/moderation/domain"
 )
 
@@ -50,12 +52,19 @@ func (s *Service) Create(ctx context.Context, action *domain.Action) error {
 	if action.Scope != domain.ScopeRoom && action.Scope != domain.ScopeHotel {
 		return domain.ErrInvalidScope
 	}
+	if err := s.fireCreateBefore(action); err != nil {
+		return err
+	}
 	action.Active = true
 	if action.DurationMinutes > 0 {
 		exp := time.Now().Add(time.Duration(action.DurationMinutes) * time.Minute)
 		action.ExpiresAt = &exp
 	}
-	return s.repo.Create(ctx, action)
+	if err := s.repo.Create(ctx, action); err != nil {
+		return err
+	}
+	s.fireCreateAfter(action)
+	return nil
 }
 
 // Deactivate marks one action as inactive.
@@ -148,5 +157,52 @@ func (s *Service) AlertAmbassadors(ctx context.Context, message string) {
 func (s *Service) fireSafe(event sdk.Event) {
 	if s.fire != nil {
 		s.fire(event)
+	}
+}
+
+// fireCreateBefore dispatches the cancellable event for one moderation action.
+func (s *Service) fireCreateBefore(action *domain.Action) error {
+	scope := string(action.Scope)
+	switch action.ActionType {
+	case domain.TypeKick:
+		event := &sdkmoderation.UserKicking{TargetID: action.TargetUserID, IssuerID: action.IssuerID, RoomID: action.RoomID, Scope: scope}
+		s.fireSafe(event)
+		if event.Cancelled() {
+			return fmt.Errorf("moderation kick cancelled by plugin")
+		}
+	case domain.TypeMute:
+		event := &sdkmoderation.UserMuting{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Scope: scope, DurationMinutes: action.DurationMinutes, Reason: action.Reason}
+		s.fireSafe(event)
+		if event.Cancelled() {
+			return fmt.Errorf("moderation mute cancelled by plugin")
+		}
+	case domain.TypeBan:
+		event := &sdkmoderation.UserBanning{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Scope: scope, Reason: action.Reason, DurationMinutes: action.DurationMinutes}
+		s.fireSafe(event)
+		if event.Cancelled() {
+			return fmt.Errorf("moderation ban cancelled by plugin")
+		}
+	case domain.TypeWarn:
+		event := &sdkmoderation.UserWarning{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Message: action.Reason}
+		s.fireSafe(event)
+		if event.Cancelled() {
+			return fmt.Errorf("moderation warning cancelled by plugin")
+		}
+	}
+	return nil
+}
+
+// fireCreateAfter dispatches the non-cancellable event for one moderation action.
+func (s *Service) fireCreateAfter(action *domain.Action) {
+	scope := string(action.Scope)
+	switch action.ActionType {
+	case domain.TypeKick:
+		s.fireSafe(&sdkmoderation.UserKicked{TargetID: action.TargetUserID, IssuerID: action.IssuerID, RoomID: action.RoomID, Scope: scope})
+	case domain.TypeMute:
+		s.fireSafe(&sdkmoderation.UserMuted{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Scope: scope, DurationMinutes: action.DurationMinutes, Reason: action.Reason})
+	case domain.TypeBan:
+		s.fireSafe(&sdkmoderation.UserBanned{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Scope: scope, Reason: action.Reason, DurationMinutes: action.DurationMinutes})
+	case domain.TypeWarn:
+		s.fireSafe(&sdkmoderation.UserWarned{TargetID: action.TargetUserID, IssuerID: action.IssuerID, Message: action.Reason})
 	}
 }

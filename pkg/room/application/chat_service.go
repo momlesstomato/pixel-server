@@ -187,7 +187,18 @@ func (s *ChatService) Shout(ctx context.Context, inst *engine.Instance, entity *
 }
 
 // Whisper delivers a private message to the sender and one target entity.
-func (s *ChatService) Whisper(_ context.Context, entity *domain.RoomEntity, roomID int, target *domain.RoomEntity, msg string, bubble int) ([]domain.RoomEntity, error) {
+func (s *ChatService) Whisper(ctx context.Context, entity *domain.RoomEntity, roomID int, target *domain.RoomEntity, msg string, bubble int) ([]domain.RoomEntity, error) {
+	if s.muteChecker != nil {
+		if muted, _ := s.muteChecker.IsHotelMuted(ctx, entity.UserID); muted {
+			return nil, domain.ErrFloodControl
+		}
+	}
+	if s.isMuted(entity.VirtualID) {
+		return nil, domain.ErrFloodControl
+	}
+	if s.wordFilter != nil {
+		msg, _ = s.wordFilter.FilterMessage(ctx, roomID, msg)
+	}
 	if s.fire != nil {
 		ev := &sdkroomchat.ChatSending{RoomID: roomID, UserID: entity.UserID, VirtualID: entity.VirtualID, Message: msg, ChatType: "whisper"}
 		s.fire(ev)
@@ -195,6 +206,7 @@ func (s *ChatService) Whisper(_ context.Context, entity *domain.RoomEntity, room
 			return nil, domain.ErrAccessDenied
 		}
 	}
+	s.recordFlood(entity.VirtualID)
 	recipients := []domain.RoomEntity{*entity, *target}
 	s.persistChat(roomID, entity, msg, "whisper")
 	if s.fire != nil {

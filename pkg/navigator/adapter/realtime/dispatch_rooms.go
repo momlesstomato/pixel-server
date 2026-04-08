@@ -31,8 +31,15 @@ func (runtime *Runtime) handleGetGuestRoom(ctx context.Context, connID string, b
 // handleCreateRoom processes room creation request.
 func (runtime *Runtime) handleCreateRoom(ctx context.Context, connID string, userID int, body []byte) error {
 	name, desc, state, catID, maxUsers, tags := parseCreateRoom(body)
+	ownerName := ""
+	if runtime.usernameResolver != nil {
+		resolvedOwnerName, err := runtime.usernameResolver(ctx, userID)
+		if err == nil {
+			ownerName = resolvedOwnerName
+		}
+	}
 	room, err := runtime.service.CreateRoom(ctx, domain.Room{
-		OwnerID: userID, Name: name, Description: desc, State: state,
+		OwnerID: userID, OwnerName: ownerName, Name: name, Description: desc, State: state,
 		CategoryID: catID, MaxUsers: maxUsers, Tags: tags,
 	})
 	if err != nil {

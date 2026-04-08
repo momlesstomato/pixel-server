@@ -140,6 +140,15 @@ func TestCheckAccess_Locked_DeniedForNonOwner(t *testing.T) {
 	assert.ErrorIs(t, svc.CheckAccess(context.Background(), room, "", 99), domain.ErrAccessDenied)
 }
 
+// TestCheckAccess_Locked_RightsBypass verifies room rights bypass locked-room access.
+func TestCheckAccess_Locked_RightsBypass(t *testing.T) {
+	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcaster)
+	rights := &rightsRepoStub{rights: map[[2]int]bool{{1, 99}: true}}
+	svc, _ := application.NewService(newModelRepo(), &banRepoStub{}, rights, mgr, zap.NewNop())
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessLocked}
+	assert.NoError(t, svc.CheckAccess(context.Background(), room, "", 99))
+}
+
 // TestCheckAccess_Password_Valid verifies valid password admits non-owner entry.
 func TestCheckAccess_Password_Valid(t *testing.T) {
 	svc := newService(t)
@@ -156,6 +165,26 @@ func TestCheckAccess_Password_Invalid(t *testing.T) {
 	require.NoError(t, err)
 	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessPassword, Password: string(hash)}
 	assert.ErrorIs(t, svc.CheckAccess(context.Background(), room, "wrong", 99), domain.ErrInvalidPassword)
+}
+
+// TestCheckAccess_Password_RightsBypass verifies room rights bypass password checks.
+func TestCheckAccess_Password_RightsBypass(t *testing.T) {
+	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcaster)
+	rights := &rightsRepoStub{rights: map[[2]int]bool{{1, 99}: true}}
+	svc, _ := application.NewService(newModelRepo(), &banRepoStub{}, rights, mgr, zap.NewNop())
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.MinCost)
+	require.NoError(t, err)
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessPassword, Password: string(hash)}
+	assert.NoError(t, svc.CheckAccess(context.Background(), room, "", 99))
+}
+
+// TestCheckAccess_Banned verifies room bans deny access before other checks.
+func TestCheckAccess_Banned(t *testing.T) {
+	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcaster)
+	bans := &banRepoStub{banned: map[[2]int]bool{{1, 99}: true}}
+	svc, _ := application.NewService(newModelRepo(), bans, &rightsRepoStub{}, mgr, zap.NewNop())
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessOpen}
+	assert.ErrorIs(t, svc.CheckAccess(context.Background(), room, "", 99), domain.ErrRoomBanned)
 }
 
 // TestFindRoom_NoRepository verifies ErrRoomNotFound when no repository is set.

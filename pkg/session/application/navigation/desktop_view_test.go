@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	packetsnavigation "github.com/momlesstomato/pixel-server/pkg/session/packet/navigation"
 )
 
 // TestNewDesktopViewUseCaseRejectsMissingDependencies verifies constructor validation behavior.
@@ -20,7 +22,7 @@ func TestDesktopViewUseCaseRunSendsDesktopViewWhenInRoom(t *testing.T) {
 	if err := useCase.Run(context.Background(), "conn-1", 7); err != nil {
 		t.Fatalf("expected run success, got %v", err)
 	}
-	if len(transport.sent) != 1 || transport.sent[0] != 3523 {
+	if len(transport.sent) != 1 || transport.sent[0] != packetsnavigation.DesktopViewResponsePacketID {
 		t.Fatalf("unexpected sent packets %v", transport.sent)
 	}
 }

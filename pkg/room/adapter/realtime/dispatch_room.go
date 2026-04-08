@@ -2,34 +2,51 @@ package realtime
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
-	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+	sessionnavigation "github.com/momlesstomato/pixel-server/pkg/session/packet/navigation"
 	notificationpacket "github.com/momlesstomato/pixel-server/pkg/session/packet/notification"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // triggerDoorbell sends a doorbell notification to the room owner and parks the visitor.
-func (rt *Runtime) triggerDoorbell(_ context.Context, connID string, username string, room domain.Room) error {
-	rt.pendingDoorbell[username] = doorbellEntry{connID: connID, roomID: room.ID}
+func (rt *Runtime) triggerDoorbell(ctx context.Context, connID string, userID int, username string, room domain.Room) error {
+	rt.access.mu.Lock()
+	rt.access.pendingDoorbell[username] = doorbellEntry{Username: username, UserID: userID, ConnID: connID, RoomID: room.ID}
+	rt.access.mu.Unlock()
 	inst, ok := rt.service.Manager().Get(room.ID)
 	if !ok {
-		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
+		rt.access.mu.Lock()
+		delete(rt.access.pendingDoorbell, username)
+		rt.access.mu.Unlock()
+		return rt.sendNoRoomPresentFeedback(connID)
 	}
+	notified := false
 	for _, entity := range inst.Entities() {
-		if entity.UserID != room.OwnerID {
+		if entity.Type != domain.EntityPlayer || entity.UserID == 0 {
+			continue
+		}
+		if !rt.canControlDoorbell(ctx, room, entity.UserID) {
 			continue
 		}
 		if err := rt.sendPacket(entity.ConnID, packet.DoorbellComposer{Username: username}); err != nil {
 			rt.logger.Warn("doorbell notify failed", zap.String("conn_id", entity.ConnID), zap.Error(err))
+			continue
 		}
+		notified = true
+	}
+	if notified {
 		return nil
 	}
-	delete(rt.pendingDoorbell, username)
-	return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
+	rt.access.mu.Lock()
+	delete(rt.access.pendingDoorbell, username)
+	rt.access.mu.Unlock()
+	return rt.sendNoRoomPresentFeedback(connID)
 }
 
 // handleLetUserIn processes room owner doorbell approval or denial.
@@ -38,38 +55,46 @@ func (rt *Runtime) handleLetUserIn(ctx context.Context, connID string, userID in
 	if err := pkt.Decode(body); err != nil {
 		return nil
 	}
-	entry, ok := rt.pendingDoorbell[pkt.Username]
+	rt.access.mu.Lock()
+	entry, ok := rt.access.pendingDoorbell[pkt.Username]
+	rt.access.mu.Unlock()
 	if !ok {
 		return nil
 	}
-	delete(rt.pendingDoorbell, pkt.Username)
-	if !pkt.Let {
-		return rt.sendPacket(entry.connID, packet.FlatAccessibleComposer{Username: pkt.Username, Accessible: false})
+	roomID, inRoom := rt.roomIDByConn(connID)
+	if !inRoom || roomID != entry.RoomID {
+		return nil
 	}
-	roomID, ownerRoomID := rt.connRooms[connID]
-	if !ownerRoomID || roomID != entry.roomID {
-		return rt.sendPacket(entry.connID, packet.CantConnectComposer{ErrorCode: 1})
-	}
-	room, err := rt.service.FindRoom(ctx, entry.roomID)
+	room, err := rt.service.FindRoom(ctx, entry.RoomID)
 	if err != nil {
-		return rt.sendPacket(entry.connID, packet.CantConnectComposer{ErrorCode: 1})
+		return rt.sendPacket(entry.ConnID, packet.CantConnectComposer{ErrorCode: 1})
 	}
-	inst, ok := rt.service.Manager().Get(entry.roomID)
+	if !rt.canControlDoorbell(ctx, room, userID) {
+		return nil
+	}
+	rt.access.mu.Lock()
+	delete(rt.access.pendingDoorbell, pkt.Username)
+	rt.access.mu.Unlock()
+	if !pkt.Let {
+		return rt.sendPacket(entry.ConnID, packet.FlatAccessibleComposer{Username: pkt.Username, Accessible: false})
+	}
+	inst, ok := rt.service.Manager().Get(entry.RoomID)
 	if !ok {
-		return rt.sendPacket(entry.connID, packet.CantConnectComposer{ErrorCode: 1})
+		return rt.sendPacket(entry.ConnID, packet.CantConnectComposer{ErrorCode: 1})
 	}
-	if err := rt.sendPacket(entry.connID, packet.FlatAccessibleComposer{Username: pkt.Username, Accessible: true}); err != nil {
+	if err := rt.sendPacket(entry.ConnID, packet.FlatAccessibleComposer{Username: pkt.Username, Accessible: true}); err != nil {
 		return err
 	}
-	if err := rt.sendPacket(entry.connID, packet.OpenConnectionComposer{}); err != nil {
+	if err := rt.sendPacket(entry.ConnID, packet.OpenConnectionComposer{}); err != nil {
 		return err
 	}
-	rt.connRooms[entry.connID] = entry.roomID
-	visitorID, visitorFound := rt.userID(entry.connID)
+	rt.setRoomForConn(entry.ConnID, entry.RoomID)
+	rt.clearPasswordFailures(entry.UserID, entry.RoomID)
+	visitorID, visitorFound := rt.userID(entry.ConnID)
 	if !visitorFound {
 		return nil
 	}
-	if err := rt.sendRoomData(entry.connID, visitorID, inst, room); err != nil {
+	if err := rt.sendRoomData(entry.ConnID, visitorID, inst, room); err != nil {
 		return err
 	}
 	return nil
@@ -97,17 +122,35 @@ func (rt *Runtime) handleSaveRoomSettings(ctx context.Context, connID string, us
 	if err := pkt.Decode(body); err != nil {
 		return nil
 	}
+	room, err := rt.service.FindRoom(ctx, int(pkt.RoomID))
+	if err != nil || room.OwnerID != userID {
+		return nil
+	}
+	passwordHash := ""
+	if packet.IntToAccessState(pkt.State) == domain.AccessPassword {
+		passwordHash = room.Password
+		if pkt.Password != "" {
+			hash, hashErr := bcrypt.GenerateFromPassword([]byte(pkt.Password), bcrypt.MinCost)
+			if hashErr != nil {
+				rt.logger.Warn("hash room password failed", zap.Int("room_id", int(pkt.RoomID)), zap.Error(hashErr))
+				return nil
+			}
+			passwordHash = string(hash)
+		}
+	}
 	updated := domain.Room{
 		Name: pkt.Name, Description: pkt.Description,
 		State:          packet.IntToAccessState(pkt.State),
-		Password:       pkt.Password,
+		Password:       passwordHash,
+		CategoryID:     int(pkt.CategoryID),
 		MaxUsers:       int(pkt.MaxUsers),
+		Tags:           pkt.Tags,
 		AllowPets:      pkt.AllowPets,
 		AllowTrading:   pkt.AllowTrading,
 		TradeMode:      int(pkt.TradeMode),
 		WallThickness:  int(pkt.WallThickness),
 		FloorThickness: int(pkt.FloorThickness),
-		WallHeight:     int(pkt.WallHeight),
+		WallHeight:     room.WallHeight,
 	}
 	if err := rt.service.SaveSettings(ctx, int(pkt.RoomID), userID, updated); err != nil {
 		rt.logger.Warn("save room settings failed", zap.Int("room_id", int(pkt.RoomID)), zap.Error(err))
@@ -129,7 +172,7 @@ func (rt *Runtime) handleGiveRoomScore(ctx context.Context, connID string, userI
 	if err := pkt.Decode(body); err != nil {
 		return nil
 	}
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok || rt.voteRepo == nil {
 		return nil
 	}
@@ -167,7 +210,7 @@ func (rt *Runtime) handleDeleteRoom(ctx context.Context, connID string, userID i
 	if ok {
 		for _, e := range inst.Entities() {
 			if e.Type == domain.EntityPlayer && e.UserID != 0 {
-				_ = rt.sendPacket(e.ConnID, packet.DesktopViewComposer{})
+				rt.publishPacketToUser(context.Background(), e.UserID, sessionnavigation.DesktopViewResponsePacket{})
 			}
 		}
 		rt.service.Manager().Unload(roomID)
@@ -217,18 +260,47 @@ func (rt *Runtime) handleUnbanUser(ctx context.Context, connID string, userID in
 	return nil
 }
 
+// handleUnbanOrPass handles room unban only when the payload clearly targets the current room.
+func (rt *Runtime) handleUnbanOrPass(ctx context.Context, connID string, userID int, body []byte) (bool, error) {
+	var pkt packet.UnbanUserPacket
+	if err := pkt.Decode(body); err != nil {
+		return false, nil
+	}
+	roomID, ok := rt.roomIDByConn(connID)
+	if !ok || roomID != int(pkt.RoomID) {
+		return false, nil
+	}
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil || room.OwnerID != userID {
+		return false, nil
+	}
+	return true, rt.handleUnbanUser(ctx, connID, userID, body)
+}
+
 // handleAssignRights grants room rights to one user.
 func (rt *Runtime) handleAssignRights(ctx context.Context, connID string, userID int, body []byte) error {
 	var pkt packet.AssignRightsPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil
 	}
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil
 	}
 	if err := rt.service.GrantRights(ctx, roomID, userID, int(pkt.UserID)); err != nil {
 		rt.logger.Warn("grant rights failed", zap.Int("room_id", roomID), zap.Error(err))
+		return nil
+	}
+	entry := packet.RightsEntry{UserID: pkt.UserID, Username: rt.resolveUsername(ctx, int(pkt.UserID))}
+	if err := rt.sendPacket(connID, packet.RoomRightsAddedComposer{RoomID: int32(roomID), Entry: entry}); err != nil {
+		return err
+	}
+	if target, found := rt.sessions.FindByUserID(int(pkt.UserID)); found {
+		if targetRoomID, inRoom := rt.roomIDByConn(target.ConnID); inRoom && targetRoomID == roomID {
+			if err := rt.sendPacket(target.ConnID, packet.YouAreControllerComposer{Level: 1}); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -239,41 +311,69 @@ func (rt *Runtime) handleRemoveRights(ctx context.Context, connID string, userID
 	if err := pkt.Decode(body); err != nil {
 		return nil
 	}
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil
 	}
 	if err := rt.service.RevokeRights(ctx, roomID, userID, int(pkt.UserID)); err != nil {
 		rt.logger.Warn("revoke rights failed", zap.Int("room_id", roomID), zap.Error(err))
+		return nil
+	}
+	if err := rt.sendPacket(connID, packet.RoomRightsRemovedComposer{RoomID: int32(roomID), UserID: pkt.UserID}); err != nil {
+		return err
+	}
+	if target, found := rt.sessions.FindByUserID(int(pkt.UserID)); found {
+		if targetRoomID, inRoom := rt.roomIDByConn(target.ConnID); inRoom && targetRoomID == roomID {
+			if err := rt.sendPacket(target.ConnID, packet.YouAreNotControllerComposer{}); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
 // handleRemoveMyRights removes rights for the requesting user.
 func (rt *Runtime) handleRemoveMyRights(ctx context.Context, connID string, userID int) error {
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil
 	}
 	_ = rt.service.RevokeRights(ctx, roomID, userID, userID)
-	return nil
+	return rt.sendPacket(connID, packet.YouAreNotControllerComposer{})
 }
 
 // handleRemoveAllRights removes all rights holders from the current room.
 func (rt *Runtime) handleRemoveAllRights(ctx context.Context, connID string, userID int) error {
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
+		return nil
+	}
+	holders, err := rt.service.ListRights(ctx, roomID, userID)
+	if err != nil {
 		return nil
 	}
 	if err := rt.service.RevokeAllRights(ctx, roomID, userID); err != nil {
 		rt.logger.Warn("revoke all rights failed", zap.Int("room_id", roomID), zap.Error(err))
+		return nil
+	}
+	for _, holderID := range holders {
+		if err := rt.sendPacket(connID, packet.RoomRightsRemovedComposer{RoomID: int32(roomID), UserID: int32(holderID)}); err != nil {
+			return err
+		}
+		if target, found := rt.sessions.FindByUserID(holderID); found {
+			if targetRoomID, inRoom := rt.roomIDByConn(target.ConnID); inRoom && targetRoomID == roomID {
+				if err := rt.sendPacket(target.ConnID, packet.YouAreNotControllerComposer{}); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	return nil
 }
 
 // handleGetRoomRights sends the rights holder list to the owner.
 func (rt *Runtime) handleGetRoomRights(ctx context.Context, connID string, userID int) error {
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil
 	}
@@ -290,7 +390,7 @@ func (rt *Runtime) handleGetRoomRights(ctx context.Context, connID string, userI
 
 // handleToggleMuteTool toggles the room global chat mute state.
 func (rt *Runtime) handleToggleMuteTool(connID string, userID int) error {
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil
 	}
@@ -306,6 +406,48 @@ func (rt *Runtime) handleToggleMuteTool(connID string, userID int) error {
 	return nil
 }
 
+// handleRoomMuteUser applies or clears one room-scoped mute for a target user.
+func (rt *Runtime) handleRoomMuteUser(ctx context.Context, connID string, userID int, body []byte) error {
+	var pkt packet.RoomMuteUserPacket
+	if err := pkt.Decode(body); err != nil {
+		return nil
+	}
+	roomID, ok := rt.roomIDByConn(connID)
+	if !ok {
+		return nil
+	}
+	if pkt.RoomID != 0 && int(pkt.RoomID) != roomID {
+		return nil
+	}
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil {
+		return nil
+	}
+	modMute := false
+	if rt.permissions != nil {
+		modMute, _ = rt.permissions.HasPermission(ctx, userID, "moderation.mute")
+	}
+	if room.OwnerID != userID && !rt.service.HasRights(ctx, roomID, userID) && !modMute {
+		return nil
+	}
+	targetID := int(pkt.UserID)
+	target, found := rt.sessions.FindByUserID(targetID)
+	if !found {
+		return nil
+	}
+	if targetRoomID, inRoom := rt.roomIDByConn(target.ConnID); !inRoom || targetRoomID != roomID {
+		return nil
+	}
+	duration := time.Duration(pkt.Minutes) * time.Minute
+	rt.setRoomUserMute(roomID, targetID, duration)
+	message := "You are muted in this room right now."
+	if pkt.Minutes > 0 {
+		message = fmt.Sprintf("You are muted in this room for %d minute(s).", pkt.Minutes)
+	}
+	rt.publishPacketToUser(ctx, targetID, notificationpacket.GenericAlertPacket{Message: message})
+	return nil
+}
+
 // handleKickUser removes a target user from the room on behalf of the room owner, rights holder, or moderator.
 func (rt *Runtime) handleKickUser(ctx context.Context, connID string, userID int, body []byte) error {
 	r := codec.NewReader(body)
@@ -313,7 +455,7 @@ func (rt *Runtime) handleKickUser(ctx context.Context, connID string, userID int
 	if err != nil {
 		return nil
 	}
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil
 	}
@@ -339,13 +481,8 @@ func (rt *Runtime) handleKickUser(ctx context.Context, connID string, userID int
 
 // sendKickedPacket notifies one user that they have been kicked out of the room.
 func (rt *Runtime) sendKickedPacket(ctx context.Context, userID int) {
-	pkt := notificationpacket.GenericErrorPacket{ErrorCode: 4008}
-	body, err := pkt.Encode()
-	if err != nil {
-		return
-	}
-	frame := codec.EncodeFrame(notificationpacket.GenericErrorPacketID, body)
-	_ = rt.broadcaster.Publish(ctx, sessionnotification.UserChannel(userID), frame)
+	rt.publishPacketToUser(ctx, userID, notificationpacket.GenericErrorPacket{ErrorCode: 4008})
+	rt.publishPacketToUser(ctx, userID, sessionnavigation.DesktopViewResponsePacket{})
 }
 
 // handleBanUser bans a target user from the room on behalf of the owner, rights holder, or moderator.
@@ -354,7 +491,7 @@ func (rt *Runtime) handleBanUser(ctx context.Context, connID string, userID int,
 	if err := pkt.Decode(body); err != nil {
 		return nil
 	}
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil
 	}

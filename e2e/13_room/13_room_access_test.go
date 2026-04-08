@@ -49,16 +49,26 @@ func setupE2EWithRooms(t *testing.T) (*roomapplication.Service, *gorm.DB) {
 		t.Fatalf("create rooms table: %v", err)
 	}
 	modelStore, err := roomstore.NewModelStore(db)
-	if err != nil { t.Fatalf("model store: %v", err) }
+	if err != nil {
+		t.Fatalf("model store: %v", err)
+	}
 	banStore, err := roomstore.NewBanStore(db)
-	if err != nil { t.Fatalf("ban store: %v", err) }
+	if err != nil {
+		t.Fatalf("ban store: %v", err)
+	}
 	rightsStore, err := roomstore.NewRightsStore(db)
-	if err != nil { t.Fatalf("rights store: %v", err) }
+	if err != nil {
+		t.Fatalf("rights store: %v", err)
+	}
 	roomRepo, err := roomstore.NewRoomStore(db)
-	if err != nil { t.Fatalf("room store: %v", err) }
+	if err != nil {
+		t.Fatalf("room store: %v", err)
+	}
 	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcast)
 	svc, err := roomapplication.NewService(modelStore, banStore, rightsStore, mgr, zap.NewNop())
-	if err != nil { t.Fatalf("new service: %v", err) }
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
 	svc.SetRoomRepository(roomRepo)
 	return svc, db
 }
@@ -95,7 +105,9 @@ func Test13RoomAccessLocked_NonOwnerDenied(t *testing.T) {
 func Test13RoomAccessPassword_Valid(t *testing.T) {
 	svc, _ := setupE2EWithRooms(t)
 	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.MinCost)
-	if err != nil { t.Fatalf("hash: %v", err) }
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
 	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessPassword, Password: string(hash)}
 	if err := svc.CheckAccess(context.Background(), room, "secret", 99); err != nil {
 		t.Fatalf("valid password should pass, got: %v", err)
@@ -106,10 +118,36 @@ func Test13RoomAccessPassword_Valid(t *testing.T) {
 func Test13RoomAccessPassword_Invalid(t *testing.T) {
 	svc, _ := setupE2EWithRooms(t)
 	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.MinCost)
-	if err != nil { t.Fatalf("hash: %v", err) }
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
 	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessPassword, Password: string(hash)}
 	if err := svc.CheckAccess(context.Background(), room, "wrong", 99); err != domain.ErrInvalidPassword {
 		t.Fatalf("expected ErrInvalidPassword, got: %v", err)
+	}
+}
+
+// Test13RoomAccessLocked_RightsBypass verifies room rights bypass locked access.
+func Test13RoomAccessLocked_RightsBypass(t *testing.T) {
+	svc, db := setupE2EWithRooms(t)
+	if err := db.Exec(`INSERT INTO room_rights (room_id,user_id) VALUES (1,99)`).Error; err != nil {
+		t.Fatalf("seed room rights: %v", err)
+	}
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessLocked}
+	if err := svc.CheckAccess(context.Background(), room, "", 99); err != nil {
+		t.Fatalf("rights holder should bypass locked room, got: %v", err)
+	}
+}
+
+// Test13RoomAccessBanned verifies active room bans deny access.
+func Test13RoomAccessBanned(t *testing.T) {
+	svc, db := setupE2EWithRooms(t)
+	if err := db.Exec(`INSERT INTO room_bans (room_id,user_id) VALUES (1,99)`).Error; err != nil {
+		t.Fatalf("seed room ban: %v", err)
+	}
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessOpen}
+	if err := svc.CheckAccess(context.Background(), room, "", 99); err != domain.ErrRoomBanned {
+		t.Fatalf("expected ErrRoomBanned, got: %v", err)
 	}
 }
 

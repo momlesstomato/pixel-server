@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	sdk "github.com/momlesstomato/pixel-sdk"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
+	packetbootstrap "github.com/momlesstomato/pixel-server/pkg/handshake/packet/bootstrap"
 	packetdisconnect "github.com/momlesstomato/pixel-server/pkg/handshake/packet/authentication"
 	packetcrypto "github.com/momlesstomato/pixel-server/pkg/handshake/packet/crypto"
 	packetauth "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
@@ -108,6 +109,28 @@ func (handler *Handler) readLoop(ctx context.Context, connection *websocket.Conn
 				}
 			}
 			switch frame.PacketID {
+			case packetbootstrap.ReleaseVersionPacketID:
+				packet := packetbootstrap.ReleaseVersionPacket{}
+				if authenticated || packet.Decode(frame.Body) != nil {
+					errorCode := protocolErrorMalformedPacket
+					if authenticated {
+						errorCode = protocolErrorWrongState
+					}
+					if handler.handleProtocolError(connID, transport, frame.PacketID, errorCode, &errorMeter) {
+						return
+					}
+				}
+			case packetbootstrap.ClientVariablesPacketID:
+				packet := packetbootstrap.ClientVariablesPacket{}
+				if authenticated || packet.Decode(frame.Body) != nil {
+					errorCode := protocolErrorMalformedPacket
+					if authenticated {
+						errorCode = protocolErrorWrongState
+					}
+					if handler.handleProtocolError(connID, transport, frame.PacketID, errorCode, &errorMeter) {
+						return
+					}
+				}
 			case packetauth.ClientMachineIDPacketID:
 				handler.handleMachineID(connID, frame.Body, transport, &machineID)
 			case packetcrypto.ClientInitDiffiePacketID:

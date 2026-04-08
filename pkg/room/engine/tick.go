@@ -68,7 +68,7 @@ func (inst *Instance) processEntityMovement() (doorExits []domain.RoomEntity) {
 					if isLay {
 						entity.Statuses["lay"] = fmt.Sprintf("%.2f", h)
 					} else {
-						entity.Statuses["sit"] = fmt.Sprintf("%.2f", h)
+						entity.Statuses["sit"] = formatSitStatus(h)
 					}
 					entity.IsSitting = true
 					entity.IsSittingAuto = true

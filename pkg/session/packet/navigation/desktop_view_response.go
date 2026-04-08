@@ -1,7 +1,7 @@
 package navigation
 
 // DesktopViewResponsePacketID identifies session.desktop_view S2C packet.
-const DesktopViewResponsePacketID uint16 = 3523
+const DesktopViewResponsePacketID uint16 = 122
 
 // DesktopViewResponsePacket carries room-exit desktop view response payload.
 type DesktopViewResponsePacket struct{}

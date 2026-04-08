@@ -337,6 +337,32 @@ func TestHandleGetClubGiftInfoSendsGiftInfoPacket(t *testing.T) {
 	}
 }
 
+// TestHandleGetClubGiftInfoWithoutSubscriptionSendsZeroState verifies users without HC still receive a valid club gift payload.
+func TestHandleGetClubGiftInfoWithoutSubscriptionSendsZeroState(t *testing.T) {
+	transport := &transportStub{}
+	svc := buildService(repoStub{
+		findErr: domain.ErrSubscriptionNotFound,
+		gifts:   []domain.ClubGift{{ID: 1, Name: "Gray Dining Chair", SpriteID: 26, DaysRequired: 31}},
+	})
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, transport, nil)
+	handled, err := rt.Handle(context.Background(), "conn1", subpacket.GetClubGiftInfoPacketID, nil)
+	if err != nil || !handled {
+		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
+	}
+	if len(transport.sent) != 1 || transport.sent[0] != subpacket.ClubGiftInfoResponsePacketID {
+		t.Fatalf("expected packet %d, got %v", subpacket.ClubGiftInfoResponsePacketID, transport.sent)
+	}
+	r := codec.NewReader(transport.bodies[0])
+	daysUntilNextGift, _ := r.ReadInt32()
+	giftsAvailable, _ := r.ReadInt32()
+	if daysUntilNextGift != 31 {
+		t.Fatalf("expected default next-gift countdown of 31 days, got %d", daysUntilNextGift)
+	}
+	if giftsAvailable != 0 {
+		t.Fatalf("expected zero available gifts, got %d", giftsAvailable)
+	}
+}
+
 // TestHandleGetKickbackInfoSendsPacket verifies 869 returns 3277 with deterministic HC metadata.
 func TestHandleGetKickbackInfoSendsPacket(t *testing.T) {
 	transport := &transportStub{}

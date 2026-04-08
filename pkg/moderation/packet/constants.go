@@ -12,6 +12,12 @@ const ModBanUserPacketID uint16 = 2766
 // ModWarnUserPacketID defines moderator warn/caution (c2s 1840).
 const ModWarnUserPacketID uint16 = 1840
 
+// ModAlertUserPacketID defines moderator alert/message (c2s 229).
+const ModAlertUserPacketID uint16 = 229
+
+// ModRoomAlertPacketID defines moderator current-room alert (c2s 3842).
+const ModRoomAlertPacketID uint16 = 3842
+
 // SanctionTradeLockPacketID defines trade lock sanction (c2s 3742).
 const SanctionTradeLockPacketID uint16 = 3742
 

@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	"github.com/momlesstomato/pixel-server/core/codec"
@@ -49,10 +50,10 @@ type Runtime struct {
 	broadcaster broadcast.Broadcaster
 	// logger stores runtime logging behavior.
 	logger *zap.Logger
-	// connRooms tracks which room each connection is in.
-	connRooms map[string]int
-	// pendingDoorbell tracks visitor connections waiting for doorbell approval.
-	pendingDoorbell map[string]doorbellEntry
+	// state stores mutable room runtime state shared across websocket runtimes.
+	state *sharedRuntimeState
+	// access stores mutable room entry state.
+	access *accessState
 	// usernameResolver resolves display names for user identifiers.
 	usernameResolver UsernameResolver
 	// profileResolver resolves full user profile for entity creation.
@@ -75,10 +76,14 @@ type PermissionChecker interface {
 
 // doorbellEntry tracks a visitor waiting for doorbell approval.
 type doorbellEntry struct {
+	// Username stores the visitor username used by the approval packet.
+	Username string
+	// UserID stores the visitor user identifier.
+	UserID int
 	// connID stores the visitor connection identifier.
-	connID string
+	ConnID string
 	// roomID stores the target room identifier.
-	roomID int
+	RoomID int
 }
 
 // NewRuntime creates one room realtime runtime instance.
@@ -98,12 +103,34 @@ func NewRuntime(service *roomapplication.Service, entitySvc *roomapplication.Ent
 	if logger == nil {
 		logger = zap.NewNop()
 	}
+	sharedState := loadSharedRuntimeState(service.Manager())
 	return &Runtime{
 		service: service, entitySvc: entitySvc, chatSvc: chatSvc,
 		sessions: sessions, transport: transport, broadcaster: broadcaster,
-		logger: logger, connRooms: make(map[string]int),
-		pendingDoorbell: make(map[string]doorbellEntry),
+		logger: logger, state: sharedState, access: sharedState.access,
 	}, nil
+}
+
+// roomIDByConn returns the active room identifier for one connection.
+func (rt *Runtime) roomIDByConn(connID string) (int, bool) {
+	rt.state.mu.RLock()
+	defer rt.state.mu.RUnlock()
+	roomID, ok := rt.state.connRooms[connID]
+	return roomID, ok
+}
+
+// setRoomForConn stores the active room identifier for one connection.
+func (rt *Runtime) setRoomForConn(connID string, roomID int) {
+	rt.state.mu.Lock()
+	rt.state.connRooms[connID] = roomID
+	rt.state.mu.Unlock()
+}
+
+// clearRoomForConn removes room tracking for one connection.
+func (rt *Runtime) clearRoomForConn(connID string) {
+	rt.state.mu.Lock()
+	delete(rt.state.connRooms, connID)
+	rt.state.mu.Unlock()
 }
 
 // userID resolves authenticated user identifier for one connection.
@@ -129,7 +156,7 @@ func (rt *Runtime) sendPacket(connID string, pkt interface {
 
 // findEntityByConnID returns the room instance and entity for a connection.
 func (rt *Runtime) findEntityByConnID(connID string, userID int) (*engine.Instance, *domain.RoomEntity) {
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil, nil
 	}
@@ -138,6 +165,11 @@ func (rt *Runtime) findEntityByConnID(connID string, userID int) (*engine.Instan
 		return nil, nil
 	}
 	entities := inst.Entities()
+	for i := range entities {
+		if entities[i].ConnID == connID {
+			return inst, &entities[i]
+		}
+	}
 	for i := range entities {
 		if entities[i].UserID == userID {
 			return inst, &entities[i]
@@ -149,35 +181,80 @@ func (rt *Runtime) findEntityByConnID(connID string, userID int) (*engine.Instan
 // leaveCurrentRoom removes all entities for connID from its current room and broadcasts each removal.
 // It is safe to call when the connection is not in any room.
 func (rt *Runtime) leaveCurrentRoom(connID string) {
-	userID, ok := rt.userID(connID)
-	if ok {
-		for {
-			inst, entity := rt.findEntityByConnID(connID, userID)
-			if inst == nil || entity == nil {
-				break
-			}
-			reply := make(chan error, 1)
-			if !inst.Send(engine.Message{Type: engine.MsgLeave, Entity: entity, Reply: reply}) {
-				break
-			}
-			<-reply
-			body, encErr := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
-			if encErr == nil {
-				frame := codec.EncodeFrame(packet.UserRemoveComposerID, body)
-				ctx := context.Background()
-				for _, e := range inst.Entities() {
-					if e.Type == domain.EntityPlayer && e.UserID != 0 {
-						_ = rt.broadcaster.Publish(ctx, sessionnotification.UserChannel(e.UserID), frame)
-					}
+	userID, _ := rt.userID(connID)
+	for {
+		inst, entity := rt.findEntityByConnID(connID, userID)
+		if inst == nil || entity == nil {
+			break
+		}
+		reply := make(chan error, 1)
+		if !inst.Send(engine.Message{Type: engine.MsgLeave, Entity: entity, Reply: reply}) {
+			break
+		}
+		leaveErr := <-reply
+		if leaveErr != nil {
+			break
+		}
+		body, encErr := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
+		if encErr == nil {
+			frame := codec.EncodeFrame(packet.UserRemoveComposerID, body)
+			ctx := context.Background()
+			for _, e := range inst.Entities() {
+				if e.Type == domain.EntityPlayer && e.UserID != 0 {
+					_ = rt.broadcaster.Publish(ctx, sessionnotification.UserChannel(e.UserID), frame)
 				}
 			}
 		}
 	}
-	delete(rt.connRooms, connID)
+	rt.clearRoomForConn(connID)
+}
+
+// isRoomUserMuted reports whether a room-scoped user mute is still active.
+func (rt *Runtime) isRoomUserMuted(roomID int, userID int) bool {
+	rt.state.mu.Lock()
+	defer rt.state.mu.Unlock()
+	users, ok := rt.state.roomUserMutes[roomID]
+	if !ok {
+		return false
+	}
+	expiresAt, ok := users[userID]
+	if !ok {
+		return false
+	}
+	if time.Now().After(expiresAt) {
+		delete(users, userID)
+		if len(users) == 0 {
+			delete(rt.state.roomUserMutes, roomID)
+		}
+		return false
+	}
+	return true
+}
+
+// setRoomUserMute updates the room-scoped mute expiry for one user.
+func (rt *Runtime) setRoomUserMute(roomID int, userID int, duration time.Duration) {
+	rt.state.mu.Lock()
+	defer rt.state.mu.Unlock()
+	if duration <= 0 {
+		if users, ok := rt.state.roomUserMutes[roomID]; ok {
+			delete(users, userID)
+			if len(users) == 0 {
+				delete(rt.state.roomUserMutes, roomID)
+			}
+		}
+		return
+	}
+	users, ok := rt.state.roomUserMutes[roomID]
+	if !ok {
+		users = make(map[int]time.Time)
+		rt.state.roomUserMutes[roomID] = users
+	}
+	users[userID] = time.Now().Add(duration)
 }
 
 // Dispose releases per-connection resources and removes the entity from its room.
 func (rt *Runtime) Dispose(connID string) {
+	rt.cleanupDoorbellForConn(connID)
 	rt.leaveCurrentRoom(connID)
 }
 

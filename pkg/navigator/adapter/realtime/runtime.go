@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"context"
 	"fmt"
 
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
@@ -14,6 +15,9 @@ type Transport interface {
 	// Send writes one encoded packet payload to one connection identifier.
 	Send(string, uint16, []byte) error
 }
+
+// UsernameResolver resolves a username for one authenticated user identifier.
+type UsernameResolver func(ctx context.Context, userID int) (string, error)
 
 // Runtime defines navigator realm websocket packet behavior.
 type Runtime struct {
@@ -29,6 +33,8 @@ type Runtime struct {
 	liveRoomCount func(roomID int) int
 	// permissions stores optional permission resolution behavior.
 	permissions navdomain.PermissionChecker
+	// usernameResolver resolves room owner usernames for navigator room creation.
+	usernameResolver UsernameResolver
 }
 
 // NewRuntime creates one navigator realtime runtime instance.
@@ -68,6 +74,11 @@ func (runtime *Runtime) SetLiveRoomCountProvider(fn func(roomID int) int) {
 // SetPermissionChecker configures optional permission resolution behavior.
 func (runtime *Runtime) SetPermissionChecker(checker navdomain.PermissionChecker) {
 	runtime.permissions = checker
+}
+
+// SetUsernameResolver configures optional username resolution for created rooms.
+func (runtime *Runtime) SetUsernameResolver(resolver UsernameResolver) {
+	runtime.usernameResolver = resolver
 }
 
 // sendPacket encodes and transmits one outgoing packet.

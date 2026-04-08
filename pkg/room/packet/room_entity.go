@@ -2,6 +2,7 @@ package packet
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
@@ -100,11 +101,52 @@ func (p UserUpdateComposer) Encode() ([]byte, error) {
 
 // encodeStatuses formats entity status map to protocol string.
 func encodeStatuses(e domain.RoomEntity) string {
+	keys := orderedStatusKeys(e.Statuses)
 	result := "/"
-	for k, v := range e.Statuses {
+	for _, k := range keys {
+		v := e.Statuses[k]
 		result += k + " " + v + "/"
 	}
 	return result
+}
+
+func orderedStatusKeys(statuses map[string]string) []string {
+	keys := make([]string, 0, len(statuses))
+	for key := range statuses {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		left := statusOrder(keys[i])
+		right := statusOrder(keys[j])
+		if left != right {
+			return left < right
+		}
+		return keys[i] < keys[j]
+	})
+	return keys
+}
+
+func statusOrder(key string) int {
+	switch key {
+	case "flatctrl":
+		return 10
+	case "sign":
+		return 20
+	case "gst":
+		return 30
+	case "trd":
+		return 40
+	case "dance":
+		return 50
+	case "mv":
+		return 90
+	case "sit":
+		return 100
+	case "lay":
+		return 110
+	default:
+		return 60
+	}
 }
 
 // UserRemoveComposer notifies entity removal (s2c 3839).

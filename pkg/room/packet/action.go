@@ -239,3 +239,37 @@ func (p ToggleMuteToolPacket) PacketID() uint16 { return ToggleMuteToolPacketID 
 
 // Decode parses packet body.
 func (p *ToggleMuteToolPacket) Decode(_ []byte) error { return nil }
+
+// RoomMuteUserPacket decodes client room.mute_user request (c2s 3485).
+type RoomMuteUserPacket struct {
+	// UserID stores the muted target user identifier.
+	UserID int32
+	// RoomID stores the current room identifier sent by Nitro.
+	RoomID int32
+	// Minutes stores the mute duration in minutes.
+	Minutes int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomMuteUserPacket) PacketID() uint16 { return RoomMuteUserPacketID }
+
+// Decode parses packet body.
+func (p *RoomMuteUserPacket) Decode(body []byte) error {
+	r := codec.NewReader(body)
+	userID, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	roomID, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	minutes, err := r.ReadInt32()
+	if err != nil {
+		return err
+	}
+	p.UserID = userID
+	p.RoomID = roomID
+	p.Minutes = minutes
+	return nil
+}

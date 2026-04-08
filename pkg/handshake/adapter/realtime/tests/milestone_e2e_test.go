@@ -16,6 +16,7 @@ import (
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	"github.com/momlesstomato/pixel-server/pkg/handshake/application/authflow"
+	packetbootstrap "github.com/momlesstomato/pixel-server/pkg/handshake/packet/bootstrap"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	packetsession "github.com/momlesstomato/pixel-server/pkg/handshake/packet/session"
 	packettelemetry "github.com/momlesstomato/pixel-server/pkg/handshake/packet/telemetry"
@@ -51,6 +52,8 @@ func TestMilestone6FullHandshakeFlow(t *testing.T) {
 	defer cleanup()
 	connection, closeConnection := startWebSocket(t, handler.Handle)
 	defer closeConnection()
+	sendPacket(t, connection, packetbootstrap.ReleaseVersionPacket{ReleaseVersion: "PRODUCTION-202401", ClientType: "HTML5", Platform: 1, DeviceCategory: 1})
+	sendPacket(t, connection, packetbootstrap.ClientVariablesPacket{ClientID: 1, ClientURL: "https://example.test", ExternalVariablesURL: "https://example.test/gamedata"})
 	sendPacket(t, connection, packetsecurity.ClientMachineIDPacket{MachineID: "~bad", Fingerprint: "x", Capabilities: "y"})
 	if frame := readFrame(t, connection); frame.PacketID != packetsecurity.ServerMachineIDPacketID {
 		t.Fatalf("expected machine id response, got %d", frame.PacketID)

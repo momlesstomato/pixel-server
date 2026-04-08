@@ -7,6 +7,7 @@ import (
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
 	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+	notificationpacket "github.com/momlesstomato/pixel-server/pkg/session/packet/notification"
 	"go.uber.org/zap"
 )
 
@@ -18,6 +19,11 @@ func (rt *Runtime) handleChat(ctx context.Context, connID string, userID int, bo
 	}
 	room, err := rt.service.FindRoom(ctx, inst.RoomID)
 	if err == nil && inst.Muted() && room.OwnerID != userID {
+		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "This room is muted right now."})
+		return nil
+	}
+	if rt.isRoomUserMuted(inst.RoomID, userID) {
+		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "You are muted in this room right now."})
 		return nil
 	}
 	var pkt packet.ChatPacket
@@ -29,6 +35,7 @@ func (rt *Runtime) handleChat(ctx context.Context, connID string, userID int, bo
 	}
 	recipients, err := rt.chatSvc.Talk(ctx, inst, entity, inst.RoomID, pkt.Message, int(pkt.BubbleStyle))
 	if err != nil {
+		rt.sendChatRejectionFeedback(connID, err)
 		rt.logger.Debug("talk rejected", zap.String("conn_id", connID), zap.Error(err))
 		return nil
 	}
@@ -45,6 +52,11 @@ func (rt *Runtime) handleShout(ctx context.Context, connID string, userID int, b
 	}
 	room, err := rt.service.FindRoom(ctx, inst.RoomID)
 	if err == nil && inst.Muted() && room.OwnerID != userID {
+		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "This room is muted right now."})
+		return nil
+	}
+	if rt.isRoomUserMuted(inst.RoomID, userID) {
+		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "You are muted in this room right now."})
 		return nil
 	}
 	var pkt packet.ShoutPacket
@@ -56,6 +68,7 @@ func (rt *Runtime) handleShout(ctx context.Context, connID string, userID int, b
 	}
 	recipients, err := rt.chatSvc.Shout(ctx, inst, entity, inst.RoomID, pkt.Message, int(pkt.BubbleStyle))
 	if err != nil {
+		rt.sendChatRejectionFeedback(connID, err)
 		rt.logger.Debug("shout rejected", zap.String("conn_id", connID), zap.Error(err))
 		return nil
 	}
@@ -68,6 +81,15 @@ func (rt *Runtime) handleShout(ctx context.Context, connID string, userID int, b
 func (rt *Runtime) handleWhisper(ctx context.Context, connID string, userID int, body []byte) error {
 	inst, entity := rt.findEntityByConnID(connID, userID)
 	if inst == nil {
+		return nil
+	}
+	room, err := rt.service.FindRoom(ctx, inst.RoomID)
+	if err == nil && inst.Muted() && room.OwnerID != userID {
+		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "This room is muted right now."})
+		return nil
+	}
+	if rt.isRoomUserMuted(inst.RoomID, userID) {
+		_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "You are muted in this room right now."})
 		return nil
 	}
 	var pkt packet.WhisperPacket
@@ -90,6 +112,7 @@ func (rt *Runtime) handleWhisper(ctx context.Context, connID string, userID int,
 	}
 	recipients, err := rt.chatSvc.Whisper(ctx, entity, inst.RoomID, target, pkt.Message, int(pkt.BubbleStyle))
 	if err != nil {
+		rt.sendChatRejectionFeedback(connID, err)
 		rt.logger.Debug("whisper rejected", zap.String("conn_id", connID), zap.Error(err))
 		return nil
 	}
@@ -118,4 +141,12 @@ func (rt *Runtime) sendToRecipients(recipients []domain.RoomEntity, pkt interfac
 			rt.logger.Warn("publish to recipient failed", zap.Int("user_id", recipients[i].UserID), zap.Error(err))
 		}
 	}
+}
+
+// sendChatRejectionFeedback makes server-side chat blocks visible to the sender.
+func (rt *Runtime) sendChatRejectionFeedback(connID string, err error) {
+	if err != domain.ErrFloodControl {
+		return
+	}
+	_ = rt.sendPacket(connID, notificationpacket.GenericAlertPacket{Message: "You are muted and cannot talk right now."})
 }

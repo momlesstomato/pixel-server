@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
 	"github.com/stretchr/testify/assert"
@@ -38,6 +39,37 @@ func TestUserUpdateComposer_Encode(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, body)
 	assert.Equal(t, packet.UserUpdateComposerID, pkt.PacketID())
+}
+
+// TestUserUpdateComposer_EncodesDeterministicStatusOrder verifies posture status ordering is stable and Nitro-compatible.
+func TestUserUpdateComposer_EncodesDeterministicStatusOrder(t *testing.T) {
+	entity := domain.NewPlayerEntity(1, 10, "c1", "Bob", "", "", "M",
+		domain.Tile{X: 0, Y: 0, Z: 0})
+	entity.Statuses["sit"] = "1.10 1"
+	entity.Statuses["sign"] = "5"
+	entity.Statuses["dance"] = "2"
+	pkt := packet.UserUpdateComposer{Entities: []domain.RoomEntity{entity}}
+	body, err := pkt.Encode()
+	require.NoError(t, err)
+	r := codec.NewReader(body)
+	count, err := r.ReadInt32()
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), count)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	_, err = r.ReadString()
+	require.NoError(t, err)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	status, err := r.ReadString()
+	require.NoError(t, err)
+	assert.Equal(t, "/sign 5/dance 2/sit 1.10 1/", status)
 }
 
 // TestUserRemoveComposer_Encode verifies entity removal packet.

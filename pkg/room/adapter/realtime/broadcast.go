@@ -7,6 +7,7 @@ import (
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 	"github.com/momlesstomato/pixel-server/pkg/room/packet"
 	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+	sessionnavigation "github.com/momlesstomato/pixel-server/pkg/session/packet/navigation"
 	"go.uber.org/zap"
 )
 
@@ -90,8 +91,7 @@ func (rt *Runtime) RotateSittingEntitiesInRoom(roomID, x, y, dir int) {
 
 // ConnRoomID returns the room identifier for a given connection, if present.
 func (rt *Runtime) ConnRoomID(connID string) (int, bool) {
-	id, ok := rt.connRooms[connID]
-	return id, ok
+	return rt.roomIDByConn(connID)
 }
 
 // OnKick broadcasts entity removal for one auto-kicked entity and removes connection tracking.
@@ -102,7 +102,7 @@ func (rt *Runtime) OnKick(roomID int, entity domain.RoomEntity) {
 		return
 	}
 	rt.publishToRoomEntities(roomID, codec.EncodeFrame(packet.UserRemoveComposerID, body))
-	delete(rt.connRooms, entity.ConnID)
+	rt.clearRoomForConn(entity.ConnID)
 }
 
 // OnDoorExit broadcasts entity removal when an entity walks out through the door tile,
@@ -115,10 +115,7 @@ func (rt *Runtime) OnDoorExit(roomID int, entity domain.RoomEntity) {
 	}
 	rt.publishToRoomEntities(roomID, codec.EncodeFrame(packet.UserRemoveComposerID, body))
 	if entity.UserID > 0 {
-		dvBody, dvErr := packet.DesktopViewComposer{}.Encode()
-		if dvErr == nil {
-			_ = rt.broadcaster.Publish(context.Background(), sessionnotification.UserChannel(entity.UserID), codec.EncodeFrame(packet.DesktopViewComposerID, dvBody))
-		}
+		rt.publishPacketToUser(context.Background(), entity.UserID, sessionnavigation.DesktopViewResponsePacket{})
 	}
-	delete(rt.connRooms, entity.ConnID)
+	rt.clearRoomForConn(entity.ConnID)
 }

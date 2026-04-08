@@ -26,6 +26,9 @@ func TestModMuteUserPacketDecode(t *testing.T) {
 	w.WriteInt32(10)
 	_ = w.WriteString("spamming")
 	w.WriteInt32(60)
+	_ = w.WriteString("preset")
+	_ = w.WriteString("note")
+	w.WriteInt32(7)
 	var pkt ModMuteUserPacket
 	err := pkt.Decode(w.Bytes())
 	require.NoError(t, err)
@@ -39,17 +42,37 @@ func TestModBanUserPacketDecode(t *testing.T) {
 	w := codec.NewWriter()
 	w.WriteInt32(99)
 	_ = w.WriteString("cheating")
-	w.WriteInt32(2)
-	_ = w.WriteString("topic")
 	w.WriteInt32(24)
+	_ = w.WriteString("topic")
+	w.WriteBool(true)
+	w.WriteBool(false)
 	var pkt ModBanUserPacket
 	err := pkt.Decode(w.Bytes())
 	require.NoError(t, err)
 	assert.Equal(t, int32(99), pkt.UserID)
 	assert.Equal(t, "cheating", pkt.Message)
-	assert.Equal(t, int32(2), pkt.BanType)
+	assert.Equal(t, int32(1), pkt.BanType)
 	assert.Equal(t, "topic", pkt.CfhTopic)
 	assert.Equal(t, int32(24), pkt.Duration)
+}
+
+// TestModBanUserPacketDecodeNitro verifies Nitro ban packet decoding.
+func TestModBanUserPacketDecodeNitro(t *testing.T) {
+	w := codec.NewWriter()
+	w.WriteInt32(99)
+	_ = w.WriteString("cheating")
+	w.WriteInt32(24)
+	w.WriteInt32(2)
+	w.WriteBool(true)
+	w.WriteInt32(77)
+	var pkt ModBanUserPacket
+	err := pkt.Decode(w.Bytes())
+	require.NoError(t, err)
+	assert.Equal(t, int32(99), pkt.UserID)
+	assert.Equal(t, "cheating", pkt.Message)
+	assert.Equal(t, int32(24), pkt.Duration)
+	assert.Equal(t, int32(2), pkt.BanType)
+	assert.Empty(t, pkt.CfhTopic)
 }
 
 // TestModWarnUserPacketDecode verifies warn packet decode round-trip.
@@ -77,6 +100,35 @@ func TestPacketConstants(t *testing.T) {
 	assert.Equal(t, uint16(1945), ModMuteUserPacketID)
 	assert.Equal(t, uint16(2766), ModBanUserPacketID)
 	assert.Equal(t, uint16(1840), ModWarnUserPacketID)
+	assert.Equal(t, uint16(229), ModAlertUserPacketID)
+	assert.Equal(t, uint16(3842), ModRoomAlertPacketID)
+}
+
+// TestModAlertUserPacketDecode verifies moderator direct alert decoding.
+func TestModAlertUserPacketDecode(t *testing.T) {
+	w := codec.NewWriter()
+	w.WriteInt32(11)
+	_ = w.WriteString("listen")
+	w.WriteInt32(4)
+	var pkt ModAlertUserPacket
+	err := pkt.Decode(w.Bytes())
+	require.NoError(t, err)
+	assert.Equal(t, int32(11), pkt.UserID)
+	assert.Equal(t, "listen", pkt.Message)
+}
+
+// TestModRoomAlertPacketDecode verifies moderator room alert decoding.
+func TestModRoomAlertPacketDecode(t *testing.T) {
+	w := codec.NewWriter()
+	w.WriteInt32(3)
+	_ = w.WriteString("room alert")
+	_ = w.WriteString("detail")
+	var pkt ModRoomAlertPacket
+	err := pkt.Decode(w.Bytes())
+	require.NoError(t, err)
+	assert.Equal(t, int32(3), pkt.ActionType)
+	assert.Equal(t, "room alert", pkt.Message)
+	assert.Equal(t, "detail", pkt.Detail)
 }
 
 // TestModeratorInitPacketEncodeEmpty verifies the empty moderator init packet wire format.

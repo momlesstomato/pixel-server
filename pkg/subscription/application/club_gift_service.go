@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -16,10 +17,18 @@ func (service *Service) GetClubGiftInfo(ctx context.Context, userID int) (domain
 		return domain.ClubGiftInfo{}, fmt.Errorf("user id must be positive")
 	}
 	status, err := service.GetPaydayStatus(ctx, userID)
-	if err != nil {
-		return domain.ClubGiftInfo{}, err
+	gifts, giftErr := service.repository.ListClubGifts(ctx)
+	if giftErr != nil {
+		return domain.ClubGiftInfo{}, giftErr
 	}
-	gifts, err := service.repository.ListClubGifts(ctx)
+	if errors.Is(err, domain.ErrSubscriptionNotFound) {
+		return domain.ClubGiftInfo{
+			DaysUntilNextGift: daysUntilNextGift(0, 0),
+			GiftsAvailable:    0,
+			ActiveDays:        0,
+			Gifts:             gifts,
+		}, nil
+	}
 	if err != nil {
 		return domain.ClubGiftInfo{}, err
 	}

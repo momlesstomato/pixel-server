@@ -206,12 +206,6 @@ func (runtime *Runtime) isTileOccupied(roomID, x, y int) bool {
 
 // canManageItem reports whether the actor may manage one furniture item in the target room.
 func (runtime *Runtime) canManageItem(ctx context.Context, roomID, userID, itemID int) bool {
-	item, err := runtime.service.FindItemByID(ctx, itemID)
-	if err == nil && item.UserID == userID {
-		if item.RoomID == 0 || item.RoomID == roomID {
-			return true
-		}
-	}
 	return runtime.canModifyRoom(ctx, roomID, userID)
 }
 

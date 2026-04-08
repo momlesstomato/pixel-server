@@ -174,8 +174,23 @@ const GetRoomRightsPacketID uint16 = 3937
 // ToggleMuteToolPacketID defines client room.toggle_mute_tool (c2s 1301).
 const ToggleMuteToolPacketID uint16 = 1301
 
-// YouAreControllerComposerID defines server room.you_are_controller (s2c 680).
-const YouAreControllerComposerID uint16 = 680
+// RoomMuteUserPacketID defines client room.mute_user (c2s 3485).
+const RoomMuteUserPacketID uint16 = 3485
 
-// RoomRightsListComposerID defines server room.rights_list (s2c 225).
-const RoomRightsListComposerID uint16 = 225
+// YouAreControllerComposerID defines server room.you_are_controller (s2c 780).
+const YouAreControllerComposerID uint16 = 780
+
+// YouAreNotControllerComposerID defines server room.you_are_not_controller (s2c 2392).
+const YouAreNotControllerComposerID uint16 = 2392
+
+// YouAreOwnerComposerID defines server room.you_are_owner (s2c 339).
+const YouAreOwnerComposerID uint16 = 339
+
+// RoomRightsListComposerID defines server room.rights_list (s2c 1284).
+const RoomRightsListComposerID uint16 = 1284
+
+// RoomRightsAddedComposerID defines server room.rights_added (s2c 2088).
+const RoomRightsAddedComposerID uint16 = 2088
+
+// RoomRightsRemovedComposerID defines server room.rights_removed (s2c 1327).
+const RoomRightsRemovedComposerID uint16 = 1327

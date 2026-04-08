@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	corehttp "github.com/momlesstomato/pixel-server/core/http"
 	httpopenapi "github.com/momlesstomato/pixel-server/core/http/openapi"
 	"github.com/momlesstomato/pixel-server/core/initializer"
@@ -27,6 +28,8 @@ import (
 	roomhttpapi "github.com/momlesstomato/pixel-server/pkg/room/adapter/httpapi"
 	roomrealtime "github.com/momlesstomato/pixel-server/pkg/room/adapter/realtime"
 	roomdomain "github.com/momlesstomato/pixel-server/pkg/room/domain"
+	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
+	notificationpacket "github.com/momlesstomato/pixel-server/pkg/session/packet/notification"
 	subscriptionhttpapi "github.com/momlesstomato/pixel-server/pkg/subscription/adapter/httpapi"
 	userhttpapi "github.com/momlesstomato/pixel-server/pkg/user/adapter/httpapi"
 	userrealtime "github.com/momlesstomato/pixel-server/pkg/user/adapter/realtime"
@@ -111,7 +114,13 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			}
 			return count
 		}
-		furnitureRT, ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, services.broadcaster, runtime.Logger, liveRoomCount)
+		furnitureRT, ecoRTs, err := buildEconomyRuntimes(services.economyBundle, services.registry, transport, services.broadcaster, runtime.Logger, liveRoomCount, func(ctx context.Context, userID int) (string, error) {
+			user, err := services.users.FindByID(ctx, userID)
+			if err != nil {
+				return "", err
+			}
+			return user.Username, nil
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -188,6 +197,32 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		modRT.SetPresetService(services.presetService)
 		modRT.SetVisitService(services.visitService)
 		modRT.SetPermissionChecker(&permissionCheckerAdapter{svc: services.permissions})
+		modRT.SetRoomLeaveNotifier(roomRT.Dispose)
+		modRT.SetRoomAlertSender(func(ctx context.Context, connID string, message string) error {
+			roomID, ok := roomRT.ConnRoomID(connID)
+			if !ok {
+				return nil
+			}
+			inst, ok := services.room.Manager().Get(roomID)
+			if !ok {
+				return nil
+			}
+			pkt := notificationpacket.ModerationCautionPacket{Message: message, Detail: ""}
+			body, err := pkt.Encode()
+			if err != nil {
+				return err
+			}
+			frame := codec.EncodeFrame(notificationpacket.ModerationCautionPacketID, body)
+			for _, entity := range inst.Entities() {
+				if entity.Type != roomdomain.EntityPlayer || entity.UserID == 0 {
+					continue
+				}
+				if err := services.broadcaster.Publish(ctx, sessionnotification.UserChannel(entity.UserID), frame); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 		roomRT.SetVisitRecorder(&visitRecorderAdapter{svc: services.visitService})
 		roomRT.SetPermissionChecker(&permissionCheckerAdapter{svc: services.permissions})
 		runtimes = append(runtimes, modRT)

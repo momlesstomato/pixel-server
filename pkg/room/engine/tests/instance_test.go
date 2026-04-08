@@ -404,3 +404,53 @@ func TestWalkToSecondBedSlotAllowed(t *testing.T) {
 	assert.True(t, secondState.IsSitting)
 	assert.Equal(t, "0.75", secondState.Statuses["lay"])
 }
+
+// TestAutoSitOnArrivalIncludesStandUpFlag verifies chair sits use Nitro's stand-up flag parameter.
+func TestAutoSitOnArrivalIncludesStandUpFlag(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.SetTileSeatChecker(func(_ int, x, y int) (float64, int, bool, bool) {
+		if x == 2 && y == 2 {
+			return 1.1, 2, true, false
+		}
+		return 0, 0, false, false
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, "1.10 1", e.Statuses["sit"])
+	_, hasLay := e.Statuses["lay"]
+	assert.False(t, hasLay)
+}
+
+// TestHandleSitUsesCanonicalFloorSitHeight verifies generic sit uses the canonical Nitro-compatible floor height.
+func TestHandleSitUsesCanonicalFloorSitHeight(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	sitReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgSit, Entity: entity, Reply: sitReply})
+	require.NoError(t, <-sitReply)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, "0.50 1", e.Statuses["sit"])
+	assert.True(t, e.IsSitting)
+}

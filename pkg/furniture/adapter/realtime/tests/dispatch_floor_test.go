@@ -142,8 +142,8 @@ func TestHandleFloorUpdateAllowsRoomAuthorisedUser(t *testing.T) {
 	}
 }
 
-// TestHandleFloorUpdateAllowsItemOwnerWithoutRoomRights verifies item owners can still move their own furniture in-room.
-func TestHandleFloorUpdateAllowsItemOwnerWithoutRoomRights(t *testing.T) {
+// TestHandleFloorUpdateRejectsItemOwnerWithoutRoomRights verifies item ownership alone no longer allows moving placed furniture.
+func TestHandleFloorUpdateRejectsItemOwnerWithoutRoomRights(t *testing.T) {
 	item := furnituredomain.Item{ID: 10, UserID: 1, RoomID: 5, DefinitionID: 3}
 	def := furnituredomain.Definition{ID: 3, SpriteID: 100}
 	repo := foundRepoStub{item: item, def: def}
@@ -154,13 +154,13 @@ func TestHandleFloorUpdateAllowsItemOwnerWithoutRoomRights(t *testing.T) {
 	if err != nil || !handled {
 		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
 	}
-	if len(*broadcast) != 1 || (*broadcast)[0] != furnipacket.FloorItemUpdatePacketID {
-		t.Fatalf("expected floor update broadcast %d, got %v", furnipacket.FloorItemUpdatePacketID, *broadcast)
+	if len(*broadcast) != 0 {
+		t.Fatalf("expected no floor update broadcast, got %v", *broadcast)
 	}
 }
 
-// TestHandlePickupAllowsItemOwnerWithoutRoomRights verifies item owners can pick up their own furniture without room rights.
-func TestHandlePickupAllowsItemOwnerWithoutRoomRights(t *testing.T) {
+// TestHandlePickupRejectsItemOwnerWithoutRoomRights verifies item ownership alone no longer allows pickup.
+func TestHandlePickupRejectsItemOwnerWithoutRoomRights(t *testing.T) {
 	item := furnituredomain.Item{ID: 10, UserID: 1, RoomID: 5, DefinitionID: 3}
 	def := furnituredomain.Definition{ID: 3, SpriteID: 100, AllowRecycle: true, AllowTrade: true}
 	repo := foundRepoStub{item: item, def: def}
@@ -174,19 +174,19 @@ func TestHandlePickupAllowsItemOwnerWithoutRoomRights(t *testing.T) {
 	if err != nil || !handled {
 		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
 	}
-	if len(*broadcast) != 1 || (*broadcast)[0] != furnipacket.FloorItemRemovePacketID {
-		t.Fatalf("expected floor remove broadcast %d, got %v", furnipacket.FloorItemRemovePacketID, *broadcast)
+	if len(*broadcast) != 0 {
+		t.Fatalf("expected no floor remove broadcast, got %v", *broadcast)
 	}
 	if len(tp.sent) != 0 {
 		t.Fatalf("expected no direct transport packets, got %v", tp.sent)
 	}
-	if len(userBroadcast.sent["broadcast:user:1"]) != 1 || userBroadcast.sent["broadcast:user:1"][0] != furnipacket.InventoryAddPacketID {
-		t.Fatalf("expected owner inventory add packet %d, got %v", furnipacket.InventoryAddPacketID, userBroadcast.sent)
+	if len(userBroadcast.sent) != 0 {
+		t.Fatalf("expected no inventory packets, got %v", userBroadcast.sent)
 	}
 }
 
-// TestHandlePlaceAllowsItemOwnerWithoutRoomRights verifies item owners can place inventory furniture without room rights.
-func TestHandlePlaceAllowsItemOwnerWithoutRoomRights(t *testing.T) {
+// TestHandlePlaceRejectsItemOwnerWithoutRoomRights verifies inventory ownership alone no longer allows placement.
+func TestHandlePlaceRejectsItemOwnerWithoutRoomRights(t *testing.T) {
 	item := furnituredomain.Item{ID: 10, UserID: 1, RoomID: 0, DefinitionID: 3}
 	def := furnituredomain.Definition{ID: 3, SpriteID: 100}
 	repo := foundRepoStub{item: item, def: def}
@@ -207,14 +207,14 @@ func TestHandlePlaceAllowsItemOwnerWithoutRoomRights(t *testing.T) {
 	if err != nil || !handled {
 		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
 	}
-	if len(broadcast) != 1 || broadcast[0] != furnipacket.FloorItemAddPacketID {
-		t.Fatalf("expected floor add broadcast %d, got %v", furnipacket.FloorItemAddPacketID, broadcast)
+	if len(broadcast) != 0 {
+		t.Fatalf("expected no floor add broadcast, got %v", broadcast)
 	}
 	if len(tp.sent) != 0 {
 		t.Fatalf("expected no direct transport packets, got %v", tp.sent)
 	}
-	if len(userBroadcast.sent["broadcast:user:1"]) != 1 || userBroadcast.sent["broadcast:user:1"][0] != furnipacket.InventoryRemovePacketID {
-		t.Fatalf("expected owner inventory remove packet %d, got %v", furnipacket.InventoryRemovePacketID, userBroadcast.sent)
+	if len(userBroadcast.sent) != 0 {
+		t.Fatalf("expected no inventory packets, got %v", userBroadcast.sent)
 	}
 }
 

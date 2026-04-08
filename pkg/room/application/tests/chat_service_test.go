@@ -14,6 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
+type muteCheckerStub struct{ muted bool }
+
+func (stub muteCheckerStub) IsHotelMuted(context.Context, int) (bool, error) { return stub.muted, nil }
+
 func newChatService(t *testing.T) *application.ChatService {
 	t.Helper()
 	svc, err := application.NewChatService(zap.NewNop())
@@ -137,4 +141,15 @@ func TestChatService_Whisper_Cancelled(t *testing.T) {
 	})
 	_, err := svc.Whisper(context.Background(), sender, 2, target, "blocked", 0)
 	assert.Equal(t, domain.ErrAccessDenied, err)
+}
+
+// TestChatService_Whisper_HotelMute verifies whisper respects hotel mute state.
+func TestChatService_Whisper_HotelMute(t *testing.T) {
+	svc := newChatService(t)
+	svc.SetMuteChecker(muteCheckerStub{muted: true})
+	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcaster)
+	defer mgr.StopAll()
+	_, sender, target := newInstanceWithTwoEntities(t, mgr)
+	_, err := svc.Whisper(context.Background(), sender, 2, target, "secret", 0)
+	assert.Equal(t, domain.ErrFloodControl, err)
 }

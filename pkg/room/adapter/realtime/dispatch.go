@@ -62,7 +62,7 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 	case packet.GetBannedUsersPacketID:
 		return true, rt.handleGetBannedUsers(ctx, connID, userID, body)
 	case packet.UnbanUserPacketID:
-		return true, rt.handleUnbanUser(ctx, connID, userID, body)
+		return rt.handleUnbanOrPass(ctx, connID, userID, body)
 	case packet.AssignRightsPacketID:
 		return true, rt.handleAssignRights(ctx, connID, userID, body)
 	case packet.RemoveRightsPacketID:
@@ -75,6 +75,8 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 		return true, rt.handleGetRoomRights(ctx, connID, userID)
 	case packet.ToggleMuteToolPacketID:
 		return true, rt.handleToggleMuteTool(connID, userID)
+	case packet.RoomMuteUserPacketID:
+		return true, rt.handleRoomMuteUser(ctx, connID, userID, body)
 	case packet.DesktopViewPacketID, packet.CloseConnectionPacketID:
 		return true, rt.handleLeaveRoom(connID)
 	default:
@@ -89,9 +91,6 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 		return nil
 	}
 	roomID := int(pkt.RoomID)
-	if rt.service.CheckBan(ctx, roomID, userID) {
-		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 4})
-	}
 	room, err := rt.service.FindRoom(ctx, roomID)
 	if err != nil {
 		rt.logger.Warn("room lookup failed", zap.Int("room_id", roomID), zap.Error(err))
@@ -100,13 +99,33 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 	if room.ForwardRoomID > 0 {
 		return rt.sendPacket(connID, packet.RoomForwardComposer{RoomID: int32(room.ForwardRoomID)})
 	}
+	canBypass := rt.canBypassRoomAccess(ctx, userID, room)
+	if room.State == domain.AccessPassword && !canBypass {
+		if retryAfter, active := rt.currentCooldown(userID, roomID); active {
+			return rt.sendPasswordCooldownFeedback(connID, retryAfter)
+		}
+	}
 	if accessErr := rt.service.CheckAccess(ctx, room, pkt.Password, userID); accessErr != nil {
+		if accessErr == domain.ErrRoomBanned {
+			return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 4})
+		}
 		if accessErr == domain.ErrInvalidPassword {
-			return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 6})
+			if canBypass {
+				goto allowEntry
+			}
+			if retryAfter, cooldown := rt.recordPasswordFailure(userID, roomID); cooldown {
+				return rt.sendPasswordCooldownFeedback(connID, retryAfter)
+			}
+			return rt.sendWrongPasswordFeedback(connID)
+		}
+		if accessErr == domain.ErrAccessDenied && canBypass {
+			goto allowEntry
 		}
 		username := rt.resolveUsername(ctx, userID)
-		return rt.triggerDoorbell(ctx, connID, username, room)
+		return rt.triggerDoorbell(ctx, connID, userID, username, room)
 	}
+allowEntry:
+	rt.clearPasswordFailures(userID, roomID)
 	inst, err := rt.service.LoadRoom(ctx, room)
 	if err != nil {
 		rt.logger.Warn("room load failed", zap.Int("room_id", roomID), zap.Error(err))
@@ -116,7 +135,7 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 		return err
 	}
 	rt.leaveCurrentRoom(connID)
-	rt.connRooms[connID] = roomID
+	rt.setRoomForConn(connID, roomID)
 	if rt.visitRecorder != nil {
 		_ = rt.visitRecorder.RecordVisit(ctx, userID, roomID)
 	}
@@ -125,7 +144,7 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 
 // handleGetEntryData sends room geometry and entity data.
 func (rt *Runtime) handleGetEntryData(ctx context.Context, connID string, userID int) error {
-	roomID, ok := rt.connRooms[connID]
+	roomID, ok := rt.roomIDByConn(connID)
 	if !ok {
 		return nil
 	}
@@ -181,14 +200,8 @@ func (rt *Runtime) sendRoomData(connID string, userID int, inst *engine.Instance
 	}); err != nil {
 		return err
 	}
-	if room.OwnerID == userID {
-		if err := rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 4}); err != nil {
-			return err
-		}
-	} else if rt.service.HasRights(context.Background(), room.ID, userID) {
-		if err := rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 1}); err != nil {
-			return err
-		}
+	if err := rt.sendRoomPermissions(connID, userID, room); err != nil {
+		return err
 	}
 	if err := rt.sendPacket(connID, packet.RoomVisualizationComposer{
 		WallThickness: int32(room.WallThickness), FloorThickness: int32(room.FloorThickness),
@@ -212,6 +225,20 @@ func (rt *Runtime) sendRoomData(connID string, userID int, inst *engine.Instance
 		return rt.floorItemSender(context.Background(), connID, inst.RoomID)
 	}
 	return nil
+}
+
+// sendRoomPermissions transmits the recipient owner or controller state for the active room.
+func (rt *Runtime) sendRoomPermissions(connID string, userID int, room domain.Room) error {
+	if room.OwnerID == userID {
+		if err := rt.sendPacket(connID, packet.YouAreOwnerComposer{}); err != nil {
+			return err
+		}
+		return rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 4})
+	}
+	if rt.service.HasRights(context.Background(), room.ID, userID) {
+		return rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 1})
+	}
+	return rt.sendPacket(connID, packet.YouAreNotControllerComposer{})
 }
 
 // sendEntryEntities transmits entity list and enters the user.

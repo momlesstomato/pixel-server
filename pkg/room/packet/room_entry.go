@@ -2,7 +2,7 @@ package packet
 
 import "github.com/momlesstomato/pixel-server/core/codec"
 
-// OpenFlatConnectionPacket decodes room entry request (c2s 189).
+// OpenFlatConnectionPacket decodes room entry request (c2s 2312).
 type OpenFlatConnectionPacket struct {
 	// RoomID stores the requested room identifier.
 	RoomID int32
@@ -40,7 +40,7 @@ func (p OpenFlatConnectionPacket) Encode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// OpenConnectionComposer acknowledges room connection (s2c 3566).
+// OpenConnectionComposer acknowledges room connection (s2c 758).
 type OpenConnectionComposer struct{}
 
 // PacketID returns the protocol packet identifier.
@@ -106,6 +106,22 @@ func (p FlatAccessibleComposer) Encode() ([]byte, error) {
 		return nil, err
 	}
 	w.WriteBool(p.Accessible)
+	return w.Bytes(), nil
+}
+
+// FloodControlComposer informs a client that room entry is temporarily rate limited (s2c 566).
+type FloodControlComposer struct {
+	// Seconds stores the remaining cooldown duration in seconds.
+	Seconds int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p FloodControlComposer) PacketID() uint16 { return FloodControlComposerID }
+
+// Encode serializes the flood-control payload.
+func (p FloodControlComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.Seconds)
 	return w.Bytes(), nil
 }
 
@@ -220,7 +236,7 @@ func (p RoomScoreComposer) Encode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// YouAreControllerComposer informs a user of their room rights level (s2c 680).
+// YouAreControllerComposer informs a user of their room rights level (s2c 780).
 type YouAreControllerComposer struct {
 	// Level stores the rights level (0 = none, 1 = rights holder).
 	Level int32
@@ -236,6 +252,24 @@ func (p YouAreControllerComposer) Encode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
+// YouAreNotControllerComposer clears the recipient room rights state (s2c 2392).
+type YouAreNotControllerComposer struct{}
+
+// PacketID returns the protocol packet identifier.
+func (p YouAreNotControllerComposer) PacketID() uint16 { return YouAreNotControllerComposerID }
+
+// Encode serializes the empty rights-clear response.
+func (p YouAreNotControllerComposer) Encode() ([]byte, error) { return []byte{}, nil }
+
+// YouAreOwnerComposer marks the recipient as the room owner (s2c 339).
+type YouAreOwnerComposer struct{}
+
+// PacketID returns the protocol packet identifier.
+func (p YouAreOwnerComposer) PacketID() uint16 { return YouAreOwnerComposerID }
+
+// Encode serializes the empty owner response.
+func (p YouAreOwnerComposer) Encode() ([]byte, error) { return []byte{}, nil }
+
 // RightsEntry defines one rights holder entry for the rights list composer.
 type RightsEntry struct {
 	// UserID stores the rights holder identifier.
@@ -244,7 +278,7 @@ type RightsEntry struct {
 	Username string
 }
 
-// RoomRightsListComposer sends all room rights holders to the owner (s2c 225).
+// RoomRightsListComposer sends all room rights holders to the owner (s2c 1284).
 type RoomRightsListComposer struct {
 	// RoomID stores the room identifier.
 	RoomID int32
@@ -266,5 +300,46 @@ func (p RoomRightsListComposer) Encode() ([]byte, error) {
 			return nil, err
 		}
 	}
+	return w.Bytes(), nil
+}
+
+// RoomRightsAddedComposer sends one incremental rights addition (s2c 2088).
+type RoomRightsAddedComposer struct {
+	// RoomID stores the room identifier.
+	RoomID int32
+	// Entry stores the rights holder that was added.
+	Entry RightsEntry
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomRightsAddedComposer) PacketID() uint16 { return RoomRightsAddedComposerID }
+
+// Encode serializes the incremental rights-add response.
+func (p RoomRightsAddedComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.RoomID)
+	w.WriteInt32(p.Entry.UserID)
+	if err := w.WriteString(p.Entry.Username); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+// RoomRightsRemovedComposer sends one incremental rights removal (s2c 1327).
+type RoomRightsRemovedComposer struct {
+	// RoomID stores the room identifier.
+	RoomID int32
+	// UserID stores the rights holder that was removed.
+	UserID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomRightsRemovedComposer) PacketID() uint16 { return RoomRightsRemovedComposerID }
+
+// Encode serializes the incremental rights-remove response.
+func (p RoomRightsRemovedComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.RoomID)
+	w.WriteInt32(p.UserID)
 	return w.Bytes(), nil
 }

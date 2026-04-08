@@ -114,7 +114,7 @@ func buildEconomyServices(runtime *initializer.Runtime) (*economyServiceBundle, 
 }
 
 // buildEconomyRuntimes creates economy-realm realtime runtimes for packet dispatch.
-func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.SessionRegistry, transport *handshakerealtime.Transport, broadcaster broadcast.Broadcaster, logger *zap.Logger, liveRoomCount func(int) int) (*furniturerealtime.Runtime, []handshakerealtime.UserRuntime, error) {
+func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.SessionRegistry, transport *handshakerealtime.Transport, broadcaster broadcast.Broadcaster, logger *zap.Logger, liveRoomCount func(int) int, usernameResolver navigatorrealtime.UsernameResolver) (*furniturerealtime.Runtime, []handshakerealtime.UserRuntime, error) {
 	frt, err := furniturerealtime.NewRuntime(bundle.furniture, sessions, transport, logger)
 	if err != nil {
 		return nil, nil, err
@@ -187,6 +187,9 @@ func buildEconomyRuntimes(bundle *economyServiceBundle, sessions coreconnection.
 		return nil, nil, err
 	}
 	nrt.SetLiveRoomCountProvider(liveRoomCount)
+	if usernameResolver != nil {
+		nrt.SetUsernameResolver(usernameResolver)
+	}
 	crt.SetClubOffersSender(func(ctx context.Context, connID string, _ int) error {
 		return srt.SendClubOffers(ctx, connID)
 	})

@@ -45,6 +45,10 @@ type Runtime struct {
 	visits *moderationapplication.VisitService
 	// permissions stores optional permission check behavior.
 	permissions PermissionChecker
+	// roomLeaveNotifier removes a target connection from its room before disconnect.
+	roomLeaveNotifier RoomLeaveNotifier
+	// roomAlertSender broadcasts room alerts from the moderation tool.
+	roomAlertSender RoomAlertSender
 }
 
 // PermissionChecker defines permission resolution behavior.
@@ -52,6 +56,12 @@ type PermissionChecker interface {
 	// HasPermission checks if a user holds a specific permission scope.
 	HasPermission(ctx context.Context, userID int, scope string) (bool, error)
 }
+
+// RoomLeaveNotifier removes a connection from its active room immediately.
+type RoomLeaveNotifier func(connID string)
+
+// RoomAlertSender broadcasts a moderation alert to users in the issuer's current room.
+type RoomAlertSender func(ctx context.Context, connID string, message string) error
 
 // NewRuntime creates one moderation realtime runtime instance.
 func NewRuntime(svc *moderationapplication.Service, sessions coreconnection.SessionRegistry, transport Transport, broadcaster broadcast.Broadcaster, closer SessionCloser, logger *zap.Logger) (*Runtime, error) {
@@ -106,6 +116,16 @@ func (rt *Runtime) SetVisitService(svc *moderationapplication.VisitService) {
 // SetPermissionChecker configures optional permission checking.
 func (rt *Runtime) SetPermissionChecker(checker PermissionChecker) {
 	rt.permissions = checker
+}
+
+// SetRoomLeaveNotifier configures the callback used to remove users from rooms before closing sessions.
+func (rt *Runtime) SetRoomLeaveNotifier(notifier RoomLeaveNotifier) {
+	rt.roomLeaveNotifier = notifier
+}
+
+// SetRoomAlertSender configures the callback used to broadcast current-room alerts.
+func (rt *Runtime) SetRoomAlertSender(sender RoomAlertSender) {
+	rt.roomAlertSender = sender
 }
 
 // RecordVisit logs a room visit for moderation tracking.

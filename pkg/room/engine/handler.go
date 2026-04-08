@@ -254,7 +254,7 @@ func (inst *Instance) handleSit(msg Message) error {
 					entity.Statuses["lay"] = fmt.Sprintf("%.2f", height)
 					canLay = true
 				} else if canSit {
-					entity.Statuses["sit"] = fmt.Sprintf("%.2f", height)
+					entity.Statuses["sit"] = formatSitStatus(height)
 				}
 			}
 		}
@@ -262,7 +262,7 @@ func (inst *Instance) handleSit(msg Message) error {
 			entity.BodyRotation--
 		}
 		if len(entity.Statuses) == 0 || (!canLay && entity.Statuses["sit"] == "") {
-			entity.Statuses["sit"] = "1.0"
+			entity.Statuses["sit"] = formatSitStatus(0.5)
 			entity.Position.Z -= 0.35
 		}
 		entity.IsSitting = true
@@ -281,6 +281,10 @@ func (inst *Instance) handleSit(msg Message) error {
 	resetEntityIdle(entity)
 	entity.UpdateNeeded = true
 	return nil
+}
+
+func formatSitStatus(height float64) string {
+	return fmt.Sprintf("%.2f 1", height)
 }
 
 // resetEntityIdle clears idle and sleep state for an entity that performed an action.

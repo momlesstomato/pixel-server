@@ -1,8 +1,6 @@
 package packet
 
 import (
-	"strings"
-
 	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/room/domain"
 )
@@ -161,7 +159,7 @@ func (p RoomSettingsSavedComposer) Encode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// RoomSettingsComposer sends full room settings to the owner (s2c 3075).
+// RoomSettingsComposer sends full room settings to the owner (s2c 1498).
 type RoomSettingsComposer struct {
 	// Room stores the room aggregate to serialize.
 	Room domain.Room
@@ -173,6 +171,10 @@ func (p RoomSettingsComposer) PacketID() uint16 { return RoomSettingsComposerID 
 // Encode serializes the room settings payload.
 func (p RoomSettingsComposer) Encode() ([]byte, error) {
 	w := codec.NewWriter()
+	maxVisitorsLimit := p.Room.MaxUsers
+	if maxVisitorsLimit < 25 {
+		maxVisitorsLimit = 25
+	}
 	w.WriteInt32(int32(p.Room.ID))
 	if err := w.WriteString(p.Room.Name); err != nil {
 		return nil, err
@@ -181,20 +183,31 @@ func (p RoomSettingsComposer) Encode() ([]byte, error) {
 		return nil, err
 	}
 	w.WriteInt32(accessStateToInt(p.Room.State))
-	if err := w.WriteString(p.Room.Password); err != nil {
-		return nil, err
-	}
-	w.WriteInt32(int32(p.Room.MaxUsers))
 	w.WriteInt32(int32(p.Room.CategoryID))
-	if err := w.WriteString(strings.Join(p.Room.Tags, ",")); err != nil {
-		return nil, err
+	w.WriteInt32(int32(p.Room.MaxUsers))
+	w.WriteInt32(int32(maxVisitorsLimit))
+	w.WriteInt32(int32(len(p.Room.Tags)))
+	for _, tag := range p.Room.Tags {
+		if err := w.WriteString(tag); err != nil {
+			return nil, err
+		}
 	}
 	w.WriteInt32(int32(p.Room.TradeMode))
-	w.WriteBool(p.Room.AllowPets)
-	w.WriteBool(p.Room.AllowTrading)
+	writeIntBool(w, p.Room.AllowPets)
+	writeIntBool(w, false)
+	writeIntBool(w, false)
+	writeIntBool(w, false)
 	w.WriteInt32(int32(p.Room.WallThickness))
 	w.WriteInt32(int32(p.Room.FloorThickness))
-	w.WriteInt32(int32(p.Room.WallHeight))
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteBool(false)
+	w.WriteInt32(1)
+	w.WriteInt32(1)
+	w.WriteInt32(1)
 	return w.Bytes(), nil
 }
 
@@ -212,18 +225,42 @@ type SaveRoomSettingsPacket struct {
 	Password string
 	// MaxUsers stores the new capacity limit.
 	MaxUsers int32
+	// CategoryID stores the target navigator category identifier.
+	CategoryID int32
+	// Tags stores the room tags sent by the client.
+	Tags []string
 	// AllowPets stores the new pet permission flag.
 	AllowPets bool
+	// AllowFoodConsume stores the new pet-food permission flag.
+	AllowFoodConsume bool
+	// AllowWalkThrough stores the new walkthrough permission flag.
+	AllowWalkThrough bool
+	// HideWalls stores the new hide-walls flag.
+	HideWalls bool
 	// AllowTrading stores the new trading permission flag.
 	AllowTrading bool
 	// TradeMode stores the new trade policy code.
 	TradeMode int32
+	// MuteMode stores the new room mute moderation mode.
+	MuteMode int32
+	// KickMode stores the new room kick moderation mode.
+	KickMode int32
+	// BanMode stores the new room ban moderation mode.
+	BanMode int32
+	// ChatMode stores the new room chat mode.
+	ChatMode int32
+	// ChatWeight stores the new room chat bubble width mode.
+	ChatWeight int32
+	// ChatSpeed stores the new room chat scroll speed mode.
+	ChatSpeed int32
+	// ChatDistance stores the new room chat hearing distance.
+	ChatDistance int32
+	// ChatProtection stores the new room flood protection mode.
+	ChatProtection int32
 	// WallThickness stores new wall thickness value.
 	WallThickness int32
 	// FloorThickness stores new floor thickness value.
 	FloorThickness int32
-	// WallHeight stores new wall height value.
-	WallHeight int32
 }
 
 // PacketID returns the protocol packet identifier.
@@ -252,13 +289,43 @@ func (p *SaveRoomSettingsPacket) Decode(body []byte) error {
 	if p.MaxUsers, err = r.ReadInt32(); err != nil {
 		p.MaxUsers = 25
 	}
-	p.AllowPets, _ = r.ReadBool()
-	p.AllowTrading, _ = r.ReadBool()
+	p.CategoryID, _ = r.ReadInt32()
+	tagCount, _ := r.ReadInt32()
+	if tagCount > 0 {
+		p.Tags = make([]string, 0, tagCount)
+		for index := int32(0); index < tagCount; index++ {
+			tag, readErr := r.ReadString()
+			if readErr != nil {
+				break
+			}
+			p.Tags = append(p.Tags, tag)
+		}
+	}
 	p.TradeMode, _ = r.ReadInt32()
+	p.AllowPets, _ = r.ReadBool()
+	p.AllowFoodConsume, _ = r.ReadBool()
+	p.AllowWalkThrough, _ = r.ReadBool()
+	p.HideWalls, _ = r.ReadBool()
 	p.WallThickness, _ = r.ReadInt32()
 	p.FloorThickness, _ = r.ReadInt32()
-	p.WallHeight, _ = r.ReadInt32()
+	p.MuteMode, _ = r.ReadInt32()
+	p.KickMode, _ = r.ReadInt32()
+	p.BanMode, _ = r.ReadInt32()
+	p.ChatMode, _ = r.ReadInt32()
+	p.ChatWeight, _ = r.ReadInt32()
+	p.ChatSpeed, _ = r.ReadInt32()
+	p.ChatDistance, _ = r.ReadInt32()
+	p.ChatProtection, _ = r.ReadInt32()
 	return nil
+}
+
+// writeIntBool serializes a boolean using Nitro's integer-flag room settings format.
+func writeIntBool(w *codec.Writer, value bool) {
+	if value {
+		w.WriteInt32(1)
+		return
+	}
+	w.WriteInt32(0)
 }
 
 // accessStateToInt converts AccessState to protocol integer representation.
