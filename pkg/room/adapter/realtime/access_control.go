@@ -55,17 +55,10 @@ func roomAccessKey(userID int, roomID int) string {
 	return fmt.Sprintf("%d:%d", userID, roomID)
 }
 
-// canBypassRoomAccess reports whether one user may bypass room entry restrictions.
-func (rt *Runtime) canBypassRoomAccess(ctx context.Context, userID int, room domain.Room) bool {
+// hasAnyRoomPermission reports whether one user holds any provided room scope.
+func (rt *Runtime) hasAnyRoomPermission(ctx context.Context, userID int, scopes ...string) bool {
 	if rt.permissions == nil {
 		return false
-	}
-	scopes := []string{roomMasterPermission, roomAccessPermission, roomEnterPermission}
-	switch room.State {
-	case domain.AccessLocked:
-		scopes = append(scopes, "room.enter.locked")
-	case domain.AccessPassword:
-		scopes = append(scopes, "room.enter.password")
 	}
 	for _, scope := range scopes {
 		granted, err := rt.permissions.HasPermission(ctx, userID, scope)
@@ -74,6 +67,26 @@ func (rt *Runtime) canBypassRoomAccess(ctx context.Context, userID int, room dom
 		}
 	}
 	return false
+}
+
+// canManageRoom reports whether one user may manage room settings without being the owner.
+func (rt *Runtime) canManageRoom(ctx context.Context, userID int, room domain.Room) bool {
+	if room.OwnerID == userID {
+		return true
+	}
+	return rt.hasAnyRoomPermission(ctx, userID, roomMasterPermission)
+}
+
+// canBypassRoomAccess reports whether one user may bypass room entry restrictions.
+func (rt *Runtime) canBypassRoomAccess(ctx context.Context, userID int, room domain.Room) bool {
+	scopes := []string{roomMasterPermission, roomAccessPermission, roomEnterPermission}
+	switch room.State {
+	case domain.AccessLocked:
+		scopes = append(scopes, "room.enter.locked")
+	case domain.AccessPassword:
+		scopes = append(scopes, "room.enter.password")
+	}
+	return rt.hasAnyRoomPermission(ctx, userID, scopes...)
 }
 
 // canControlDoorbell reports whether one user may approve or deny doorbell access.

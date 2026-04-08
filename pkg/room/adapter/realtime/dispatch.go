@@ -235,6 +235,9 @@ func (rt *Runtime) sendRoomPermissions(connID string, userID int, room domain.Ro
 		}
 		return rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 4})
 	}
+	if rt.hasAnyRoomPermission(context.Background(), userID, roomMasterPermission) {
+		return rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 5})
+	}
 	if rt.service.HasRights(context.Background(), room.ID, userID) {
 		return rt.sendPacket(connID, packet.YouAreControllerComposer{Level: 1})
 	}

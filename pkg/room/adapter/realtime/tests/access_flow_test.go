@@ -334,6 +334,38 @@ func TestHandleOpenFlat_PermissionControllerReceivesDoorbell(t *testing.T) {
 	assert.True(t, doorbellNotified)
 }
 
+// TestHandleGetRoomEntryData_RoomMasterReceivesModeratorController verifies room-master permission yields moderator controller level in-room.
+func TestHandleGetRoomEntryData_RoomMasterReceivesModeratorController(t *testing.T) {
+	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessOpen, ModelSlug: "model_a"}
+	rt, transport := newAccessRuntime(t, map[int]domain.Room{1: room}, map[string]coreconnection.Session{
+		"staff": {ConnID: "staff", UserID: 50},
+	}, map[int]string{50: "staff"}, map[int]map[string]bool{
+		50: {"pixels.room.master": true},
+	}, nil)
+	body, err := packet.OpenFlatConnectionPacket{RoomID: 1}.Encode()
+	require.NoError(t, err)
+	_, err = rt.Handle(context.Background(), "staff", packet.OpenFlatConnectionPacketID, body)
+	require.NoError(t, err)
+	_, err = rt.Handle(context.Background(), "staff", packet.GetRoomEntryDataPacketID, nil)
+	require.NoError(t, err)
+	controllerLevel := int32(-1)
+	for _, sent := range transport.sent {
+		if sent.connID != "staff" || sent.packetID != packet.YouAreControllerComposerID {
+			continue
+		}
+		reader := codec.NewReader(sent.body)
+		controllerLevel, err = reader.ReadInt32()
+		require.NoError(t, err)
+	}
+	assert.Equal(t, int32(5), controllerLevel)
+	for _, sent := range transport.sent {
+		if sent.connID == "staff" {
+			assert.NotEqual(t, packet.YouAreNotControllerComposerID, sent.packetID)
+			assert.NotEqual(t, packet.YouAreOwnerComposerID, sent.packetID)
+		}
+	}
+}
+
 // TestHandleKickUserBroadcastsRemoval verifies room kicks remove the target entity immediately for other room users.
 func TestHandleKickUserBroadcastsRemoval(t *testing.T) {
 	room := domain.Room{ID: 1, OwnerID: 10, State: domain.AccessOpen, ModelSlug: "model_a"}
@@ -417,6 +449,23 @@ func TestHandleGetRoomSettings_OwnerReceivesSettings(t *testing.T) {
 	assert.Equal(t, packet.RoomSettingsComposerID, transport.sent[len(transport.sent)-1].packetID)
 }
 
+// TestHandleGetRoomSettings_RoomMasterReceivesSettings verifies room-master permission bypasses ownership for room settings reads.
+func TestHandleGetRoomSettings_RoomMasterReceivesSettings(t *testing.T) {
+	room := domain.Room{ID: 1, OwnerID: 10, Name: "Blue Room", Description: "Desc", State: domain.AccessLocked, ModelSlug: "model_a", MaxUsers: 10, CategoryID: 2, Tags: []string{"fun"}}
+	rt, transport := newAccessRuntime(t, map[int]domain.Room{1: room}, map[string]coreconnection.Session{
+		"staff": {ConnID: "staff", UserID: 50},
+	}, map[int]string{50: "staff"}, map[int]map[string]bool{
+		50: {"pixels.room.master": true},
+	}, nil)
+	w := codec.NewWriter()
+	w.WriteInt32(1)
+	handled, err := rt.Handle(context.Background(), "staff", packet.GetRoomSettingsPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	require.NotEmpty(t, transport.sent)
+	assert.Equal(t, packet.RoomSettingsComposerID, transport.sent[len(transport.sent)-1].packetID)
+}
+
 // TestHandleSaveRoomSettings_OwnerCanUpdateNameAndDoorbell verifies owner saves persist name and locked-door state.
 func TestHandleSaveRoomSettings_OwnerCanUpdateNameAndDoorbell(t *testing.T) {
 	rooms := map[int]domain.Room{1: {ID: 1, OwnerID: 1, Name: "Blue Room", Description: "Desc", State: domain.AccessOpen, ModelSlug: "model_a", MaxUsers: 10}}
@@ -448,6 +497,47 @@ func TestHandleSaveRoomSettings_OwnerCanUpdateNameAndDoorbell(t *testing.T) {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	handled, err := rt.Handle(context.Background(), "owner", packet.SaveRoomSettingsPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Equal(t, "New Name", rooms[1].Name)
+	assert.Equal(t, domain.AccessLocked, rooms[1].State)
+	require.NotEmpty(t, transport.sent)
+	assert.Equal(t, packet.RoomSettingsSavedComposerID, transport.sent[len(transport.sent)-1].packetID)
+}
+
+// TestHandleSaveRoomSettings_RoomMasterCanUpdateNameAndDoorbell verifies room-master permission bypasses ownership for room settings writes.
+func TestHandleSaveRoomSettings_RoomMasterCanUpdateNameAndDoorbell(t *testing.T) {
+	rooms := map[int]domain.Room{1: {ID: 1, OwnerID: 10, Name: "Blue Room", Description: "Desc", State: domain.AccessOpen, ModelSlug: "model_a", MaxUsers: 10}}
+	rt, transport := newAccessRuntime(t, rooms, map[string]coreconnection.Session{
+		"staff": {ConnID: "staff", UserID: 50},
+	}, map[int]string{50: "staff"}, map[int]map[string]bool{
+		50: {"pixels.room.master": true},
+	}, nil)
+	w := codec.NewWriter()
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString("New Name"))
+	require.NoError(t, w.WriteString("Updated"))
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString(""))
+	w.WriteInt32(25)
+	w.WriteInt32(0)
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString("tag"))
+	w.WriteInt32(0)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	handled, err := rt.Handle(context.Background(), "staff", packet.SaveRoomSettingsPacketID, w.Bytes())
 	require.NoError(t, err)
 	assert.True(t, handled)
 	assert.Equal(t, "New Name", rooms[1].Name)

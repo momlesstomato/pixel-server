@@ -283,7 +283,7 @@ func (rt *Runtime) SetVisitRecorder(recorder VisitRecorder) {
 	rt.visitRecorder = recorder
 }
 
-// SetPermissionChecker configures optional moderator permission checks for room actions.
+// SetPermissionChecker configures optional dotted permission checks for room actions.
 func (rt *Runtime) SetPermissionChecker(checker PermissionChecker) {
 	rt.permissions = checker
 }

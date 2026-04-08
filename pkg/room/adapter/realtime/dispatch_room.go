@@ -100,7 +100,7 @@ func (rt *Runtime) handleLetUserIn(ctx context.Context, connID string, userID in
 	return nil
 }
 
-// handleGetRoomSettings sends room settings to the requesting owner.
+// handleGetRoomSettings sends room settings to the owner or a room-master override.
 func (rt *Runtime) handleGetRoomSettings(ctx context.Context, connID string, userID int, body []byte) error {
 	var pkt packet.GetRoomSettingsPacket
 	if err := pkt.Decode(body); err != nil {
@@ -110,20 +110,23 @@ func (rt *Runtime) handleGetRoomSettings(ctx context.Context, connID string, use
 	if err != nil {
 		return nil
 	}
-	if room.OwnerID != userID {
+	if !rt.canManageRoom(ctx, userID, room) {
 		return nil
 	}
 	return rt.sendPacket(connID, packet.RoomSettingsComposer{Room: room})
 }
 
-// handleSaveRoomSettings persists updated room settings from the owner.
+// handleSaveRoomSettings persists updated room settings from the owner or a room-master override.
 func (rt *Runtime) handleSaveRoomSettings(ctx context.Context, connID string, userID int, body []byte) error {
 	var pkt packet.SaveRoomSettingsPacket
 	if err := pkt.Decode(body); err != nil {
 		return nil
 	}
 	room, err := rt.service.FindRoom(ctx, int(pkt.RoomID))
-	if err != nil || room.OwnerID != userID {
+	if err != nil {
+		return nil
+	}
+	if !rt.canManageRoom(ctx, userID, room) {
 		return nil
 	}
 	passwordHash := ""
@@ -152,8 +155,15 @@ func (rt *Runtime) handleSaveRoomSettings(ctx context.Context, connID string, us
 		FloorThickness: int(pkt.FloorThickness),
 		WallHeight:     room.WallHeight,
 	}
-	if err := rt.service.SaveSettings(ctx, int(pkt.RoomID), userID, updated); err != nil {
-		rt.logger.Warn("save room settings failed", zap.Int("room_id", int(pkt.RoomID)), zap.Error(err))
+	saveErr := error(nil)
+	if room.OwnerID == userID {
+		saveErr = rt.service.SaveSettings(ctx, int(pkt.RoomID), userID, updated)
+	} else {
+		updated.ID = int(pkt.RoomID)
+		saveErr = rt.service.ModerateSettings(ctx, updated)
+	}
+	if saveErr != nil {
+		rt.logger.Warn("save room settings failed", zap.Int("room_id", int(pkt.RoomID)), zap.Error(saveErr))
 		return nil
 	}
 	rt.broadcastToRoom(int(pkt.RoomID), packet.RoomVisualizationComposer{
