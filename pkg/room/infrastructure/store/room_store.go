@@ -83,13 +83,18 @@ func (s *RoomStore) FindByID(ctx context.Context, roomID int) (domain.Room, erro
 
 // SaveSettings persists updated room settings for one room.
 func (s *RoomStore) SaveSettings(ctx context.Context, room domain.Room) error {
+	tags := ""
+	if len(room.Tags) > 0 {
+		tags = strings.Join(room.Tags, ",")
+	}
 	updates := map[string]interface{}{
 		"name": room.Name, "description": room.Description,
 		"state": string(room.State), "max_users": room.MaxUsers,
 		"password_hash": room.Password, "wall_height": room.WallHeight,
 		"floor_thickness": room.FloorThickness, "wall_thickness": room.WallThickness,
 		"allow_pets": room.AllowPets, "allow_trading": room.AllowTrading,
-		"trade_mode": room.TradeMode,
+		"trade_mode": room.TradeMode, "category_id": room.CategoryID,
+		"tags": tags,
 	}
 	return s.db.WithContext(ctx).Table("rooms").Where("id = ?", room.ID).Updates(updates).Error
 }

@@ -6,6 +6,9 @@ const InitNavigatorPacketID uint16 = 2110
 // SearchRoomsPacketID defines packet identifier for navigator.search (c2s).
 const SearchRoomsPacketID uint16 = 249
 
+// MyRoomsSearchPacketID defines packet identifier for navigator.my_rooms_search (c2s).
+const MyRoomsSearchPacketID uint16 = 2277
+
 // GetGuestRoomPacketID defines packet identifier for navigator.get_guest_room (c2s).
 const GetGuestRoomPacketID uint16 = 2230
 
@@ -44,6 +47,9 @@ const NavigatorMetaDataPacketID uint16 = 3052
 
 // NavigatorSearchResultsPacketID defines packet identifier for navigator.search_results (s2c).
 const NavigatorSearchResultsPacketID uint16 = 2690
+
+// GuestRoomSearchResultPacketID defines packet identifier for navigator.guest_room_search_result (s2c).
+const GuestRoomSearchResultPacketID uint16 = 52
 
 // NavigatorCollapsedPacketID defines packet identifier for navigator.collapsed (s2c).
 const NavigatorCollapsedPacketID uint16 = 1543

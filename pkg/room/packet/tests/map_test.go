@@ -54,6 +54,42 @@ func TestRoomVisualizationComposer_Encode(t *testing.T) {
 	assert.Equal(t, packet.RoomVisualizationComposerID, pkt.PacketID())
 }
 
+// TestRoomChatSettingsComposer_Encode verifies room chat settings encoding.
+func TestRoomChatSettingsComposer_Encode(t *testing.T) {
+	pkt := packet.RoomChatSettingsComposer{Mode: 1, Weight: 2, Speed: 3, Distance: 4, Protection: 5}
+	body, err := pkt.Encode()
+	require.NoError(t, err)
+	r := codec.NewReader(body)
+	mode, readErr := r.ReadInt32()
+	require.NoError(t, readErr)
+	weight, readErr := r.ReadInt32()
+	require.NoError(t, readErr)
+	speed, readErr := r.ReadInt32()
+	require.NoError(t, readErr)
+	distance, readErr := r.ReadInt32()
+	require.NoError(t, readErr)
+	protection, readErr := r.ReadInt32()
+	require.NoError(t, readErr)
+	assert.Equal(t, int32(1), mode)
+	assert.Equal(t, int32(2), weight)
+	assert.Equal(t, int32(3), speed)
+	assert.Equal(t, int32(4), distance)
+	assert.Equal(t, int32(5), protection)
+	assert.Equal(t, packet.RoomChatSettingsComposerID, pkt.PacketID())
+}
+
+// TestRoomSettingsUpdatedComposer_Encode verifies room settings updated encoding.
+func TestRoomSettingsUpdatedComposer_Encode(t *testing.T) {
+	pkt := packet.RoomSettingsUpdatedComposer{RoomID: 7}
+	body, err := pkt.Encode()
+	require.NoError(t, err)
+	r := codec.NewReader(body)
+	roomID, readErr := r.ReadInt32()
+	require.NoError(t, readErr)
+	assert.Equal(t, int32(7), roomID)
+	assert.Equal(t, packet.RoomSettingsUpdatedComposerID, pkt.PacketID())
+}
+
 // TestFurnitureAliasesComposer_Encode verifies empty alias map.
 func TestFurnitureAliasesComposer_Encode(t *testing.T) {
 	pkt := packet.FurnitureAliasesComposer{}
@@ -177,9 +213,9 @@ func TestRoomSettingsComposer_Encode(t *testing.T) {
 	assert.Equal(t, int32(0), chatDistance)
 	assert.Equal(t, int32(0), chatProtection)
 	assert.False(t, allowNavigatorDynamicCats)
-	assert.Equal(t, int32(1), muteMode)
-	assert.Equal(t, int32(1), kickMode)
-	assert.Equal(t, int32(1), banMode)
+	assert.Equal(t, int32(0), muteMode)
+	assert.Equal(t, int32(0), kickMode)
+	assert.Equal(t, int32(0), banMode)
 	assert.Equal(t, packet.RoomSettingsComposerID, pkt.PacketID())
 }
 

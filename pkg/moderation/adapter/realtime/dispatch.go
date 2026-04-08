@@ -55,6 +55,12 @@ func (rt *Runtime) Handle(ctx context.Context, connID string, packetID uint16, b
 		return true, rt.handleTradeLock(ctx, connID, userID, body)
 	case packet.CallForHelpPacketID:
 		return true, rt.handleCallForHelp(ctx, connID, userID, body)
+	case packet.GetCFHStatusPacketID:
+		return true, rt.handleGetCFHStatus(ctx, connID, userID)
+	case packet.GuideSessionCreatePacketID:
+		return true, rt.handleGuideSessionCreate(ctx, connID, userID, body)
+	case packet.GetGuideReportingStatusPacketID:
+		return true, rt.handleGetGuideReportingStatus(ctx, connID, userID)
 	default:
 		return false, nil
 	}

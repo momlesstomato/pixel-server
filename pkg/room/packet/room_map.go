@@ -94,6 +94,50 @@ func (p RoomVisualizationComposer) Encode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
+// RoomChatSettingsComposer sends room chat settings (s2c 1191).
+type RoomChatSettingsComposer struct {
+	// Mode stores the room chat mode.
+	Mode int32
+	// Weight stores the room chat bubble width mode.
+	Weight int32
+	// Speed stores the room chat scroll speed mode.
+	Speed int32
+	// Distance stores the room chat hearing distance.
+	Distance int32
+	// Protection stores the room chat flood protection mode.
+	Protection int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomChatSettingsComposer) PacketID() uint16 { return RoomChatSettingsComposerID }
+
+// Encode serializes room chat settings.
+func (p RoomChatSettingsComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.Mode)
+	w.WriteInt32(p.Weight)
+	w.WriteInt32(p.Speed)
+	w.WriteInt32(p.Distance)
+	w.WriteInt32(p.Protection)
+	return w.Bytes(), nil
+}
+
+// RoomSettingsUpdatedComposer sends room settings update notification (s2c 3297).
+type RoomSettingsUpdatedComposer struct {
+	// RoomID stores the updated room identifier.
+	RoomID int32
+}
+
+// PacketID returns the protocol packet identifier.
+func (p RoomSettingsUpdatedComposer) PacketID() uint16 { return RoomSettingsUpdatedComposerID }
+
+// Encode serializes the room settings updated notification.
+func (p RoomSettingsUpdatedComposer) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.RoomID)
+	return w.Bytes(), nil
+}
+
 // FurnitureAliasesComposer sends empty furniture alias map (s2c 2159).
 type FurnitureAliasesComposer struct{}
 
@@ -171,10 +215,6 @@ func (p RoomSettingsComposer) PacketID() uint16 { return RoomSettingsComposerID 
 // Encode serializes the room settings payload.
 func (p RoomSettingsComposer) Encode() ([]byte, error) {
 	w := codec.NewWriter()
-	maxVisitorsLimit := p.Room.MaxUsers
-	if maxVisitorsLimit < 25 {
-		maxVisitorsLimit = 25
-	}
 	w.WriteInt32(int32(p.Room.ID))
 	if err := w.WriteString(p.Room.Name); err != nil {
 		return nil, err
@@ -185,7 +225,7 @@ func (p RoomSettingsComposer) Encode() ([]byte, error) {
 	w.WriteInt32(accessStateToInt(p.Room.State))
 	w.WriteInt32(int32(p.Room.CategoryID))
 	w.WriteInt32(int32(p.Room.MaxUsers))
-	w.WriteInt32(int32(maxVisitorsLimit))
+	w.WriteInt32(int32(p.Room.MaxUsers))
 	w.WriteInt32(int32(len(p.Room.Tags)))
 	for _, tag := range p.Room.Tags {
 		if err := w.WriteString(tag); err != nil {
@@ -205,9 +245,9 @@ func (p RoomSettingsComposer) Encode() ([]byte, error) {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	w.WriteBool(false)
-	w.WriteInt32(1)
-	w.WriteInt32(1)
-	w.WriteInt32(1)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
 	return w.Bytes(), nil
 }
 

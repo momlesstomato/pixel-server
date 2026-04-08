@@ -5,8 +5,8 @@ import "testing"
 // TestRegistryReturnsOrderedSeedSteps verifies seed step registry contents.
 func TestRegistryReturnsOrderedSeedSteps(t *testing.T) {
 	steps := Registry()
-	if len(steps) != 27 {
-		t.Fatalf("expected twenty-seven seed steps, got %d", len(steps))
+	if len(steps) != 28 {
+		t.Fatalf("expected twenty-eight seed steps, got %d", len(steps))
 	}
 	if steps[0] == nil || steps[0].ID != "20260313_01_system_user" {
 		t.Fatalf("unexpected seed step metadata")
@@ -83,10 +83,13 @@ func TestRegistryReturnsOrderedSeedSteps(t *testing.T) {
 	if steps[24] == nil || steps[24].ID != "20260326_S02_nav_demo_rooms" {
 		t.Fatalf("unexpected seed step metadata at index 24")
 	}
-	if steps[25] == nil || steps[25].ID != "seed_20260401_01_room_models" {
+	if steps[25] == nil || steps[25].ID != "20260408_S03_nav_demo_admin_room_owner_backfill" {
 		t.Fatalf("unexpected seed step metadata at index 25")
 	}
-	if steps[26] == nil || steps[26].ID != "20260405_09_permission_assignment_backfill" {
+	if steps[26] == nil || steps[26].ID != "seed_20260401_01_room_models" {
 		t.Fatalf("unexpected seed step metadata at index 26")
+	}
+	if steps[27] == nil || steps[27].ID != "20260405_09_permission_assignment_backfill" {
+		t.Fatalf("unexpected seed step metadata at index 27")
 	}
 }

@@ -24,14 +24,16 @@ import (
 type transportRecord struct {
 	connID   string
 	packetID uint16
+	body     []byte
 }
 
 // transportCapture stores sent packets per connection.
 type transportCapture struct{ sent []transportRecord }
 
 // Send records one outgoing packet.
-func (capture *transportCapture) Send(connID string, packetID uint16, _ []byte) error {
-	capture.sent = append(capture.sent, transportRecord{connID: connID, packetID: packetID})
+func (capture *transportCapture) Send(connID string, packetID uint16, body []byte) error {
+	copyBody := append([]byte(nil), body...)
+	capture.sent = append(capture.sent, transportRecord{connID: connID, packetID: packetID, body: copyBody})
 	return nil
 }
 
@@ -108,8 +110,28 @@ func (stub *roomRepoLocalStub) FindByID(_ context.Context, roomID int) (domain.R
 	return room, nil
 }
 
-// SaveSettings is a no-op stub.
-func (stub *roomRepoLocalStub) SaveSettings(_ context.Context, _ domain.Room) error { return nil }
+// SaveSettings persists updated room settings.
+func (stub *roomRepoLocalStub) SaveSettings(_ context.Context, room domain.Room) error {
+	current, ok := stub.rooms[room.ID]
+	if !ok {
+		return domain.ErrRoomNotFound
+	}
+	current.Name = room.Name
+	current.Description = room.Description
+	current.State = room.State
+	current.CategoryID = room.CategoryID
+	current.MaxUsers = room.MaxUsers
+	current.Password = room.Password
+	current.WallHeight = room.WallHeight
+	current.FloorThickness = room.FloorThickness
+	current.WallThickness = room.WallThickness
+	current.AllowPets = room.AllowPets
+	current.AllowTrading = room.AllowTrading
+	current.TradeMode = room.TradeMode
+	current.Tags = append([]string(nil), room.Tags...)
+	stub.rooms[room.ID] = current
+	return nil
+}
 
 // SoftDelete is a no-op stub.
 func (stub *roomRepoLocalStub) SoftDelete(_ context.Context, _ int) error { return nil }
@@ -378,6 +400,106 @@ func TestHandleRoomMuteUserBlocksChat(t *testing.T) {
 	}
 	assert.Contains(t, visitorPacketIDs, notificationpacket.GenericAlertPacketID)
 	assert.NotContains(t, visitorPacketIDs, packet.ChatComposerID)
+}
+
+// TestHandleGetRoomSettings_OwnerReceivesSettings verifies owner room settings requests are claimed and answered.
+func TestHandleGetRoomSettings_OwnerReceivesSettings(t *testing.T) {
+	room := domain.Room{ID: 1, OwnerID: 1, Name: "Blue Room", Description: "Desc", State: domain.AccessLocked, ModelSlug: "model_a", MaxUsers: 10, CategoryID: 2, Tags: []string{"fun"}}
+	rt, transport := newAccessRuntime(t, map[int]domain.Room{1: room}, map[string]coreconnection.Session{
+		"owner": {ConnID: "owner", UserID: 1},
+	}, map[int]string{1: "owner"}, nil, nil)
+	w := codec.NewWriter()
+	w.WriteInt32(1)
+	handled, err := rt.Handle(context.Background(), "owner", packet.GetRoomSettingsPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	require.NotEmpty(t, transport.sent)
+	assert.Equal(t, packet.RoomSettingsComposerID, transport.sent[len(transport.sent)-1].packetID)
+}
+
+// TestHandleSaveRoomSettings_OwnerCanUpdateNameAndDoorbell verifies owner saves persist name and locked-door state.
+func TestHandleSaveRoomSettings_OwnerCanUpdateNameAndDoorbell(t *testing.T) {
+	rooms := map[int]domain.Room{1: {ID: 1, OwnerID: 1, Name: "Blue Room", Description: "Desc", State: domain.AccessOpen, ModelSlug: "model_a", MaxUsers: 10}}
+	rt, transport := newAccessRuntime(t, rooms, map[string]coreconnection.Session{
+		"owner": {ConnID: "owner", UserID: 1},
+	}, map[int]string{1: "owner"}, nil, nil)
+	w := codec.NewWriter()
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString("New Name"))
+	require.NoError(t, w.WriteString("Updated"))
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString(""))
+	w.WriteInt32(25)
+	w.WriteInt32(0)
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString("tag"))
+	w.WriteInt32(0)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	handled, err := rt.Handle(context.Background(), "owner", packet.SaveRoomSettingsPacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Equal(t, "New Name", rooms[1].Name)
+	assert.Equal(t, domain.AccessLocked, rooms[1].State)
+	require.NotEmpty(t, transport.sent)
+	assert.Equal(t, packet.RoomSettingsSavedComposerID, transport.sent[len(transport.sent)-1].packetID)
+}
+
+// TestHandleSaveRoomSettings_BroadcastsUpdatePackets verifies successful saves push the expected follow-up packets into the room.
+func TestHandleSaveRoomSettings_BroadcastsUpdatePackets(t *testing.T) {
+	rooms := map[int]domain.Room{1: {ID: 1, OwnerID: 1, Name: "Blue Room", Description: "Desc", State: domain.AccessOpen, ModelSlug: "model_a", MaxUsers: 10}}
+	rt, transport, broadcaster := newAccessRuntimeWithBroadcast(t, rooms, map[string]coreconnection.Session{
+		"owner": {ConnID: "owner", UserID: 1},
+	}, map[int]string{1: "owner"}, nil, nil)
+	openBody, err := packet.OpenFlatConnectionPacket{RoomID: 1}.Encode()
+	require.NoError(t, err)
+	_, err = rt.Handle(context.Background(), "owner", packet.OpenFlatConnectionPacketID, openBody)
+	require.NoError(t, err)
+	_, err = rt.Handle(context.Background(), "owner", packet.GetRoomEntryDataPacketID, nil)
+	require.NoError(t, err)
+	w := codec.NewWriter()
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString("New Name"))
+	require.NoError(t, w.WriteString("Updated"))
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString(""))
+	w.WriteInt32(25)
+	w.WriteInt32(0)
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString("tag"))
+	w.WriteInt32(0)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteBool(false)
+	w.WriteBool(true)
+	w.WriteInt32(1)
+	w.WriteInt32(2)
+	w.WriteInt32(3)
+	w.WriteInt32(4)
+	w.WriteInt32(5)
+	w.WriteInt32(6)
+	w.WriteInt32(7)
+	w.WriteInt32(8)
+	w.WriteInt32(9)
+	_, err = rt.Handle(context.Background(), "owner", packet.SaveRoomSettingsPacketID, w.Bytes())
+	require.NoError(t, err)
+	packetIDs := broadcaster.sent[sessionnotification.UserChannel(1)]
+	assert.Contains(t, packetIDs, packet.RoomVisualizationComposerID)
+	assert.Contains(t, packetIDs, packet.RoomChatSettingsComposerID)
+	assert.Contains(t, packetIDs, packet.RoomSettingsUpdatedComposerID)
+	require.NotEmpty(t, transport.sent)
+	assert.Equal(t, packet.RoomSettingsSavedComposerID, transport.sent[len(transport.sent)-1].packetID)
 }
 
 // TestHandleKickUserBroadcastsRemovalAcrossRuntimes verifies owner kicks work when actor and target use different runtime instances.

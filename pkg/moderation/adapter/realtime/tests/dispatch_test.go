@@ -36,6 +36,9 @@ func (repo *actionRepoStub) FindByID(_ context.Context, _ int64) (*domain.Action
 func (repo *actionRepoStub) List(_ context.Context, filter domain.ListFilter) ([]domain.Action, error) {
 	out := make([]domain.Action, 0, len(repo.actions))
 	for _, action := range repo.actions {
+		if filter.Active != nil && action.Active != *filter.Active {
+			continue
+		}
 		if filter.ActionType != "" && action.ActionType != filter.ActionType {
 			continue
 		}
@@ -66,6 +69,11 @@ func (repo *actionRepoStub) HasActiveBan(_ context.Context, _ int, _ domain.Acti
 }
 
 func (repo *actionRepoStub) HasActiveMute(_ context.Context, _ int, _ domain.ActionScope) (bool, error) {
+	for _, action := range repo.actions {
+		if action.ActionType == domain.TypeMute && action.Active {
+			return true, nil
+		}
+	}
 	return false, nil
 }
 
@@ -74,6 +82,11 @@ func (repo *actionRepoStub) HasActiveIPBan(_ context.Context, _ string) (bool, e
 }
 
 func (repo *actionRepoStub) HasActiveTradeLock(_ context.Context, _ int) (bool, error) {
+	for _, action := range repo.actions {
+		if action.ActionType == domain.TypeTradeLock && action.Active {
+			return true, nil
+		}
+	}
 	return false, nil
 }
 
@@ -198,6 +211,27 @@ func (ticketRepoStub) UpdateStatus(_ context.Context, _ int64, _ domain.TicketSt
 }
 
 func (ticketRepoStub) Delete(_ context.Context, _ int64) error { return nil }
+
+type reporterTicketRepoStub struct{}
+
+func (reporterTicketRepoStub) Create(_ context.Context, _ *domain.Ticket) error { return nil }
+
+func (reporterTicketRepoStub) FindByID(_ context.Context, id int64) (*domain.Ticket, error) {
+	return &domain.Ticket{ID: id, ReporterID: 1, ReportedID: 2, RoomID: 77, Message: "Need help", Status: domain.TicketOpen, CreatedAt: time.Now().Add(-2 * time.Minute)}, nil
+}
+
+func (reporterTicketRepoStub) List(_ context.Context, status domain.TicketStatus, _ int) ([]domain.Ticket, error) {
+	if status != domain.TicketOpen && status != domain.TicketInProgress {
+		return nil, nil
+	}
+	return []domain.Ticket{{ID: 9, ReporterID: 1, ReportedID: 2, RoomID: 77, Message: "Need help", Status: status, CreatedAt: time.Now().Add(-2 * time.Minute)}}, nil
+}
+
+func (reporterTicketRepoStub) UpdateStatus(_ context.Context, _ int64, _ domain.TicketStatus, _ int) error {
+	return nil
+}
+
+func (reporterTicketRepoStub) Delete(_ context.Context, _ int64) error { return nil }
 
 // TestHandleModKickUsesFallbackReasonAndLeavesRoom verifies empty-message kicks still persist, remove the room entity, and close the target session.
 func TestHandleModKickUsesFallbackReasonAndLeavesRoom(t *testing.T) {
@@ -476,4 +510,142 @@ func TestHandleModToolChangeRoomSettingsUpdatesTitleAndDoorMode(t *testing.T) {
 	assert.Equal(t, 77, saved.ID)
 	assert.Equal(t, roomdomain.AccessLocked, saved.State)
 	assert.Equal(t, "Inappropriate to hotel staff", saved.Name)
+}
+
+// TestHandleGetCFHStatusSendsSanctionStatusPacket verifies sanction-status requests return Nitro sanction data.
+func TestHandleGetCFHStatusSendsSanctionStatusPacket(t *testing.T) {
+	repo := &actionRepoStub{actions: []*domain.Action{{
+		TargetUserID:    1,
+		Scope:           domain.ScopeHotel,
+		ActionType:      domain.TypeMute,
+		Reason:          "spam",
+		DurationMinutes: 120,
+		Active:          true,
+		CreatedAt:       time.Now().Add(-30 * time.Minute),
+		ExpiresAt:       timePointer(time.Now().Add(90 * time.Minute)),
+	}, {
+		TargetUserID:    1,
+		Scope:           domain.ScopeHotel,
+		ActionType:      domain.TypeTradeLock,
+		Reason:          "trade abuse",
+		DurationMinutes: 60,
+		Active:          true,
+		CreatedAt:       time.Now().Add(-15 * time.Minute),
+		ExpiresAt:       timePointer(time.Now().Add(45 * time.Minute)),
+	}}}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	handled, err := rt.Handle(context.Background(), "conn1", packet.GetCFHStatusPacketID, nil)
+	require.NoError(t, err)
+	assert.True(t, handled)
+	require.Contains(t, transport.packetIDs, packet.CFHSanctionStatusPacketID)
+	body := transport.bodies[packet.CFHSanctionStatusPacketID][0]
+	r := codec.NewReader(body)
+	isNew, err := r.ReadBool()
+	require.NoError(t, err)
+	isActive, err := r.ReadBool()
+	require.NoError(t, err)
+	name, err := r.ReadString()
+	require.NoError(t, err)
+	lengthHours, err := r.ReadInt32()
+	require.NoError(t, err)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	reason, err := r.ReadString()
+	require.NoError(t, err)
+	_, err = r.ReadString()
+	require.NoError(t, err)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	_, err = r.ReadString()
+	require.NoError(t, err)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	_, err = r.ReadInt32()
+	require.NoError(t, err)
+	hasCustomMute, err := r.ReadBool()
+	require.NoError(t, err)
+	tradeLockExpiry, err := r.ReadString()
+	require.NoError(t, err)
+	assert.True(t, isNew)
+	assert.True(t, isActive)
+	assert.Equal(t, "MUTE", name)
+	assert.Equal(t, int32(2), lengthHours)
+	assert.Equal(t, "spam", reason)
+	assert.True(t, hasCustomMute)
+	assert.NotEmpty(t, tradeLockExpiry)
+}
+
+// TestHandleGuideSessionCreateSendsGuideError verifies unsupported guide session requests return a deterministic error.
+func TestHandleGuideSessionCreateSendsGuideError(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	w := codec.NewWriter()
+	w.WriteInt32(1)
+	require.NoError(t, w.WriteString("Need assistance"))
+	handled, err := rt.Handle(context.Background(), "conn1", packet.GuideSessionCreatePacketID, w.Bytes())
+	require.NoError(t, err)
+	assert.True(t, handled)
+	require.Contains(t, transport.packetIDs, packet.GuideSessionErrorPacketID)
+	body := transport.bodies[packet.GuideSessionErrorPacketID][0]
+	r := codec.NewReader(body)
+	errorCode, err := r.ReadInt32()
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), errorCode)
+}
+
+// TestHandleGetGuideReportingStatusSendsPendingTicket verifies room-report status requests expose a pending ticket when present.
+func TestHandleGetGuideReportingStatusSendsPendingTicket(t *testing.T) {
+	repo := &actionRepoStub{}
+	svc, err := moderationapplication.NewService(repo)
+	require.NoError(t, err)
+	ticketSvc, err := moderationapplication.NewTicketService(reporterTicketRepoStub{})
+	require.NoError(t, err)
+	transport := &transportStub{}
+	rt, err := moderationrealtime.NewRuntime(svc, sessionRegistryStub{}, transport, broadcasterStub{}, &closerStub{}, zap.NewNop())
+	require.NoError(t, err)
+	rt.SetTicketService(ticketSvc)
+	rt.SetUserLookup(userLookupStub{})
+	rt.SetRoomLookup(roomLookupStub{})
+	handled, err := rt.Handle(context.Background(), "conn1", packet.GetGuideReportingStatusPacketID, nil)
+	require.NoError(t, err)
+	assert.True(t, handled)
+	require.Contains(t, transport.packetIDs, packet.GuideReportingStatusPacketID)
+	body := transport.bodies[packet.GuideReportingStatusPacketID][0]
+	r := codec.NewReader(body)
+	statusCode, err := r.ReadInt32()
+	require.NoError(t, err)
+	requestType, err := r.ReadInt32()
+	require.NoError(t, err)
+	secondsAgo, err := r.ReadInt32()
+	require.NoError(t, err)
+	isGuide, err := r.ReadBool()
+	require.NoError(t, err)
+	otherPartyName, err := r.ReadString()
+	require.NoError(t, err)
+	otherPartyFigure, err := r.ReadString()
+	require.NoError(t, err)
+	description, err := r.ReadString()
+	require.NoError(t, err)
+	roomName, err := r.ReadString()
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), statusCode)
+	assert.Equal(t, int32(1), requestType)
+	assert.Positive(t, secondsAgo)
+	assert.False(t, isGuide)
+	assert.Equal(t, "beta", otherPartyName)
+	assert.Equal(t, "hr-1", otherPartyFigure)
+	assert.Equal(t, "Need help", description)
+	assert.Equal(t, "Blue Room", roomName)
+}
+
+func timePointer(value time.Time) *time.Time {
+	return &value
 }

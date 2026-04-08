@@ -54,6 +54,12 @@ const CallForHelpPacketID uint16 = 1691
 // GetCFHStatusPacketID defines call-for-help status query (c2s 2746).
 const GetCFHStatusPacketID uint16 = 2746
 
+// GuideSessionCreatePacketID defines guide-assistance session creation (c2s 3338).
+const GuideSessionCreatePacketID uint16 = 3338
+
+// GetGuideReportingStatusPacketID defines guide/reporting status query (c2s 3786).
+const GetGuideReportingStatusPacketID uint16 = 3786
+
 // ModeratorInitPacketID defines moderator tool init (s2c 2696).
 const ModeratorInitPacketID uint16 = 2696
 
@@ -65,6 +71,15 @@ const CFHPendingPacketID uint16 = 1121
 
 // CFHResultPacketID defines call-for-help result (s2c 3635).
 const CFHResultPacketID uint16 = 3635
+
+// CFHSanctionStatusPacketID defines call-for-help sanction status payload (s2c 2221).
+const CFHSanctionStatusPacketID uint16 = 2221
+
+// GuideSessionErrorPacketID defines guide session error payload (s2c 673).
+const GuideSessionErrorPacketID uint16 = 673
+
+// GuideReportingStatusPacketID defines guide/reporting status payload (s2c 3463).
+const GuideReportingStatusPacketID uint16 = 3463
 
 // ModToolRoomInfoComposerID defines moderator room info payload (s2c 1333).
 const ModToolRoomInfoComposerID uint16 = 1333

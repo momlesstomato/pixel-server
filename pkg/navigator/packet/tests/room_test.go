@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/momlesstomato/pixel-server/core/codec"
 	"github.com/momlesstomato/pixel-server/pkg/navigator/domain"
 	navpacket "github.com/momlesstomato/pixel-server/pkg/navigator/packet"
 )
@@ -117,6 +118,87 @@ func TestNavigatorSearchResultsPacketEncode(t *testing.T) {
 	}
 	if len(body) == 0 {
 		t.Fatal("expected non-empty body")
+	}
+}
+
+// TestGuestRoomSearchResultPacketEncode verifies legacy private-room search results match Nitro parsing order.
+func TestGuestRoomSearchResultPacketEncode(t *testing.T) {
+	room := domain.Room{ID: 1, Name: "Room A", OwnerID: 2, OwnerName: "alice", State: "locked", MaxUsers: 10, Description: "Desc", Tags: []string{"fun"}}
+	p := navpacket.GuestRoomSearchResultPacket{SearchType: 2, SearchParam: "", Rooms: []domain.Room{room}}
+	if p.PacketID() != navpacket.GuestRoomSearchResultPacketID {
+		t.Fatalf("unexpected packet id %d", p.PacketID())
+	}
+	body, err := p.Encode()
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+	r := codec.NewReader(body)
+	searchType, readErr := r.ReadInt32()
+	if readErr != nil {
+		t.Fatalf("read search type: %v", readErr)
+	}
+	searchParam, readErr := r.ReadString()
+	if readErr != nil {
+		t.Fatalf("read search param: %v", readErr)
+	}
+	roomCount, readErr := r.ReadInt32()
+	if readErr != nil {
+		t.Fatalf("read room count: %v", readErr)
+	}
+	roomID, readErr := r.ReadInt32()
+	if readErr != nil {
+		t.Fatalf("read room id: %v", readErr)
+	}
+	name, readErr := r.ReadString()
+	if readErr != nil {
+		t.Fatalf("read room name: %v", readErr)
+	}
+	ownerID, readErr := r.ReadInt32()
+	if readErr != nil {
+		t.Fatalf("read owner id: %v", readErr)
+	}
+	ownerName, readErr := r.ReadString()
+	if readErr != nil {
+		t.Fatalf("read owner name: %v", readErr)
+	}
+	doorMode, readErr := r.ReadInt32()
+	if readErr != nil {
+		t.Fatalf("read door mode: %v", readErr)
+	}
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	description, readErr := r.ReadString()
+	if readErr != nil {
+		t.Fatalf("read description: %v", readErr)
+	}
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	_, _ = r.ReadInt32()
+	tagCount, readErr := r.ReadInt32()
+	if readErr != nil {
+		t.Fatalf("read tag count: %v", readErr)
+	}
+	tag, readErr := r.ReadString()
+	if readErr != nil {
+		t.Fatalf("read tag: %v", readErr)
+	}
+	bitmask, readErr := r.ReadInt32()
+	if readErr != nil {
+		t.Fatalf("read bitmask: %v", readErr)
+	}
+	hasAdditional, readErr := r.ReadBool()
+	if readErr != nil {
+		t.Fatalf("read additional flag: %v", readErr)
+	}
+	if searchType != 2 || searchParam != "" || roomCount != 1 {
+		t.Fatalf("unexpected header values type=%d param=%q count=%d", searchType, searchParam, roomCount)
+	}
+	if roomID != 1 || name != "Room A" || ownerID != 2 || ownerName != "alice" {
+		t.Fatalf("unexpected room identity values id=%d name=%q ownerID=%d ownerName=%q", roomID, name, ownerID, ownerName)
+	}
+	if doorMode != 1 || description != "Desc" || tagCount != 1 || tag != "fun" || bitmask != 8 || hasAdditional {
+		t.Fatalf("unexpected room payload values doorMode=%d description=%q tagCount=%d tag=%q bitmask=%d hasAdditional=%v", doorMode, description, tagCount, tag, bitmask, hasAdditional)
 	}
 }
 

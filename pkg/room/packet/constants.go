@@ -135,6 +135,12 @@ const RoomSettingsComposerID uint16 = 1498
 // RoomSettingsSavedComposerID defines server room.room_settings_saved (s2c 948).
 const RoomSettingsSavedComposerID uint16 = 948
 
+// RoomChatSettingsComposerID defines server room.room_chat_settings (s2c 1191).
+const RoomChatSettingsComposerID uint16 = 1191
+
+// RoomSettingsUpdatedComposerID defines server room.room_settings_updated (s2c 3297).
+const RoomSettingsUpdatedComposerID uint16 = 3297
+
 // GiveRoomScorePacketID defines client room.give_room_score (c2s 3616).
 const GiveRoomScorePacketID uint16 = 3616
 

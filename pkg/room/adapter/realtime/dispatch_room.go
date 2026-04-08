@@ -156,6 +156,19 @@ func (rt *Runtime) handleSaveRoomSettings(ctx context.Context, connID string, us
 		rt.logger.Warn("save room settings failed", zap.Int("room_id", int(pkt.RoomID)), zap.Error(err))
 		return nil
 	}
+	rt.broadcastToRoom(int(pkt.RoomID), packet.RoomVisualizationComposer{
+		WallsHidden:    pkt.HideWalls,
+		WallThickness:  pkt.WallThickness,
+		FloorThickness: pkt.FloorThickness,
+	})
+	rt.broadcastToRoom(int(pkt.RoomID), packet.RoomChatSettingsComposer{
+		Mode:       pkt.ChatMode,
+		Weight:     pkt.ChatWeight,
+		Speed:      pkt.ChatSpeed,
+		Distance:   pkt.ChatDistance,
+		Protection: pkt.ChatProtection,
+	})
+	rt.broadcastToRoom(int(pkt.RoomID), packet.RoomSettingsUpdatedComposer{RoomID: pkt.RoomID})
 	return rt.sendPacket(connID, packet.RoomSettingsSavedComposer{RoomID: pkt.RoomID})
 }
 

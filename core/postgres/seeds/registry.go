@@ -38,6 +38,7 @@ func Registry() []*gormigrate.Migration {
 		subscriptionseed.Step04DefaultPaydayConfig(),
 		navigatorseed.Step01DefaultCategories(),
 		navigatorseed.Step02DemoRooms(),
+		navigatorseed.Step03DemoAdminRoomOwnerBackfill(),
 		roomseed.Step01StandardModels(),
 		Step09AssignmentBackfill(),
 	}

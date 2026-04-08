@@ -82,6 +82,36 @@ type GuestRoomDataPacket struct {
 	Forward bool
 }
 
+// GuestRoomSearchResultPacket defines navigator.guest_room_search_result (s2c 52) payload.
+type GuestRoomSearchResultPacket struct {
+	// SearchType stores the private-room search type identifier.
+	SearchType int32
+	// SearchParam stores the search parameter string.
+	SearchParam string
+	// Rooms stores the returned private rooms.
+	Rooms []domain.Room
+}
+
+// PacketID returns the wire protocol packet identifier.
+func (p GuestRoomSearchResultPacket) PacketID() uint16 { return GuestRoomSearchResultPacketID }
+
+// Encode serializes guest room search results into packet body.
+func (p GuestRoomSearchResultPacket) Encode() ([]byte, error) {
+	w := codec.NewWriter()
+	w.WriteInt32(p.SearchType)
+	if err := w.WriteString(p.SearchParam); err != nil {
+		return nil, err
+	}
+	w.WriteInt32(int32(len(p.Rooms)))
+	for _, room := range p.Rooms {
+		if err := EncodeRoomData(w, room); err != nil {
+			return nil, err
+		}
+	}
+	w.WriteBool(false)
+	return w.Bytes(), nil
+}
+
 // PacketID returns the wire protocol packet identifier.
 func (p GuestRoomDataPacket) PacketID() uint16 { return GuestRoomDataPacketID }
 

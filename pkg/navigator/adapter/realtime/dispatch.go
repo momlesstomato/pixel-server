@@ -21,6 +21,8 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 		return true, runtime.handleInit(ctx, connID, userID)
 	case packet.SearchRoomsPacketID:
 		return true, runtime.handleSearch(ctx, connID, userID, body)
+	case packet.MyRoomsSearchPacketID:
+		return true, runtime.handleMyRooms(ctx, connID, userID)
 	case packet.GetGuestRoomPacketID:
 		return true, runtime.handleGetGuestRoom(ctx, connID, body)
 	case packet.GetFlatCategoriesPacketID:
@@ -48,6 +50,20 @@ func (runtime *Runtime) Handle(ctx context.Context, connID string, packetID uint
 	default:
 		return false, nil
 	}
+}
+
+// handleMyRooms responds with the caller's owned rooms using the legacy private-room result packet.
+func (runtime *Runtime) handleMyRooms(ctx context.Context, connID string, userID int) error {
+	rooms, err := runtime.listRooms(ctx, domain.RoomFilter{OwnerID: &userID, Limit: 50})
+	if err != nil {
+		runtime.logger.Error("list my rooms failed", zap.Int("user_id", userID), zap.Error(err))
+		return nil
+	}
+	return runtime.sendPacket(connID, packet.GuestRoomSearchResultPacket{
+		SearchType:  2,
+		SearchParam: "",
+		Rooms:       rooms,
+	})
 }
 
 // handleInit sends navigator initialization data.
@@ -86,20 +102,29 @@ func (runtime *Runtime) handleSearch(ctx context.Context, connID string, userID 
 	case "official_view":
 		roomFilter.StaffPickOnly = true
 	}
-	rooms, _, err := runtime.service.ListRooms(ctx, roomFilter)
+	rooms, err := runtime.listRooms(ctx, roomFilter)
 	if err != nil {
 		runtime.logger.Error("search rooms failed", zap.String("code", searchCode), zap.Error(err))
 		return nil
+	}
+	block := packet.SearchResultBlock{SearchCode: searchCode, Text: searchCode, Rooms: rooms}
+	return runtime.sendPacket(connID, packet.NavigatorSearchResultsPacket{
+		SearchCode: searchCode, Filter: filter, Results: []packet.SearchResultBlock{block},
+	})
+}
+
+// listRooms fetches rooms and overlays live occupant counts when available.
+func (runtime *Runtime) listRooms(ctx context.Context, filter domain.RoomFilter) ([]domain.Room, error) {
+	rooms, _, err := runtime.service.ListRooms(ctx, filter)
+	if err != nil {
+		return nil, err
 	}
 	if runtime.liveRoomCount != nil {
 		for i := range rooms {
 			rooms[i].CurrentUsers = runtime.liveRoomCount(rooms[i].ID)
 		}
 	}
-	block := packet.SearchResultBlock{SearchCode: searchCode, Text: searchCode, Rooms: rooms}
-	return runtime.sendPacket(connID, packet.NavigatorSearchResultsPacket{
-		SearchCode: searchCode, Filter: filter, Results: []packet.SearchResultBlock{block},
-	})
+	return rooms, nil
 }
 
 // handleGetEventCats responds with an empty event categories list.
