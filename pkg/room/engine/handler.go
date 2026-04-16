@@ -16,6 +16,8 @@ func (inst *Instance) handleMessage(msg Message) {
 		err = inst.handleLeave(msg)
 	case MsgWalk:
 		err = inst.handleWalk(msg)
+	case MsgWarp:
+		err = inst.handleWarp(msg)
 	case MsgAction:
 		err = inst.handleAction(msg)
 	case MsgDance:
@@ -49,12 +51,14 @@ func (inst *Instance) handleEnter(msg Message) error {
 	entity := *msg.Entity
 	entity.VirtualID = inst.nextVID
 	inst.nextVID++
-	entity.Position = domain.Tile{
-		X: inst.Layout.DoorX, Y: inst.Layout.DoorY,
-		Z: inst.Layout.DoorZ, State: domain.TileOpen,
-	}
+	entity.Position = domain.Tile{X: inst.Layout.DoorX, Y: inst.Layout.DoorY, Z: inst.Layout.DoorZ, State: domain.TileOpen}
 	entity.BodyRotation = inst.Layout.DoorDir
 	entity.HeadRotation = inst.Layout.DoorDir
+	if msg.Tile != nil {
+		entity.Position = *msg.Tile
+		entity.BodyRotation = msg.Dir
+		entity.HeadRotation = msg.Dir
+	}
 	entity.Statuses = make(map[string]string)
 	entity.CanWalk = true
 	entity.UpdateNeeded = true
@@ -94,6 +98,44 @@ func (inst *Instance) handleWalk(msg Message) error {
 		return domain.ErrAccessDenied
 	}
 	return inst.startWalk(entity, msg.TargetX, msg.TargetY)
+}
+
+// handleWarp moves one entity directly to a target tile.
+func (inst *Instance) handleWarp(msg Message) error {
+	if msg.Entity == nil || msg.Tile == nil {
+		return domain.ErrEntityNotFound
+	}
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	entity, ok := inst.entities[msg.Entity.VirtualID]
+	if !ok {
+		return domain.ErrEntityNotFound
+	}
+	previous := entity.Position
+	clearSeatPosture(entity)
+	if msg.Animate && (previous.X != msg.Tile.X || previous.Y != msg.Tile.Y || previous.Z != msg.Tile.Z) {
+		target := *msg.Tile
+		entity.Path = []domain.Tile{target}
+		entity.GoalPosition = &target
+		entity.IsWalking = true
+		entity.StepFrom = nil
+		delete(entity.Statuses, "mv")
+		entity.IsIdle = false
+		entity.IdleTimer = 0
+		return nil
+	}
+	entity.Position = *msg.Tile
+	entity.Path = nil
+	entity.GoalPosition = nil
+	entity.IsWalking = false
+	entity.BodyRotation = msg.Dir
+	entity.HeadRotation = msg.Dir
+	entity.IsIdle = false
+	entity.IdleTimer = 0
+	entity.StepFrom = nil
+	delete(entity.Statuses, "mv")
+	entity.UpdateNeeded = !msg.Silent
+	return nil
 }
 
 // handleAction marks entity as needing an update for expression broadcast.

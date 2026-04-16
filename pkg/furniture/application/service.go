@@ -45,8 +45,8 @@ func (service *Service) ListDefinitions(ctx context.Context) ([]domain.Definitio
 
 // CreateDefinition persists one validated item definition.
 func (service *Service) CreateDefinition(ctx context.Context, def domain.Definition) (domain.Definition, error) {
-	if def.ItemName == "" {
-		return domain.Definition{}, fmt.Errorf("item name is required")
+	if err := validateDefinitionCreate(def); err != nil {
+		return domain.Definition{}, err
 	}
 	if service.fire != nil {
 		event := &sdkfurniture.DefinitionCreating{ItemName: def.ItemName}
@@ -179,6 +179,81 @@ func (service *Service) PickupItem(ctx context.Context, itemID int, userID int) 
 		return domain.Item{}, domain.ErrItemNotOwned
 	}
 	if err := service.repository.PlaceItem(ctx, itemID, 0, 0, 0, 0, 0); err != nil {
+		return domain.Item{}, err
+	}
+	return service.repository.FindItemByID(ctx, itemID)
+}
+
+// PlaceWallItem moves an owned inventory item onto a room wall anchor.
+func (service *Service) PlaceWallItem(ctx context.Context, itemID int, userID int, roomID int, wallPosition string) (domain.Item, error) {
+	if itemID <= 0 {
+		return domain.Item{}, fmt.Errorf("item id must be positive")
+	}
+	item, err := service.repository.FindItemByID(ctx, itemID)
+	if err != nil {
+		return domain.Item{}, err
+	}
+	if item.RoomID == 0 && item.UserID != userID {
+		return domain.Item{}, domain.ErrItemNotOwned
+	}
+	if item.RoomID != 0 && item.RoomID != roomID {
+		return domain.Item{}, domain.ErrItemNotFound
+	}
+	if err := service.repository.PlaceWallItem(ctx, itemID, roomID, wallPosition); err != nil {
+		return domain.Item{}, err
+	}
+	return service.repository.FindItemByID(ctx, itemID)
+}
+
+// UpdateItemData persists a visible item data payload and returns the updated item.
+func (service *Service) UpdateItemData(ctx context.Context, itemID int, extraData string) (domain.Item, error) {
+	if itemID <= 0 {
+		return domain.Item{}, fmt.Errorf("item id must be positive")
+	}
+	if err := service.repository.UpdateItemData(ctx, itemID, extraData); err != nil {
+		return domain.Item{}, err
+	}
+	return service.repository.FindItemByID(ctx, itemID)
+}
+
+// UpdateItemInteractionData persists hidden interaction metadata and returns the updated item.
+func (service *Service) UpdateItemInteractionData(ctx context.Context, itemID int, interactionData string) (domain.Item, error) {
+	if itemID <= 0 {
+		return domain.Item{}, fmt.Errorf("item id must be positive")
+	}
+	if err := service.repository.UpdateItemInteractionData(ctx, itemID, interactionData); err != nil {
+		return domain.Item{}, err
+	}
+	return service.repository.FindItemByID(ctx, itemID)
+}
+
+// TransformItem updates the definition and payload of one existing item.
+func (service *Service) TransformItem(ctx context.Context, itemID int, definitionID int, extraData string, interactionData string) (domain.Item, error) {
+	if itemID <= 0 {
+		return domain.Item{}, fmt.Errorf("item id must be positive")
+	}
+	if definitionID <= 0 {
+		return domain.Item{}, fmt.Errorf("definition id must be positive")
+	}
+	if err := service.repository.UpdateItemDefinition(ctx, itemID, definitionID, extraData, interactionData); err != nil {
+		return domain.Item{}, err
+	}
+	return service.repository.FindItemByID(ctx, itemID)
+}
+
+// MovePlacedItem updates one already-placed floor item including its height offset.
+func (service *Service) MovePlacedItem(ctx context.Context, itemID int, roomID int, x int, y int, z float64, dir int) (domain.Item, error) {
+	if itemID <= 0 {
+		return domain.Item{}, fmt.Errorf("item id must be positive")
+	}
+	item, err := service.repository.FindItemByID(ctx, itemID)
+	if err != nil {
+		return domain.Item{}, err
+	}
+	if item.RoomID != roomID {
+		return domain.Item{}, domain.ErrItemNotFound
+	}
+	if err := service.repository.PlaceItem(ctx, itemID, roomID, x, y, z, dir); err != nil {
 		return domain.Item{}, err
 	}
 	return service.repository.FindItemByID(ctx, itemID)

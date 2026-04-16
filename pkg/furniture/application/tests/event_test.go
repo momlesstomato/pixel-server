@@ -18,7 +18,7 @@ func TestDefinitionCreatingEventCancelsCreation(t *testing.T) {
 			value.Cancel()
 		}
 	})
-	if _, err := service.CreateDefinition(context.Background(), domain.Definition{ItemName: "chair"}); err == nil {
+	if _, err := service.CreateDefinition(context.Background(), domain.Definition{ItemName: "chair", SpriteID: 1}); err == nil {
 		t.Fatalf("expected definition creation to be cancelled")
 	}
 }
@@ -32,7 +32,7 @@ func TestDefinitionCreatingEventAllowsCreation(t *testing.T) {
 			afterFired = true
 		}
 	})
-	def, err := service.CreateDefinition(context.Background(), domain.Definition{ItemName: "table"})
+	def, err := service.CreateDefinition(context.Background(), domain.Definition{ItemName: "table", SpriteID: 2})
 	if err != nil || def.ID != 1 {
 		t.Fatalf("unexpected create result %+v err=%v", def, err)
 	}

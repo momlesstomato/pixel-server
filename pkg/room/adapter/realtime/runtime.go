@@ -60,6 +60,8 @@ type Runtime struct {
 	profileResolver ProfileResolver
 	// floorItemSender sends the room floor item list to one arriving connection.
 	floorItemSender func(ctx context.Context, connID string, roomID int) error
+	// wallItemSender sends the room wall item list to one arriving connection.
+	wallItemSender func(ctx context.Context, connID string, roomID int) error
 	// voteRepo stores optional vote persistence for room scoring.
 	voteRepo domain.VoteRepository
 	// visitRecorder stores optional room visit tracking behavior.
@@ -180,20 +182,15 @@ func (rt *Runtime) findEntityByConnID(connID string, userID int) (*engine.Instan
 
 // leaveCurrentRoom removes all entities for connID from its current room and broadcasts each removal.
 // It is safe to call when the connection is not in any room.
-func (rt *Runtime) leaveCurrentRoom(connID string) {
+func (rt *Runtime) leaveCurrentRoom(connID string) error {
 	userID, _ := rt.userID(connID)
 	for {
 		inst, entity := rt.findEntityByConnID(connID, userID)
 		if inst == nil || entity == nil {
 			break
 		}
-		reply := make(chan error, 1)
-		if !inst.Send(engine.Message{Type: engine.MsgLeave, Entity: entity, Reply: reply}) {
-			break
-		}
-		leaveErr := <-reply
-		if leaveErr != nil {
-			break
+		if err := rt.service.LeaveRoom(context.Background(), inst, entity, inst.RoomID, entity.UserID); err != nil {
+			return err
 		}
 		body, encErr := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()
 		if encErr == nil {
@@ -207,6 +204,7 @@ func (rt *Runtime) leaveCurrentRoom(connID string) {
 		}
 	}
 	rt.clearRoomForConn(connID)
+	return nil
 }
 
 // isRoomUserMuted reports whether a room-scoped user mute is still active.
@@ -255,12 +253,17 @@ func (rt *Runtime) setRoomUserMute(roomID int, userID int, duration time.Duratio
 // Dispose releases per-connection resources and removes the entity from its room.
 func (rt *Runtime) Dispose(connID string) {
 	rt.cleanupDoorbellForConn(connID)
-	rt.leaveCurrentRoom(connID)
+	_ = rt.leaveCurrentRoom(connID)
 }
 
 // SetFloorItemSender configures the function used to send floor items on room entry.
 func (rt *Runtime) SetFloorItemSender(fn func(ctx context.Context, connID string, roomID int) error) {
 	rt.floorItemSender = fn
+}
+
+// SetWallItemSender configures the function used to send wall items on room entry.
+func (rt *Runtime) SetWallItemSender(fn func(ctx context.Context, connID string, roomID int) error) {
+	rt.wallItemSender = fn
 }
 
 // SetUsernameResolver configures the optional username lookup function.
@@ -286,6 +289,63 @@ func (rt *Runtime) SetVisitRecorder(recorder VisitRecorder) {
 // SetPermissionChecker configures optional dotted permission checks for room actions.
 func (rt *Runtime) SetPermissionChecker(checker PermissionChecker) {
 	rt.permissions = checker
+}
+
+// QueueTeleporterEntry stores one pending teleporter destination and starts the destination room load.
+func (rt *Runtime) QueueTeleporterEntry(ctx context.Context, connID string, roomID int, spawnX int, spawnY int, spawnZ float64, spawnDir int, exitX int, exitY int) error {
+	userID, ok := rt.userID(connID)
+	if !ok {
+		return nil
+	}
+	room, err := rt.service.FindRoom(ctx, roomID)
+	if err != nil {
+		return err
+	}
+	if rt.service.CheckBan(ctx, roomID, userID) {
+		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 4})
+	}
+	if _, err := rt.service.LoadRoom(ctx, room); err != nil {
+		return err
+	}
+	rt.state.mu.Lock()
+	rt.state.pendingTeleports[connID] = teleportEntry{RoomID: roomID, SpawnX: spawnX, SpawnY: spawnY, SpawnZ: spawnZ, SpawnDir: spawnDir, ExitX: exitX, ExitY: exitY}
+	rt.state.mu.Unlock()
+	inst, ok := rt.service.Manager().Get(roomID)
+	if !ok {
+		return domain.ErrRoomNotFound
+	}
+	if err := rt.sendPacket(connID, packet.OpenConnectionComposer{}); err != nil {
+		return err
+	}
+	if err := rt.leaveCurrentRoom(connID); err != nil {
+		return err
+	}
+	rt.setRoomForConn(connID, roomID)
+	if rt.visitRecorder != nil {
+		_ = rt.visitRecorder.RecordVisit(ctx, userID, roomID)
+	}
+	if err := rt.sendRoomData(connID, userID, inst, room); err != nil {
+		return err
+	}
+	return nil
+}
+
+// pendingTeleport returns one queued teleporter destination for the requested room.
+func (rt *Runtime) pendingTeleport(connID string, roomID int) (teleportEntry, bool) {
+	rt.state.mu.RLock()
+	defer rt.state.mu.RUnlock()
+	entry, ok := rt.state.pendingTeleports[connID]
+	if !ok || entry.RoomID != roomID {
+		return teleportEntry{}, false
+	}
+	return entry, true
+}
+
+// clearPendingTeleport removes one queued teleporter destination.
+func (rt *Runtime) clearPendingTeleport(connID string) {
+	rt.state.mu.Lock()
+	delete(rt.state.pendingTeleports, connID)
+	rt.state.mu.Unlock()
 }
 
 // resolveUsername looks up the display name for a user identifier.

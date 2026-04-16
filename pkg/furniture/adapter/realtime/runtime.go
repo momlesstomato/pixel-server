@@ -3,12 +3,15 @@ package realtime
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/momlesstomato/pixel-server/core/broadcast"
 	"github.com/momlesstomato/pixel-server/core/codec"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	furnitureapp "github.com/momlesstomato/pixel-server/pkg/furniture/application"
+	furnituredomain "github.com/momlesstomato/pixel-server/pkg/furniture/domain"
 	furnipacket "github.com/momlesstomato/pixel-server/pkg/furniture/packet"
 	sessionnotification "github.com/momlesstomato/pixel-server/pkg/session/application/notification"
 	"go.uber.org/zap"
@@ -28,6 +31,52 @@ type RoomAccessChecker func(ctx context.Context, roomID, userID int) bool
 
 // RoomOccupancyChecker reports whether a tile is currently occupied by a player entity.
 type RoomOccupancyChecker func(roomID, x, y int) bool
+
+// RoomEntityTileResolver resolves the active room tile for one connection.
+type RoomEntityTileResolver func(connID string) (roomID, x, y int, ok bool)
+
+// RoomTileSnapshot stores the layout-facing tile data required by roller safety checks.
+type RoomTileSnapshot struct {
+	// Z stores the static base tile height.
+	Z float64
+	// Walkable reports whether the layout allows movement onto the tile.
+	Walkable bool
+}
+
+// RoomTileResolver resolves one room layout tile snapshot.
+type RoomTileResolver func(roomID, x, y int) (RoomTileSnapshot, bool)
+
+// RoomEntitySnapshot stores the room-facing entity data required by furniture interactions.
+type RoomEntitySnapshot struct {
+	// ConnID stores the owning connection identifier.
+	ConnID string
+	// VirtualID stores the room-scoped entity identifier.
+	VirtualID int
+	// UserID stores the backing user identifier.
+	UserID int
+	// X stores the current tile horizontal coordinate.
+	X int
+	// Y stores the current tile vertical coordinate.
+	Y int
+	// Z stores the current tile height.
+	Z float64
+	// Dir stores the current body rotation.
+	Dir int
+	// IsWalking reports whether the entity is currently following a walk path.
+	IsWalking bool
+}
+
+// RoomEntitySnapshotter resolves the current entity list for one room.
+type RoomEntitySnapshotter func(roomID int) []RoomEntitySnapshot
+
+// RoomEntityWalker requests one entity walk toward a destination tile.
+type RoomEntityWalker func(ctx context.Context, connID string, x, y int) error
+
+// RoomEntityWarper requests one direct entity relocation in a room.
+type RoomEntityWarper func(ctx context.Context, roomID, virtualID, x, y int, z float64, dir int, silent bool, animate bool) error
+
+// TeleporterForwarder queues one cross-room teleporter arrival and forwards the client.
+type TeleporterForwarder func(ctx context.Context, connID string, roomID, spawnX, spawnY int, spawnZ float64, spawnDir, exitX, exitY int) error
 
 // seatEntry caches the seat properties of one placed sittable furniture item.
 type seatEntry struct {
@@ -79,12 +128,34 @@ type Runtime struct {
 	roomAccessChecker RoomAccessChecker
 	// roomOccupancyChecker validates whether a target tile is already occupied by a player.
 	roomOccupancyChecker RoomOccupancyChecker
+	// roomEntityTileResolver resolves the current tile for one active room connection.
+	roomEntityTileResolver RoomEntityTileResolver
+	// roomTileResolver resolves one layout tile snapshot for roller movement validation.
+	roomTileResolver RoomTileResolver
 	// entityRotator rotates seated entities on a tile to match new furniture direction.
 	entityRotator RoomEntityRotator
 	// entityEvictor clears seated entities from a tile when furniture is moved or removed.
 	entityEvictor RoomEntityEvictor
+	// roomEntitySnapshotter resolves room entity snapshots for roller processing.
+	roomEntitySnapshotter RoomEntitySnapshotter
+	// roomEntityWalker requests avatar walks used by teleporter interactions.
+	roomEntityWalker RoomEntityWalker
+	// roomEntityWarper requests direct avatar relocation used by rollers and teleporters.
+	roomEntityWarper RoomEntityWarper
+	// teleporterForwarder forwards avatars into destination rooms through teleporters.
+	teleporterForwarder TeleporterForwarder
+	// diceRandomizer resolves one zero-based dice result.
+	diceRandomizer func(int) int
+	// diceRollDelay stores the rolling animation duration.
+	diceRollDelay time.Duration
+	// diceMu protects diceCancels.
+	diceMu sync.Mutex
+	// diceCancels stores cancellation callbacks for in-flight dice rolls.
+	diceCancels map[int]context.CancelFunc
 	// seatCache maps room identifier to its list of sittable item entries.
 	seatCache map[int][]seatEntry
+	// blockCache maps room identifier to blocked floor-item footprint tiles.
+	blockCache map[int][]blockEntry
 	// seatMu protects seatCache from concurrent access.
 	seatMu sync.RWMutex
 }
@@ -105,7 +176,9 @@ func NewRuntime(service *furnitureapp.Service, sessions coreconnection.SessionRe
 	}
 	return &Runtime{
 		service: service, sessions: sessions, transport: transport,
-		logger: logger, seatCache: make(map[int][]seatEntry),
+		logger: logger, seatCache: make(map[int][]seatEntry), blockCache: make(map[int][]blockEntry),
+		diceRandomizer: rand.Intn, diceRollDelay: 2500 * time.Millisecond,
+		diceCancels: make(map[int]context.CancelFunc),
 	}, nil
 }
 
@@ -151,6 +224,16 @@ func (runtime *Runtime) SetRoomOccupancyChecker(fn RoomOccupancyChecker) {
 	runtime.roomOccupancyChecker = fn
 }
 
+// SetRoomEntityTileResolver configures the callback that resolves one player's current room tile.
+func (runtime *Runtime) SetRoomEntityTileResolver(fn RoomEntityTileResolver) {
+	runtime.roomEntityTileResolver = fn
+}
+
+// SetRoomTileResolver configures the callback that resolves one room layout tile snapshot.
+func (runtime *Runtime) SetRoomTileResolver(fn RoomTileResolver) {
+	runtime.roomTileResolver = fn
+}
+
 // SetRoomEntityRotator configures the callback that rotates seated entities when furniture rotates.
 func (runtime *Runtime) SetRoomEntityRotator(fn RoomEntityRotator) {
 	runtime.entityRotator = fn
@@ -159,6 +242,36 @@ func (runtime *Runtime) SetRoomEntityRotator(fn RoomEntityRotator) {
 // SetRoomEntityEvictor configures the callback that clears seated entities when furniture is moved or removed.
 func (runtime *Runtime) SetRoomEntityEvictor(fn RoomEntityEvictor) {
 	runtime.entityEvictor = fn
+}
+
+// SetRoomEntitySnapshotter configures the callback that resolves room entity snapshots.
+func (runtime *Runtime) SetRoomEntitySnapshotter(fn RoomEntitySnapshotter) {
+	runtime.roomEntitySnapshotter = fn
+}
+
+// SetRoomEntityWalker configures the callback that walks avatars to a tile.
+func (runtime *Runtime) SetRoomEntityWalker(fn RoomEntityWalker) {
+	runtime.roomEntityWalker = fn
+}
+
+// SetRoomEntityWarper configures the callback that relocates avatars in-place.
+func (runtime *Runtime) SetRoomEntityWarper(fn RoomEntityWarper) {
+	runtime.roomEntityWarper = fn
+}
+
+// SetTeleporterForwarder configures the callback that forwards avatars into destination rooms.
+func (runtime *Runtime) SetTeleporterForwarder(fn TeleporterForwarder) {
+	runtime.teleporterForwarder = fn
+}
+
+// SetDiceRandomizer configures the zero-based dice result generator used by delayed rolls.
+func (runtime *Runtime) SetDiceRandomizer(fn func(int) int) {
+	runtime.diceRandomizer = fn
+}
+
+// SetDiceRollDelay configures the rolling animation duration.
+func (runtime *Runtime) SetDiceRollDelay(delay time.Duration) {
+	runtime.diceRollDelay = delay
 }
 
 // sendPacket encodes and transmits one outgoing packet.
@@ -286,9 +399,7 @@ func (runtime *Runtime) SendRoomFloorItems(ctx context.Context, connID string, r
 	if err != nil {
 		return err
 	}
-	runtime.seatMu.Lock()
-	delete(runtime.seatCache, roomID)
-	runtime.seatMu.Unlock()
+	runtime.clearRoomPlacementEntries(roomID)
 	owners := make(map[int]string)
 	floorItems := make([]furnipacket.FurnitureFloorItem, 0, len(items))
 	for _, item := range items {
@@ -299,7 +410,7 @@ func (runtime *Runtime) SendRoomFloorItems(ctx context.Context, connID string, r
 		floorItems = append(floorItems, furnipacket.FurnitureFloorItem{
 			ItemID: item.ID, SpriteID: def.SpriteID,
 			X: item.X, Y: item.Y, Dir: item.Dir, Z: item.Z,
-			StackHeight: def.StackHeight,
+			StackHeight: runtime.effectiveStackHeight(item, def),
 			ExtraData:   item.ExtraData, UserID: item.UserID,
 		})
 		if _, seen := owners[item.UserID]; !seen {
@@ -311,11 +422,36 @@ func (runtime *Runtime) SendRoomFloorItems(ctx context.Context, connID string, r
 			}
 			owners[item.UserID] = name
 		}
-		if def.CanSit || def.CanLay {
-			runtime.replaceSeatEntries(roomID, item.ID, seatEntriesFromFootprint(item.ID, item.X, item.Y, item.Dir, def.StackHeight, def.Width, def.Length, def.CanSit, def.CanLay))
-		}
+		runtime.syncFloorItemEntries(roomID, item, def)
 	}
 	return runtime.sendPacket(connID, furnipacket.FurnitureFloorComposer{
 		Items: floorItems, Owners: owners,
 	})
+}
+
+// SendRoomWallItems loads placed wall items for one room and sends the wall list to one connection.
+func (runtime *Runtime) SendRoomWallItems(ctx context.Context, connID string, roomID int) error {
+	items, err := runtime.service.ListRoomItems(ctx, roomID)
+	if err != nil {
+		return err
+	}
+	owners := make(map[int]string)
+	wallItems := make([]furnipacket.FurnitureWallItem, 0, len(items))
+	for _, item := range items {
+		def, defErr := runtime.service.FindDefinitionByID(ctx, item.DefinitionID)
+		if defErr != nil || def.ItemType != furnituredomain.ItemTypeWall {
+			continue
+		}
+		wallItems = append(wallItems, furnipacket.FurnitureWallItem{ItemID: item.ID, SpriteID: def.SpriteID, WallPosition: item.WallPosition, ExtraData: item.ExtraData, UserID: item.UserID})
+		if _, seen := owners[item.UserID]; !seen {
+			name := ""
+			if runtime.usernameResolver != nil {
+				if resolved, resolveErr := runtime.usernameResolver(ctx, item.UserID); resolveErr == nil {
+					name = resolved
+				}
+			}
+			owners[item.UserID] = name
+		}
+	}
+	return runtime.sendPacket(connID, furnipacket.FurnitureWallComposer{Items: wallItems, Owners: owners})
 }

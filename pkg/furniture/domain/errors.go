@@ -25,3 +25,9 @@ var ErrItemNotExchangeable = errors.New("item is not exchangeable")
 
 // ErrLimitedSoldOut defines limited edition stock exhaustion behavior.
 var ErrLimitedSoldOut = errors.New("limited edition sold out")
+
+// ErrInvalidInteraction defines unsupported interaction behavior.
+var ErrInvalidInteraction = errors.New("item interaction is not supported")
+
+// ErrItemNotPlaced defines behavior for room-only interactions on inventory items.
+var ErrItemNotPlaced = errors.New("item is not placed in a room")

@@ -14,6 +14,8 @@ type Item struct {
 	DefinitionID uint `gorm:"not null;index"`
 	// ExtraData stores item-specific custom data payload.
 	ExtraData string `gorm:"type:text;not null;default:''"`
+	// InteractionData stores server-only interaction metadata.
+	InteractionData string `gorm:"type:text;not null;default:''"`
 	// LimitedNumber stores the limited edition serial number.
 	LimitedNumber int `gorm:"not null;default:0"`
 	// LimitedTotal stores the limited edition total print run.
@@ -26,6 +28,8 @@ type Item struct {
 	Z float64 `gorm:"type:numeric(6,3);not null;default:0"`
 	// Dir stores the placed rotation direction (0-7).
 	Dir int `gorm:"not null;default:0"`
+	// WallPosition stores the placed wall anchor string for wall items.
+	WallPosition string `gorm:"type:text;not null;default:''"`
 	// CreatedAt stores row creation timestamp.
 	CreatedAt time.Time
 	// UpdatedAt stores row update timestamp.

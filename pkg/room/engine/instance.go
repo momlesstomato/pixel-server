@@ -36,6 +36,12 @@ type TileSeatChecker func(roomID, x, y int) (height float64, dir int, canSit, ca
 // SeatTargetResolver resolves a clicked furniture tile to its canonical stand/sit/lay target tile.
 type SeatTargetResolver func(roomID, x, y int) (targetX, targetY int, ok bool)
 
+// TileBlockChecker checks whether a tile is blocked by dynamic room state such as furniture footprints.
+type TileBlockChecker func(roomID, x, y int) bool
+
+// TickProcessor runs one extension hook during each room tick.
+type TickProcessor func(roomID int)
+
 // RoomState identifies the lifecycle phase of a room instance.
 type RoomState int
 
@@ -89,6 +95,10 @@ type Instance struct {
 	seatChecker TileSeatChecker
 	// seatTargetResolver normalizes furniture clicks to a canonical target tile.
 	seatTargetResolver SeatTargetResolver
+	// blockChecker resolves dynamic blocked tiles such as non-walkable furniture.
+	blockChecker TileBlockChecker
+	// tickProcessor runs one optional extension during each room tick.
+	tickProcessor TickProcessor
 	// muted reports whether the room has chat globally muted.
 	muted bool
 }
@@ -152,6 +162,16 @@ func (inst *Instance) SetTileSeatChecker(fn TileSeatChecker) {
 // SetSeatTargetResolver configures the furniture target normalization callback for this instance.
 func (inst *Instance) SetSeatTargetResolver(fn SeatTargetResolver) {
 	inst.seatTargetResolver = fn
+}
+
+// SetTileBlockChecker configures the dynamic tile blocking callback for this instance.
+func (inst *Instance) SetTileBlockChecker(fn TileBlockChecker) {
+	inst.blockChecker = fn
+}
+
+// SetTickProcessor configures the optional tick extension callback for this instance.
+func (inst *Instance) SetTickProcessor(fn TickProcessor) {
+	inst.tickProcessor = fn
 }
 
 // Muted reports whether the room has chat globally muted.

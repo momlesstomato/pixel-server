@@ -38,6 +38,8 @@ func Registry() []*gormigrate.Migration {
 		furnituremigration.Step04RestoreSpriteID(),
 		furnituremigration.Step05AddItemPlacement(),
 		furnituremigration.Step06AddCanLay(),
+		furnituremigration.Step07AddItemInteractionData(),
+		furnituremigration.Step08BackfillZeroSpriteID(),
 		inventorymigration.Step01UserCurrencies(),
 		inventorymigration.Step02DropUserCredits(),
 		inventorymigration.Step03UserBadges(),

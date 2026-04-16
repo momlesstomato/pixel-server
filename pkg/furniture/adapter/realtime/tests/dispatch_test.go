@@ -70,11 +70,25 @@ func (r repoStub) DeleteItem(_ context.Context, _ int) error { return nil }
 // TransferItem returns nil.
 func (r repoStub) TransferItem(_ context.Context, _ int, _ int) error { return nil }
 
+// UpdateItemData returns nil.
+func (r repoStub) UpdateItemData(_ context.Context, _ int, _ string) error { return nil }
+
+// UpdateItemInteractionData returns nil.
+func (r repoStub) UpdateItemInteractionData(_ context.Context, _ int, _ string) error { return nil }
+
 // CountItemsByUserID returns zero.
 func (r repoStub) CountItemsByUserID(_ context.Context, _ int) (int, error) { return 0, nil }
 
 // PlaceItem returns nil (no-op placement for tests).
 func (r repoStub) PlaceItem(_ context.Context, _ int, _ int, _ int, _ int, _ float64, _ int) error {
+	return nil
+}
+
+// PlaceWallItem returns nil (no-op wall placement for tests).
+func (r repoStub) PlaceWallItem(_ context.Context, _ int, _ int, _ string) error { return nil }
+
+// UpdateItemDefinition returns nil.
+func (r repoStub) UpdateItemDefinition(_ context.Context, _ int, _ int, _ string, _ string) error {
 	return nil
 }
 

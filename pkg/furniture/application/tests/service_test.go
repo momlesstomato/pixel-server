@@ -30,7 +30,7 @@ func TestServiceDefinitionCRUD(t *testing.T) {
 	if _, err := service.CreateDefinition(context.Background(), domain.Definition{}); err == nil {
 		t.Fatalf("expected create failure for empty name")
 	}
-	created, err := service.CreateDefinition(context.Background(), domain.Definition{ItemName: "table"})
+	created, err := service.CreateDefinition(context.Background(), domain.Definition{ItemName: "table", SpriteID: 2})
 	if err != nil || created.ID != 1 {
 		t.Fatalf("unexpected create result %+v err=%v", created, err)
 	}

@@ -109,3 +109,19 @@ func Step06AddCanLay() *gormigrate.Migration {
 		},
 	}
 }
+
+// Step07AddItemInteractionData returns the migration that adds hidden interaction and wall placement support.
+func Step07AddItemInteractionData() *gormigrate.Migration {
+	return &gormigrate.Migration{
+		ID: "20260409_01_add_item_interaction_data",
+		Migrate: func(database *gorm.DB) error {
+			return database.AutoMigrate(&furnituremodel.Item{})
+		},
+		Rollback: func(database *gorm.DB) error {
+			if database.Dialector.Name() != "postgres" {
+				return nil
+			}
+			return database.Exec(`ALTER TABLE items DROP COLUMN IF EXISTS interaction_data, DROP COLUMN IF EXISTS wall_position`).Error
+		},
+	}
+}

@@ -12,6 +12,8 @@ const (
 	MsgLeave
 	// MsgWalk requests an entity to walk to a destination.
 	MsgWalk
+	// MsgWarp requests an entity to move directly to a destination tile.
+	MsgWarp
 	// MsgChat delivers a chat message to the room.
 	MsgChat
 	// MsgAction delivers an entity action to the room.
@@ -36,6 +38,8 @@ type Message struct {
 	Type MessageType
 	// Entity stores the entity performing the action.
 	Entity *domain.RoomEntity
+	// Tile stores an optional target tile payload.
+	Tile *domain.Tile
 	// TargetX stores walk destination horizontal coordinate.
 	TargetX int
 	// TargetY stores walk destination vertical coordinate.
@@ -44,6 +48,12 @@ type Message struct {
 	Text string
 	// IntValue stores numeric payload for action commands.
 	IntValue int
+	// Dir stores the target facing direction when applicable.
+	Dir int
+	// Silent suppresses a follow-up user update broadcast for direct moves.
+	Silent bool
+	// Animate requests a one-step client movement update instead of an instant relocation.
+	Animate bool
 	// Reply receives a response after processing.
 	Reply chan error
 }

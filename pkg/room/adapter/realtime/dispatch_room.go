@@ -498,7 +498,7 @@ func (rt *Runtime) handleKickUser(ctx context.Context, connID string, userID int
 		return nil
 	}
 	rt.sendKickedPacket(ctx, int(targetID))
-	rt.leaveCurrentRoom(target.ConnID)
+	_ = rt.leaveCurrentRoom(target.ConnID)
 	return nil
 }
 
@@ -549,6 +549,6 @@ func (rt *Runtime) handleBanUser(ctx context.Context, connID string, userID int,
 		return nil
 	}
 	rt.sendKickedPacket(ctx, targetID)
-	rt.leaveCurrentRoom(target.ConnID)
+	_ = rt.leaveCurrentRoom(target.ConnID)
 	return nil
 }

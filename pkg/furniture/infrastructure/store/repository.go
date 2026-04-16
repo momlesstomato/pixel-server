@@ -35,8 +35,10 @@ func mapDefinition(row furnituremodel.Definition) domain.Definition {
 		IsWalkable: row.IsWalkable, SpriteID: row.SpriteID,
 		AllowRecycle: row.AllowRecycle, AllowTrade: row.AllowTrade,
 		AllowMarketplaceSell: row.AllowMarketplaceSell, AllowGift: row.AllowGift,
-		AllowInventoryStack: row.AllowInventoryStack,
-		InteractionType:     domain.InteractionType(row.InteractionType),
+		AllowInventoryStack:   row.AllowInventoryStack,
+		InteractionType:       domain.InteractionType(row.InteractionType),
+		InteractionModesCount: int(row.InteractionModesCount),
+		EffectID:              row.EffectID,
 	}
 }
 
@@ -45,9 +47,11 @@ func mapItem(row furnituremodel.Item) domain.Item {
 	return domain.Item{
 		ID: int(row.ID), UserID: int(row.UserID), RoomID: int(row.RoomID),
 		DefinitionID: int(row.DefinitionID), ExtraData: row.ExtraData,
-		LimitedNumber: row.LimitedNumber, LimitedTotal: row.LimitedTotal,
+		InteractionData: row.InteractionData,
+		LimitedNumber:   row.LimitedNumber, LimitedTotal: row.LimitedTotal,
 		X: row.X, Y: row.Y, Z: row.Z, Dir: row.Dir,
-		CreatedAt: row.CreatedAt,
+		WallPosition: row.WallPosition,
+		CreatedAt:    row.CreatedAt,
 	}
 }
 
@@ -55,7 +59,8 @@ func mapItem(row furnituremodel.Item) domain.Item {
 func toItemRecord(item domain.Item) furnituremodel.Item {
 	return furnituremodel.Item{
 		UserID: uint(item.UserID), DefinitionID: uint(item.DefinitionID),
-		ExtraData: item.ExtraData, LimitedNumber: item.LimitedNumber,
-		LimitedTotal: item.LimitedTotal, CreatedAt: time.Now().UTC(),
+		ExtraData: item.ExtraData, InteractionData: item.InteractionData,
+		LimitedNumber: item.LimitedNumber,
+		LimitedTotal:  item.LimitedTotal, CreatedAt: time.Now().UTC(),
 	}
 }

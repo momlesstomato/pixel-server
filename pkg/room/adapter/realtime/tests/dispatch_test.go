@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	sdk "github.com/momlesstomato/pixel-sdk"
+	sdkroom "github.com/momlesstomato/pixel-sdk/events/room"
 	"github.com/momlesstomato/pixel-server/core/codec"
 	coreconnection "github.com/momlesstomato/pixel-server/core/connection"
 	"github.com/momlesstomato/pixel-server/pkg/room/adapter/realtime"
@@ -119,6 +121,107 @@ func TestHandle_MoveAvatar_NoRoom(t *testing.T) {
 	handled, err := rt.Handle(context.Background(), "conn1", packet.MoveAvatarPacketID, body)
 	assert.NoError(t, err)
 	assert.True(t, handled)
+}
+
+// TestQueueTeleporterEntry_SpawnsWithoutImmediateExitWalk verifies pending teleporter entry enters the target room on the spawn tile without immediately walking out.
+func TestQueueTeleporterEntry_SpawnsWithoutImmediateExitWalk(t *testing.T) {
+	models := &modelRepoStub{models: map[string]domain.RoomModel{
+		"model_a": {Slug: "model_a", DoorX: 1, DoorY: 1, DoorDir: 2, Heightmap: "xxxxx\rx000x\rxxxxx"},
+	}}
+	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcaster)
+	svc, err := roomapp.NewService(models, &banRepoStub{}, &rightsRepoStub{}, mgr, zap.NewNop())
+	require.NoError(t, err)
+	svc.SetRoomRepository(&roomRepoLocalStub{rooms: map[int]domain.Room{1: {ID: 1, OwnerID: 1, State: domain.AccessOpen, ModelSlug: "model_a"}}})
+	entitySvc, err := roomapp.NewEntityService(mgr, zap.NewNop())
+	require.NoError(t, err)
+	chatSvc, err := roomapp.NewChatService(zap.NewNop())
+	require.NoError(t, err)
+	tp := &transportStub{}
+	rt, err := realtime.NewRuntime(svc, entitySvc, chatSvc, sessionStub{}, tp, broadcasterStub{}, zap.NewNop())
+	require.NoError(t, err)
+	t.Cleanup(func() { mgr.StopAll() })
+	baselinePackets := len(tp.sent)
+	require.NoError(t, rt.QueueTeleporterEntry(context.Background(), "conn1", 1, 2, 1, 0, 2, 3, 1))
+	inst, ok := mgr.Get(1)
+	require.True(t, ok)
+	require.Empty(t, inst.Entities())
+	queuedPackets := tp.sent[baselinePackets:]
+	assert.NotContains(t, queuedPackets, packet.UsersComposerID)
+	assert.NotContains(t, queuedPackets, packet.UserUpdateComposerID)
+	_, err = rt.Handle(context.Background(), "conn1", packet.GetRoomEntryDataPacketID, nil)
+	require.NoError(t, err)
+	entities := inst.Entities()
+	require.Len(t, entities, 1)
+	assert.Equal(t, 2, entities[0].Position.X)
+	assert.Equal(t, 1, entities[0].Position.Y)
+	assert.Nil(t, entities[0].GoalPosition)
+	assert.Empty(t, entities[0].Path)
+	require.NotEmpty(t, tp.sent)
+	assert.Equal(t, packet.OpenConnectionComposerID, tp.sent[0])
+}
+
+// TestQueueTeleporterEntry_UsesRoomLifecycle verifies cross-room teleports leave through room events and defer target entry until room entry data is requested.
+func TestQueueTeleporterEntry_UsesRoomLifecycle(t *testing.T) {
+	models := &modelRepoStub{models: map[string]domain.RoomModel{
+		"model_a": {Slug: "model_a", DoorX: 1, DoorY: 1, DoorDir: 2, Heightmap: "xxxxx\rx000x\rxxxxx"},
+	}}
+	mgr := engine.NewManager(context.Background(), zap.NewNop(), noopBroadcaster)
+	svc, err := roomapp.NewService(models, &banRepoStub{}, &rightsRepoStub{}, mgr, zap.NewNop())
+	require.NoError(t, err)
+	events := make([]string, 0, 4)
+	svc.SetEventFirer(func(event sdk.Event) {
+		switch event.(type) {
+		case *sdkroom.RoomLeaving:
+			events = append(events, "leaving")
+		case *sdkroom.RoomLeft:
+			events = append(events, "left")
+		case *sdkroom.RoomEntering:
+			events = append(events, "entering")
+		case *sdkroom.RoomEntered:
+			events = append(events, "entered")
+		}
+	})
+	svc.SetRoomRepository(&roomRepoLocalStub{rooms: map[int]domain.Room{
+		1: {ID: 1, OwnerID: 1, State: domain.AccessOpen, ModelSlug: "model_a"},
+		2: {ID: 2, OwnerID: 1, State: domain.AccessOpen, ModelSlug: "model_a"},
+	}})
+	entitySvc, err := roomapp.NewEntityService(mgr, zap.NewNop())
+	require.NoError(t, err)
+	chatSvc, err := roomapp.NewChatService(zap.NewNop())
+	require.NoError(t, err)
+	tp := &transportStub{}
+	rt, err := realtime.NewRuntime(svc, entitySvc, chatSvc, sessionStub{}, tp, broadcasterStub{}, zap.NewNop())
+	require.NoError(t, err)
+	t.Cleanup(func() { mgr.StopAll() })
+	openBody, err := packet.OpenFlatConnectionPacket{RoomID: 1}.Encode()
+	require.NoError(t, err)
+	_, err = rt.Handle(context.Background(), "conn1", packet.OpenFlatConnectionPacketID, openBody)
+	require.NoError(t, err)
+	_, err = rt.Handle(context.Background(), "conn1", packet.GetRoomEntryDataPacketID, nil)
+	require.NoError(t, err)
+	events = events[:0]
+	inst, ok := mgr.Get(1)
+	require.True(t, ok)
+	require.Len(t, inst.Entities(), 1)
+	baselinePackets := len(tp.sent)
+	require.NoError(t, rt.QueueTeleporterEntry(context.Background(), "conn1", 2, 2, 1, 0, 2, 3, 1))
+	assert.Empty(t, inst.Entities())
+	targetInst, ok := mgr.Get(2)
+	require.True(t, ok)
+	assert.Empty(t, targetInst.Entities())
+	queuedPackets := tp.sent[baselinePackets:]
+	assert.NotContains(t, queuedPackets, packet.UsersComposerID)
+	assert.NotContains(t, queuedPackets, packet.UserUpdateComposerID)
+	assert.Equal(t, []string{"leaving", "left"}, events)
+	_, err = rt.Handle(context.Background(), "conn1", packet.GetRoomEntryDataPacketID, nil)
+	require.NoError(t, err)
+	targetEntities := targetInst.Entities()
+	require.Len(t, targetEntities, 1)
+	assert.Equal(t, 2, targetEntities[0].Position.X)
+	assert.Equal(t, 1, targetEntities[0].Position.Y)
+	assert.Equal(t, []string{"leaving", "left", "entering", "entered"}, events)
+	require.NotEmpty(t, queuedPackets)
+	assert.Contains(t, queuedPackets, packet.OpenConnectionComposerID)
 }
 
 // TestDispose verifies connection cleanup for a connection not in any room.

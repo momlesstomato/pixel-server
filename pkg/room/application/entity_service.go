@@ -57,6 +57,13 @@ func (s *EntityService) Walk(_ context.Context, inst *engine.Instance, entity *d
 	return nil
 }
 
+// Warp requests an immediate entity relocation inside one room instance.
+func (s *EntityService) Warp(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity, tile domain.Tile, dir int, silent bool, animate bool) error {
+	reply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWarp, Entity: entity, Tile: &tile, Dir: dir, Silent: silent, Animate: animate, Reply: reply})
+	return <-reply
+}
+
 // Dance sends a dance state change into the room engine.
 func (s *EntityService) Dance(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity, danceID int) error {
 	if s.fire != nil {

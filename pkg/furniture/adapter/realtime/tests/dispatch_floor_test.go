@@ -40,6 +40,9 @@ func (r foundRepoStub) ListItemsByRoomID(_ context.Context, _ int) ([]furnitured
 // compile-time assertion that foundRepoStub satisfies domain.Repository.
 var _ furnituredomain.Repository = foundRepoStub{}
 
+// UpdateItemData returns nil.
+func (r foundRepoStub) UpdateItemData(_ context.Context, _ int, _ string) error { return nil }
+
 // buildRuntimeWithRoom creates a runtime wired with room finder and broadcaster stubs.
 func buildRuntimeWithRoom(repo furnituredomain.Repository, roomID int) (*realtime.Runtime, *transportStub, *[]uint16) {
 	svc, _ := furnitureapplication.NewService(repo)
@@ -431,6 +434,49 @@ func TestSendRoomFloorItemsSends1778(t *testing.T) {
 	}
 	if len(tp.sent) != 1 || tp.sent[0] != furnipacket.FurnitureFloorPacketID {
 		t.Fatalf("expected floor packet %d, got %v", furnipacket.FurnitureFloorPacketID, tp.sent)
+	}
+}
+
+// TestSendRoomFloorItemsCachesBlockedTeleporterTile verifies non-walkable teleporter footprints are cached as blocked room tiles.
+func TestSendRoomFloorItemsCachesBlockedTeleporterTile(t *testing.T) {
+	item := furnituredomain.Item{ID: 7, UserID: 1, RoomID: 5, X: 4, Y: 7, Dir: 2, DefinitionID: 3}
+	def := furnituredomain.Definition{ID: 3, ItemType: furnituredomain.ItemTypeFloor, Width: 1, Length: 1, InteractionType: furnituredomain.InteractionTeleport, IsWalkable: false, SpriteID: 55}
+	repo := foundRepoStub{item: item, def: def, repoStub: repoStub{items: []furnituredomain.Item{item}}}
+	svc, _ := furnitureapplication.NewService(repo)
+	tp := &transportStub{}
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, tp, nil)
+	if err := rt.SendRoomFloorItems(context.Background(), "conn1", 5); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rt.TileBlockCheckerFor(5, 4, 7) {
+		t.Fatal("expected teleporter footprint tile to be blocked")
+	}
+	if rt.TileBlockCheckerFor(5, 5, 7) {
+		t.Fatal("expected adjacent tile to remain unblocked")
+	}
+}
+
+// TestHandleFloorUpdateMovesBlockedTileCache verifies moving a blocked floor item updates the room blocker cache.
+func TestHandleFloorUpdateMovesBlockedTileCache(t *testing.T) {
+	repo := &advancedRepo{items: map[int]furnituredomain.Item{10: {ID: 10, UserID: 1, RoomID: 5, X: 1, Y: 1, DefinitionID: 3}}, defs: map[int]furnituredomain.Definition{3: {ID: 3, ItemType: furnituredomain.ItemTypeFloor, Width: 1, Length: 1, InteractionType: furnituredomain.InteractionTeleport, IsWalkable: false, SpriteID: 100}}}
+	svc, _ := furnitureapplication.NewService(repo)
+	tp := &transportStub{}
+	rt, _ := realtime.NewRuntime(svc, sessionStub{}, tp, nil)
+	rt.SetRoomFinder(func(_ string) (int, bool) { return 5, true })
+	rt.SetRoomBroadcaster(func(_ int, _ uint16, _ []byte) {})
+	if err := rt.SendRoomFloorItems(context.Background(), "conn1", 5); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	body := encodeInt32x4(10, 2, 3, 2)
+	handled, err := rt.Handle(context.Background(), "conn1", furnipacket.FloorUpdatePacketID, body)
+	if err != nil || !handled {
+		t.Fatalf("expected handled without error, got handled=%v err=%v", handled, err)
+	}
+	if rt.TileBlockCheckerFor(5, 1, 1) {
+		t.Fatal("expected old teleporter tile to be released")
+	}
+	if !rt.TileBlockCheckerFor(5, 2, 3) {
+		t.Fatal("expected moved teleporter tile to be blocked")
 	}
 }
 

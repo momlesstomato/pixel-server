@@ -13,6 +13,7 @@ import (
 	cataloghttpapi "github.com/momlesstomato/pixel-server/pkg/catalog/adapter/httpapi"
 	economyhttpapi "github.com/momlesstomato/pixel-server/pkg/economy/adapter/httpapi"
 	furniturehttpapi "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/httpapi"
+	furniturerealtime "github.com/momlesstomato/pixel-server/pkg/furniture/adapter/realtime"
 	handshakerealtime "github.com/momlesstomato/pixel-server/pkg/handshake/adapter/realtime"
 	packetsecurity "github.com/momlesstomato/pixel-server/pkg/handshake/packet/security"
 	inventoryhttpapi "github.com/momlesstomato/pixel-server/pkg/inventory/adapter/httpapi"
@@ -137,6 +138,7 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 		services.room.Manager().SetDoorExitNotifier(roomRT.OnDoorExit)
 		furnitureRT.SetRoomFinder(roomRT.ConnRoomID)
 		furnitureRT.SetRoomBroadcaster(roomRT.BroadcastRawToRoom)
+		furnitureRT.SetRoomEntityTileResolver(roomRT.ConnTile)
 		furnitureRT.SetRoomAccessChecker(func(ctx context.Context, roomID, userID int) bool {
 			room, err := services.room.FindRoom(ctx, roomID)
 			if err != nil {
@@ -163,8 +165,60 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			}
 			return false
 		})
+		furnitureRT.SetRoomTileResolver(func(roomID, x, y int) (furniturerealtime.RoomTileSnapshot, bool) {
+			inst, ok := services.room.Manager().Get(roomID)
+			if !ok {
+				return furniturerealtime.RoomTileSnapshot{}, false
+			}
+			tile, ok := inst.Layout.TileAt(x, y)
+			if !ok {
+				return furniturerealtime.RoomTileSnapshot{}, false
+			}
+			return furniturerealtime.RoomTileSnapshot{Z: tile.Z, Walkable: tile.State == roomdomain.TileOpen}, true
+		})
 		furnitureRT.SetRoomEntityRotator(roomRT.RotateSittingEntitiesInRoom)
 		furnitureRT.SetRoomEntityEvictor(roomRT.EjectSittingEntitiesInRoom)
+		furnitureRT.SetRoomEntitySnapshotter(func(roomID int) []furniturerealtime.RoomEntitySnapshot {
+			inst, ok := services.room.Manager().Get(roomID)
+			if !ok {
+				return nil
+			}
+			entities := inst.Entities()
+			result := make([]furniturerealtime.RoomEntitySnapshot, 0, len(entities))
+			for _, entity := range entities {
+				result = append(result, furniturerealtime.RoomEntitySnapshot{ConnID: entity.ConnID, VirtualID: entity.VirtualID, UserID: entity.UserID, X: entity.Position.X, Y: entity.Position.Y, Z: entity.Position.Z, Dir: entity.BodyRotation, IsWalking: entity.IsWalking})
+			}
+			return result
+		})
+		furnitureRT.SetRoomEntityWalker(func(ctx context.Context, connID string, x, y int) error {
+			roomID, ok := roomRT.ConnRoomID(connID)
+			if !ok {
+				return nil
+			}
+			inst, ok := services.room.Manager().Get(roomID)
+			if !ok {
+				return nil
+			}
+			entities := inst.Entities()
+			for index := range entities {
+				if entities[index].ConnID == connID {
+					return services.entityService.Walk(ctx, inst, &entities[index], x, y)
+				}
+			}
+			return nil
+		})
+		furnitureRT.SetRoomEntityWarper(func(ctx context.Context, roomID, virtualID, x, y int, z float64, dir int, silent bool, animate bool) error {
+			inst, ok := services.room.Manager().Get(roomID)
+			if !ok {
+				return nil
+			}
+			entity, ok := inst.Entity(virtualID)
+			if !ok {
+				return nil
+			}
+			return services.entityService.Warp(ctx, inst, &entity, roomdomain.Tile{X: x, Y: y, Z: z, State: roomdomain.TileOpen}, dir, silent, animate)
+		})
+		furnitureRT.SetTeleporterForwarder(roomRT.QueueTeleporterEntry)
 		furnitureRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
 			user, err := services.users.FindByID(ctx, userID)
 			if err != nil {
@@ -173,9 +227,12 @@ func registerServeWebSocket(module *corehttp.Module, path string, runtime *initi
 			return user.Username, nil
 		})
 		roomRT.SetFloorItemSender(furnitureRT.SendRoomFloorItems)
+		roomRT.SetWallItemSender(furnitureRT.SendRoomWallItems)
 		roomRT.SetVoteRepository(services.voteStore)
 		services.room.Manager().SetTileSeatChecker(furnitureRT.TileSeatCheckerFor)
 		services.room.Manager().SetSeatTargetResolver(furnitureRT.ResolveSeatTargetFor)
+		services.room.Manager().SetTileBlockChecker(furnitureRT.TileBlockCheckerFor)
+		services.room.Manager().SetTickProcessor(furnitureRT.ProcessRoomTick)
 		roomRT.SetUsernameResolver(func(ctx context.Context, userID int) (string, error) {
 			user, err := services.users.FindByID(ctx, userID)
 			if err != nil {

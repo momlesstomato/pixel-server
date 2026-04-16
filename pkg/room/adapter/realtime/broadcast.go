@@ -94,6 +94,19 @@ func (rt *Runtime) ConnRoomID(connID string) (int, bool) {
 	return rt.roomIDByConn(connID)
 }
 
+// ConnTile returns the active room tile for a given connection, if present.
+func (rt *Runtime) ConnTile(connID string) (int, int, int, bool) {
+	userID, ok := rt.userID(connID)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	inst, entity := rt.findEntityByConnID(connID, userID)
+	if inst == nil || entity == nil {
+		return 0, 0, 0, false
+	}
+	return inst.RoomID, entity.Position.X, entity.Position.Y, true
+}
+
 // OnKick broadcasts entity removal for one auto-kicked entity and removes connection tracking.
 func (rt *Runtime) OnKick(roomID int, entity domain.RoomEntity) {
 	body, err := packet.UserRemoveComposer{VirtualID: int32(entity.VirtualID)}.Encode()

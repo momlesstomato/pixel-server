@@ -24,6 +24,14 @@ const (
 	InteractionRoller InteractionType = "roller"
 	// InteractionDice identifies a throwable dice item.
 	InteractionDice InteractionType = "dice"
+	// InteractionGift identifies an unwrap-able present item.
+	InteractionGift InteractionType = "gift"
+	// InteractionPostIt identifies a wall post-it item.
+	InteractionPostIt InteractionType = "postit"
+	// InteractionDimmer identifies a room dimmer item.
+	InteractionDimmer InteractionType = "dimmer"
+	// InteractionStackHelper identifies a stack-helper item.
+	InteractionStackHelper InteractionType = "stack_helper"
 )
 
 // Definition defines one static furniture type metadata row.
@@ -64,4 +72,8 @@ type Definition struct {
 	AllowInventoryStack bool
 	// InteractionType stores the behavior handler key.
 	InteractionType InteractionType
+	// InteractionModesCount stores the number of client-visible toggle modes.
+	InteractionModesCount int
+	// EffectID stores the associated room effect identifier.
+	EffectID int
 }

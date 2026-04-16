@@ -30,6 +30,10 @@ type Manager struct {
 	seatChecker TileSeatChecker
 	// seatTargetResolver stores the furniture target normalization callback.
 	seatTargetResolver SeatTargetResolver
+	// blockChecker stores the dynamic tile blocking callback.
+	blockChecker TileBlockChecker
+	// tickProcessor stores the per-tick extension callback.
+	tickProcessor TickProcessor
 }
 
 // NewManager creates a room instance manager.
@@ -57,6 +61,8 @@ func (m *Manager) Load(roomID int, layout domain.Layout) *Instance {
 	inst.SetDoorExitNotifier(m.doorExitNotifier)
 	inst.SetTileSeatChecker(m.seatChecker)
 	inst.SetSeatTargetResolver(m.seatTargetResolver)
+	inst.SetTileBlockChecker(m.blockChecker)
+	inst.SetTickProcessor(m.tickProcessor)
 	inst.Start(m.ctx)
 	m.rooms[roomID] = inst
 	m.logger.Info("room loaded", zap.Int("room_id", roomID))
@@ -152,6 +158,20 @@ func (m *Manager) SetSeatTargetResolver(fn SeatTargetResolver) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.seatTargetResolver = fn
+}
+
+// SetTileBlockChecker configures the dynamic tile blocker for all new instances.
+func (m *Manager) SetTileBlockChecker(fn TileBlockChecker) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.blockChecker = fn
+}
+
+// SetTickProcessor configures the room tick extension callback for all new instances.
+func (m *Manager) SetTickProcessor(fn TickProcessor) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.tickProcessor = fn
 }
 
 // Cleanup removes stopped instances from the registry.

@@ -110,6 +110,28 @@ func (s *Service) EnterRoom(ctx context.Context, inst *engine.Instance, entity *
 	return nil
 }
 
+// EnterRoomAt places a player entity into a room instance at a specific tile.
+func (s *Service) EnterRoomAt(ctx context.Context, inst *engine.Instance, entity *domain.RoomEntity, roomID int, userID int, tile domain.Tile, dir int) error {
+	if s.fire != nil {
+		ev := &sdkroom.RoomEntering{RoomID: roomID, UserID: userID}
+		s.fire(ev)
+		if ev.Cancelled() {
+			return domain.ErrAccessDenied
+		}
+	}
+	reply := make(chan error, 1)
+	if !inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Tile: &tile, Dir: dir, Reply: reply}) {
+		return domain.ErrRoomFull
+	}
+	if err := <-reply; err != nil {
+		return err
+	}
+	if s.fire != nil {
+		s.fire(&sdkroom.RoomEntered{RoomID: roomID, UserID: userID, VirtualID: entity.VirtualID})
+	}
+	return nil
+}
+
 // LeaveRoom removes a player entity from a room instance.
 func (s *Service) LeaveRoom(_ context.Context, inst *engine.Instance, entity *domain.RoomEntity, roomID int, userID int) error {
 	if s.fire != nil {

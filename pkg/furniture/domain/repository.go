@@ -26,8 +26,16 @@ type Repository interface {
 	DeleteItem(context.Context, int) error
 	// TransferItem changes item ownership atomically.
 	TransferItem(ctx context.Context, itemID int, newUserID int) error
+	// UpdateItemData updates the custom data payload for one item.
+	UpdateItemData(ctx context.Context, itemID int, extraData string) error
+	// UpdateItemInteractionData updates the hidden interaction payload for one item.
+	UpdateItemInteractionData(ctx context.Context, itemID int, interactionData string) error
 	// PlaceItem updates item room placement coordinates.
 	PlaceItem(ctx context.Context, itemID int, roomID int, x int, y int, z float64, dir int) error
+	// PlaceWallItem updates item wall placement for one room.
+	PlaceWallItem(ctx context.Context, itemID int, roomID int, wallPosition string) error
+	// UpdateItemDefinition transforms one item into another definition payload.
+	UpdateItemDefinition(ctx context.Context, itemID int, definitionID int, extraData string, interactionData string) error
 	// ListItemsByRoomID resolves all placed items in one room.
 	ListItemsByRoomID(context.Context, int) ([]Item, error)
 	// CountItemsByUserID returns item count for one user inventory.

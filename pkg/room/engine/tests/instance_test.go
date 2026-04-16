@@ -91,6 +91,36 @@ func TestInstance_Leave(t *testing.T) {
 	assert.Equal(t, 0, inst.EntityCount())
 }
 
+// TestInstance_AnimatedWarpUsesMovementTick verifies animated warps move on the next tick instead of relocating immediately.
+func TestInstance_AnimatedWarpUsesMovementTick(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	require.NoError(t, <-enterReply)
+	warpReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWarp, Entity: entity, Tile: &domain.Tile{X: 1, Y: 0, Z: 0, State: domain.TileOpen}, Dir: 6, Animate: true, Reply: warpReply})
+	require.NoError(t, <-warpReply)
+	beforeTick, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, 0, beforeTick.Position.X)
+	assert.Equal(t, 0, beforeTick.Position.Y)
+	assert.True(t, beforeTick.IsWalking)
+	time.Sleep(600 * time.Millisecond)
+	afterTick, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, 1, afterTick.Position.X)
+	assert.Equal(t, 0, afterTick.Position.Y)
+	require.NotNil(t, afterTick.StepFrom)
+	assert.Equal(t, 0, afterTick.StepFrom.X)
+	assert.Equal(t, 0, afterTick.StepFrom.Y)
+	assert.Equal(t, "1,0,0", afterTick.Statuses["mv"])
+	assert.False(t, afterTick.IsWalking)
+}
+
 // TestInstance_SendFull verifies channel backpressure.
 func TestInstance_SendFull(t *testing.T) {
 	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
@@ -453,4 +483,45 @@ func TestHandleSitUsesCanonicalFloorSitHeight(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "0.50 1", e.Statuses["sit"])
 	assert.True(t, e.IsSitting)
+}
+
+// TestWalkBlockedByTileBlockChecker verifies dynamic furniture blockers prevent normal walking onto blocked tiles.
+func TestWalkBlockedByTileBlockChecker(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.SetTileBlockChecker(func(_ int, x, y int) bool {
+		return x == 2 && y == 2
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Reply: enterReply})
+	<-enterReply
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 2, TargetY: 2, Reply: walkReply})
+	assert.ErrorIs(t, <-walkReply, domain.ErrPathBlocked)
+}
+
+// TestWalkOffBlockedStartTileAllowed verifies entities can walk off a blocked start tile after teleporter-style entry.
+func TestWalkOffBlockedStartTileAllowed(t *testing.T) {
+	inst := engine.NewInstance(1, testLayout(), zap.NewNop(), noopBroadcaster)
+	inst.SetTileBlockChecker(func(_ int, x, y int) bool {
+		return x == 2 && y == 2
+	})
+	inst.Start(context.Background())
+	defer inst.Stop()
+	time.Sleep(50 * time.Millisecond)
+	entity := testEntity()
+	enterReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgEnter, Entity: entity, Tile: &domain.Tile{X: 2, Y: 2, Z: 0, State: domain.TileOpen}, Dir: 2, Reply: enterReply})
+	require.NoError(t, <-enterReply)
+	walkReply := make(chan error, 1)
+	inst.Send(engine.Message{Type: engine.MsgWalk, Entity: entity, TargetX: 3, TargetY: 2, Reply: walkReply})
+	require.NoError(t, <-walkReply)
+	time.Sleep(3 * time.Second)
+	e, ok := inst.Entity(entity.VirtualID)
+	require.True(t, ok)
+	assert.Equal(t, 3, e.Position.X)
+	assert.Equal(t, 2, e.Position.Y)
 }

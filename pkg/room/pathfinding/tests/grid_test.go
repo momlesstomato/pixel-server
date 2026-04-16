@@ -68,6 +68,16 @@ func TestGrid_IsWalkable(t *testing.T) {
 	assert.False(t, g.IsWalkable(5, 5))
 }
 
+// TestGrid_IsWalkableWithDynamicBlockChecker verifies dynamic blocker callbacks participate in walkability checks.
+func TestGrid_IsWalkableWithDynamicBlockChecker(t *testing.T) {
+	tiles := makeGrid([]string{"00", "00"})
+	g := pathfinding.NewGridWithBlockersAndChecker(tiles, nil, func(x, y int) bool {
+		return x == 1 && y == 0
+	})
+	assert.True(t, g.IsWalkable(0, 0))
+	assert.False(t, g.IsWalkable(1, 0))
+}
+
 // TestGrid_HeightAt verifies height retrieval.
 func TestGrid_HeightAt(t *testing.T) {
 	tiles := makeGridWithHeight([]string{"00"}, map[[2]int]float64{{1, 0}: 3.5})

@@ -77,6 +77,16 @@ func (s repositoryStub) TransferItem(_ context.Context, _ int, _ int) error {
 	return s.transferErr
 }
 
+// UpdateItemData returns deterministic error.
+func (s repositoryStub) UpdateItemData(_ context.Context, _ int, _ string) error {
+	return s.transferErr
+}
+
+// UpdateItemInteractionData returns deterministic error.
+func (s repositoryStub) UpdateItemInteractionData(_ context.Context, _ int, _ string) error {
+	return s.transferErr
+}
+
 // CountItemsByUserID returns deterministic count.
 func (s repositoryStub) CountItemsByUserID(_ context.Context, _ int) (int, error) {
 	return 5, nil
@@ -85,6 +95,16 @@ func (s repositoryStub) CountItemsByUserID(_ context.Context, _ int) (int, error
 // PlaceItem returns nil (no-op placement for tests).
 func (s repositoryStub) PlaceItem(_ context.Context, _ int, _ int, _ int, _ int, _ float64, _ int) error {
 	return nil
+}
+
+// PlaceWallItem returns nil (no-op placement for tests).
+func (s repositoryStub) PlaceWallItem(_ context.Context, _ int, _ int, _ string) error {
+	return nil
+}
+
+// UpdateItemDefinition returns deterministic error.
+func (s repositoryStub) UpdateItemDefinition(_ context.Context, _ int, _ int, _ string, _ string) error {
+	return s.transferErr
 }
 
 // ListItemsByRoomID returns deterministic items placed in a room.

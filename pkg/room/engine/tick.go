@@ -11,6 +11,9 @@ import (
 func (inst *Instance) processTick() {
 	inst.processIdleCheck()
 	doorExits := inst.processEntityMovement()
+	if inst.tickProcessor != nil {
+		inst.tickProcessor(inst.RoomID)
+	}
 	newlySlept, kicked := inst.processEntityIdle()
 	inst.broadcastDirtyEntities()
 	inst.removeDoorExits(doorExits)
@@ -204,7 +207,15 @@ func (inst *Instance) startWalk(entity *domain.RoomEntity, targetX, targetY int)
 		}
 		blockers = append(blockers, [2]int{e.Position.X, e.Position.Y})
 	}
-	grid := pathfinding.NewGridWithBlockers(inst.Layout.Grid, blockers)
+	grid := pathfinding.NewGridWithBlockersAndChecker(inst.Layout.Grid, blockers, func(x, y int) bool {
+		if inst.blockChecker == nil {
+			return false
+		}
+		if x == entity.Position.X && y == entity.Position.Y {
+			return false
+		}
+		return inst.blockChecker(inst.RoomID, x, y)
+	})
 	opts := pathfinding.DefaultOptions()
 	path := pathfinding.FindPath(grid, entity.Position.X, entity.Position.Y, targetX, targetY, opts)
 	if path == nil {

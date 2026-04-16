@@ -67,10 +67,60 @@ func (store *Store) TransferItem(ctx context.Context, itemID int, newUserID int)
 	return nil
 }
 
+// UpdateItemData updates the custom data payload for one item.
+func (store *Store) UpdateItemData(ctx context.Context, itemID int, extraData string) error {
+	result := store.database.WithContext(ctx).Model(&furnituremodel.Item{}).Where("id = ?", itemID).Update("extra_data", extraData)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrItemNotFound
+	}
+	return nil
+}
+
+// UpdateItemInteractionData updates the hidden interaction payload for one item.
+func (store *Store) UpdateItemInteractionData(ctx context.Context, itemID int, interactionData string) error {
+	result := store.database.WithContext(ctx).Model(&furnituremodel.Item{}).Where("id = ?", itemID).Update("interaction_data", interactionData)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrItemNotFound
+	}
+	return nil
+}
+
 // PlaceItem updates item room placement coordinates.
 func (store *Store) PlaceItem(ctx context.Context, itemID int, roomID int, x int, y int, z float64, dir int) error {
 	result := store.database.WithContext(ctx).Model(&furnituremodel.Item{}).Where("id = ?", itemID).
-		Updates(map[string]interface{}{"room_id": roomID, "x": x, "y": y, "z": z, "dir": dir})
+		Updates(map[string]interface{}{"room_id": roomID, "x": x, "y": y, "z": z, "dir": dir, "wall_position": ""})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrItemNotFound
+	}
+	return nil
+}
+
+// PlaceWallItem updates item wall placement coordinates.
+func (store *Store) PlaceWallItem(ctx context.Context, itemID int, roomID int, wallPosition string) error {
+	result := store.database.WithContext(ctx).Model(&furnituremodel.Item{}).Where("id = ?", itemID).
+		Updates(map[string]interface{}{"room_id": roomID, "x": 0, "y": 0, "z": 0, "dir": 0, "wall_position": wallPosition})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrItemNotFound
+	}
+	return nil
+}
+
+// UpdateItemDefinition transforms one item into another definition payload.
+func (store *Store) UpdateItemDefinition(ctx context.Context, itemID int, definitionID int, extraData string, interactionData string) error {
+	result := store.database.WithContext(ctx).Model(&furnituremodel.Item{}).Where("id = ?", itemID).
+		Updates(map[string]interface{}{"definition_id": definitionID, "extra_data": extraData, "interaction_data": interactionData})
 	if result.Error != nil {
 		return result.Error
 	}

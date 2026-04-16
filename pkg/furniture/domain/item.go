@@ -14,6 +14,8 @@ type Item struct {
 	DefinitionID int
 	// ExtraData stores item-specific custom data payload.
 	ExtraData string
+	// InteractionData stores server-only interaction metadata.
+	InteractionData string
 	// LimitedNumber stores the limited edition serial number.
 	LimitedNumber int
 	// LimitedTotal stores the limited edition total print run.
@@ -26,6 +28,8 @@ type Item struct {
 	Z float64
 	// Dir stores the placed rotation direction (0-7).
 	Dir int
+	// WallPosition stores the placed wall anchor string for wall items.
+	WallPosition string
 	// CreatedAt stores item creation timestamp.
 	CreatedAt time.Time
 }

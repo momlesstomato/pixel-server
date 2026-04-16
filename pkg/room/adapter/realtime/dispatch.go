@@ -96,33 +96,40 @@ func (rt *Runtime) handleOpenFlat(ctx context.Context, connID string, userID int
 		rt.logger.Warn("room lookup failed", zap.Int("room_id", roomID), zap.Error(err))
 		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 1})
 	}
-	if room.ForwardRoomID > 0 {
+	teleportEntry, viaTeleporter := rt.pendingTeleport(connID, roomID)
+	if viaTeleporter && rt.service.CheckBan(ctx, room.ID, userID) {
+		rt.clearPendingTeleport(connID)
+		return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 4})
+	}
+	if room.ForwardRoomID > 0 && !viaTeleporter {
 		return rt.sendPacket(connID, packet.RoomForwardComposer{RoomID: int32(room.ForwardRoomID)})
 	}
 	canBypass := rt.canBypassRoomAccess(ctx, userID, room)
-	if room.State == domain.AccessPassword && !canBypass {
+	if room.State == domain.AccessPassword && !canBypass && !viaTeleporter {
 		if retryAfter, active := rt.currentCooldown(userID, roomID); active {
 			return rt.sendPasswordCooldownFeedback(connID, retryAfter)
 		}
 	}
-	if accessErr := rt.service.CheckAccess(ctx, room, pkt.Password, userID); accessErr != nil {
-		if accessErr == domain.ErrRoomBanned {
-			return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 4})
-		}
-		if accessErr == domain.ErrInvalidPassword {
-			if canBypass {
+	if !viaTeleporter {
+		if accessErr := rt.service.CheckAccess(ctx, room, pkt.Password, userID); accessErr != nil {
+			if accessErr == domain.ErrRoomBanned {
+				return rt.sendPacket(connID, packet.CantConnectComposer{ErrorCode: 4})
+			}
+			if accessErr == domain.ErrInvalidPassword {
+				if canBypass {
+					goto allowEntry
+				}
+				if retryAfter, cooldown := rt.recordPasswordFailure(userID, roomID); cooldown {
+					return rt.sendPasswordCooldownFeedback(connID, retryAfter)
+				}
+				return rt.sendWrongPasswordFeedback(connID)
+			}
+			if accessErr == domain.ErrAccessDenied && canBypass {
 				goto allowEntry
 			}
-			if retryAfter, cooldown := rt.recordPasswordFailure(userID, roomID); cooldown {
-				return rt.sendPasswordCooldownFeedback(connID, retryAfter)
-			}
-			return rt.sendWrongPasswordFeedback(connID)
+			username := rt.resolveUsername(ctx, userID)
+			return rt.triggerDoorbell(ctx, connID, userID, username, room)
 		}
-		if accessErr == domain.ErrAccessDenied && canBypass {
-			goto allowEntry
-		}
-		username := rt.resolveUsername(ctx, userID)
-		return rt.triggerDoorbell(ctx, connID, userID, username, room)
 	}
 allowEntry:
 	rt.clearPasswordFailures(userID, roomID)
@@ -134,11 +141,14 @@ allowEntry:
 	if err := rt.sendPacket(connID, packet.OpenConnectionComposer{}); err != nil {
 		return err
 	}
-	rt.leaveCurrentRoom(connID)
+	if err := rt.leaveCurrentRoom(connID); err != nil {
+		return err
+	}
 	rt.setRoomForConn(connID, roomID)
 	if rt.visitRecorder != nil {
 		_ = rt.visitRecorder.RecordVisit(ctx, userID, roomID)
 	}
+	_ = teleportEntry
 	return rt.sendRoomData(connID, userID, inst, room)
 }
 
@@ -222,7 +232,14 @@ func (rt *Runtime) sendRoomData(connID string, userID int, inst *engine.Instance
 		return err
 	}
 	if rt.floorItemSender != nil {
-		return rt.floorItemSender(context.Background(), connID, inst.RoomID)
+		if err := rt.floorItemSender(context.Background(), connID, inst.RoomID); err != nil {
+			return err
+		}
+	}
+	if rt.wallItemSender != nil {
+		if err := rt.wallItemSender(context.Background(), connID, inst.RoomID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -247,7 +264,11 @@ func (rt *Runtime) sendRoomPermissions(connID string, userID int, room domain.Ro
 // sendEntryEntities transmits entity list and enters the user.
 // If the user already has an entity in the room (e.g. duplicate GetRoomEntryData), it skips creation.
 func (rt *Runtime) sendEntryEntities(connID string, userID int, inst *engine.Instance) error {
+	pendingEntry, hasPendingEntry := rt.pendingTeleport(connID, inst.RoomID)
 	_, existing := rt.findEntityByConnID(connID, userID)
+	if existing != nil && hasPendingEntry {
+		rt.clearPendingTeleport(connID)
+	}
 	if existing == nil {
 		existingEntities := inst.Entities()
 		username, look, motto, gender := "", "", "", "M"
@@ -256,10 +277,24 @@ func (rt *Runtime) sendEntryEntities(connID string, userID int, inst *engine.Ins
 				username, look, motto, gender = u, l, m, g
 			}
 		}
-		entity := domain.NewPlayerEntity(0, userID, connID, username, look, motto, gender,
-			domain.Tile{X: inst.Layout.DoorX, Y: inst.Layout.DoorY, Z: inst.Layout.DoorZ, State: domain.TileOpen})
-		if err := rt.service.EnterRoom(context.Background(), inst, &entity, inst.RoomID, userID); err != nil {
-			return err
+		spawnTile := domain.Tile{X: inst.Layout.DoorX, Y: inst.Layout.DoorY, Z: inst.Layout.DoorZ, State: domain.TileOpen}
+		spawnDir := inst.Layout.DoorDir
+		if hasPendingEntry {
+			spawnTile = domain.Tile{X: pendingEntry.SpawnX, Y: pendingEntry.SpawnY, Z: pendingEntry.SpawnZ, State: domain.TileOpen}
+			spawnDir = pendingEntry.SpawnDir
+		}
+		entity := domain.NewPlayerEntity(0, userID, connID, username, look, motto, gender, spawnTile)
+		var enterErr error
+		if hasPendingEntry {
+			enterErr = rt.service.EnterRoomAt(context.Background(), inst, &entity, inst.RoomID, userID, spawnTile, spawnDir)
+		} else {
+			enterErr = rt.service.EnterRoom(context.Background(), inst, &entity, inst.RoomID, userID)
+		}
+		if enterErr != nil {
+			return enterErr
+		}
+		if hasPendingEntry {
+			rt.clearPendingTeleport(connID)
 		}
 		ctx := context.Background()
 		newEntities := []domain.RoomEntity{entity}
